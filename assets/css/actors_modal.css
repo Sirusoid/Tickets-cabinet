@@ -1,0 +1,181 @@
+/* Базовая обёртка модалки (backdrop + центрирование) */
+.actors-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    /* по умолчанию скрыта через aria-hidden */
+}
+
+/* Скрытие модалки, когда она закрыта */
+.actors-modal[aria-hidden="true"] {
+    display: none !important;
+}
+
+/* Полупрозрачный фон (backdrop) — отдельный элемент можно добавить в HTML при необходимости */
+.actors-modal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 9999;
+    pointer-events: auto;
+}
+
+/* Контейнер содержимого (карточка модалки) */
+.actors-modal-content {
+    position: relative;
+    z-index: 10000;
+    width: 600px;
+    max-width: calc(100% - 32px);
+    max-height: 80vh;
+    overflow-y: auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    box-sizing: border-box;
+    margin: 0;
+    transform: translateZ(0);
+    outline: none;
+	margin: auto;
+	margin-top: 100px;
+}
+
+/* Если по каким-то причинам flex центрирование конфликтует, можно добавить класс .use-fixed на .actors-modal,
+   тогда контейнер будет фиксированно центрирован через translate */
+.actors-modal.use-fixed .actors-modal-content {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Список актёров */
+.actors-list {
+    margin-top: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #fafafa;
+    box-sizing: border-box;
+}
+
+/* Элемент актёра */
+.actor-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    gap: 12px;
+    background: transparent;
+}
+.actor-item:last-child {
+    border-bottom: none;
+}
+.actor-item:hover {
+    background: #f0f0f0;
+}
+
+/* Фото актёра */
+.actor-photo {
+    width: 50px;
+    height: 50px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #e0e0e0;
+    flex: 0 0 50px;
+}
+
+/* Имя актёра */
+.actor-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: #222;
+    line-height: 1.2;
+}
+
+/* Чекбокс */
+.actor-item input[type="checkbox"] {
+    margin-right: 12px;
+    transform: scale(1.2);
+    flex: 0 0 auto;
+}
+
+/* Действия/кнопки модалки */
+.modal-actions,
+.actors-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Заголовок и кнопка закрытия (если используются внутри .actors-modal-content) */
+.actors-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #eee;
+}
+.actors-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #111;
+}
+.actors-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+}
+
+/* Плавное появление содержимого */
+.actors-modal[aria-hidden="false"] .actors-modal-content {
+    animation: actorsModalFadeIn .16s ease-out;
+}
+@keyframes actorsModalFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Фокусная подсветка для доступности */
+.actors-modal-content:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(13,110,253,0.08);
+}
+
+/* Блокировка прокрутки страницы при открытой модалке:
+   JS должен добавлять/удалять класс .no-scroll на <body> при открытии/закрытии */
+body.no-scroll {
+    overflow: hidden !important;
+    touch-action: none;
+}
+
+/* Responsive: уменьшение ширины и отступов на маленьких экранах */
+@media (max-width: 640px) {
+    .actors-modal-content {
+        width: calc(100% - 24px);
+        max-height: 92vh;
+        padding: 14px;
+        border-radius: 8px;
+    }
+    .actor-photo { width: 44px; height: 44px; }
+    .actor-name { font-size: 14px; }
+    .actors-modal-header h2 { font-size: 16px; }
+}
+
+/
+#actors-modal .actors-modal-content { 
+
+}

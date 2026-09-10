@@ -1,0 +1,1060 @@
+/* ===================================================================
+   assets/css/admin.css
+   Unified Admin UI stylesheet
+   Scope: wrap admin pages with <body class="admin-ui"> or .admin-ui container
+   =================================================================== */
+
+/* =========================
+   Design Tokens
+   ========================= */
+:root {
+  --admin-bg: #f7f8fb;
+  --card-bg: #ffffff;
+  --muted: #6b7280;
+  --text: #111827;
+  --accent: #2563eb;
+  --accent-600: #1e40af;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --surface-border: rgba(15,23,42,0.06);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-sm: 0 6px 18px rgba(15,23,42,0.06);
+  --shadow-md: 0 12px 36px rgba(15,23,42,0.08);
+  --gap-xs: 8px;
+  --gap-sm: 12px;
+  --gap-md: 18px;
+  --font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --base-font-size: 14px;
+  --muted: #6b7280;
+  --text: #111827;
+  --primary: #3b82f6;
+  --primary-600: #2563eb;
+  --danger: #dc2626;
+  --danger-700: #b91c1c;
+  --bg-muted: #f8fafc;
+}
+
+/* =========================
+   Global resets and box-sizing
+   ========================= */
+html { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+.admin-ui { 
+  font-family: var(--font-family);
+  font-size: var(--base-font-size);
+  color: var(--text);
+  background: var(--admin-bg);
+  line-height: 1.45;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* Unified controls for all cabinet pages. Layout classes may still set width. */
+.admin-ui input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+.admin-ui select,
+.admin-ui textarea,
+.admin-ui .input,
+.admin-ui .form-control {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid #d5dde8;
+  border-radius: 6px;
+  background: #fff;
+  color: #243447;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.35;
+  box-shadow: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+
+.admin-ui textarea,
+.admin-ui textarea.input,
+.admin-ui textarea.form-control {
+  min-height: 96px;
+  height: auto;
+  resize: vertical;
+}
+
+.admin-ui input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):focus,
+.admin-ui select:focus,
+.admin-ui textarea:focus,
+.admin-ui .input:focus,
+.admin-ui .form-control:focus {
+  border-color: #4a7aff;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(74, 122, 255, .14);
+  outline: none;
+}
+
+.admin-ui input::placeholder,
+.admin-ui textarea::placeholder {
+  color: #98a5b5;
+  opacity: 1;
+}
+
+.admin-ui .form-group > label,
+.admin-ui .schedule-panel.compact form > div > label,
+.admin-ui .settings-field label,
+.admin-ui .reports-filters label,
+.admin-ui .customers-filters label {
+  display: block;
+  margin-bottom: 6px;
+  color: #40526c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Compact filters keep the same control geometry as regular forms. */
+.admin-ui .schedule-panel.compact .form-control,
+.admin-ui .schedule-panel.compact .input {
+  min-height: 40px;
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+/* =========================
+   Layout primitives
+   ========================= */
+.container {
+  /*max-width: 1200px;*/
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Виджет в iframe на Тильде: убираем лишние отступы */
+.widget-iframe-mode {
+  padding: 0;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--surface-border);
+  padding: 16px;
+}
+
+/* Header / nav */
+.admin-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  border-bottom: 1px solid var(--surface-border);
+}
+.admin-header .brand a { font-weight:500; color:var(--accent); text-decoration:none; font-size:16px; }
+.admin-header nav a { margin-left:12px; color:var(--muted); text-decoration:none; font-size:14px; }
+
+.admin-header__user {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  color: #52647e;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.admin-header__user-role {
+  color: #718096;
+}
+
+.admin-header__user-name {
+  max-width: 280px;
+  overflow: hidden;
+  color: #243b5a;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .admin-header__user {
+    max-width: 48%;
+    font-size: 12px;
+  }
+
+  .admin-header__user-name {
+    max-width: 150px;
+  }
+}
+
+.admin-ui .admin-header nav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Базовый вид ссылок в шапке */
+.admin-ui .admin-header nav a {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background .12s ease, color .12s ease, transform .06s ease;
+  border: 1px solid transparent;
+}
+
+/* Hover / focus — соответствие общему дизайну (без градиента, плоская подсветка) */
+.admin-ui .admin-header nav a:hover,
+.admin-ui .admin-header nav a:focus {
+  background: rgba(37,99,235,0.08); /* мягкий акцентный фон */
+  color: var(--accent-600);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+/* Активная ссылка (текущая страница) — плоская заливка, контрастный текст */
+.admin-ui .admin-header nav a.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: rgba(0,0,0,0.04);
+  box-shadow: none;
+  transform: none;
+}
+
+
+/* Общие настройки кнопок в таблице */
+.events-list .actions .btn {
+  min-width: 92px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .12s ease, transform .06s ease;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Редактировать: поведение как в верхнем меню (тонкий hover) */
+.events-list .btn-ghost {
+  color: var(--text);
+  background: transparent;
+  border-color: transparent;
+}
+.events-list .btn-ghost:hover,
+.events-list .btn-ghost:focus {
+  background: rgba(37,99,235,0.08); /* совпадает с hover в шапке */
+  color: var(--accent-600);
+  border-color: rgba(37,99,235,0.12);
+  transform: translateY(-1px);
+  text-decoration: none;
+  outline: none;
+}
+
+/* Удалить: по умолчанию красный текст, при hover — красная заливка и белый текст */
+.events-list .btn-danger {
+  color: var(--danger);
+  background: transparent;
+  border-color: rgba(220,38,38,0.12);
+}
+.events-list .btn-danger:hover,
+.events-list .btn-danger:focus {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger-700);
+  box-shadow: 0 6px 18px rgba(220,38,38,0.12);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+/* --- Базовые кнопки (общие) --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .12s ease, transform .06s ease;
+  border: 1px solid transparent;
+  text-decoration: none;
+  user-select: none;
+}
+
+/* Ghost button — общий стиль */
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: transparent;
+}
+.btn-ghost:hover,
+.btn-ghost:focus {
+  background: rgba(37,99,235,0.08);
+  color: var(--accent-600);
+  border-color: rgba(37,99,235,0.12);
+  transform: translateY(-1px);
+}
+
+/* Danger button — общий стиль */
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: rgba(220,38,38,0.12);
+}
+.btn-danger:hover,
+.btn-danger:focus {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger-700);
+  box-shadow: 0 6px 18px rgba(220,38,38,0.12);
+  transform: translateY(-1px);
+}
+
+/* Primary button */
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: rgba(59,130,246,0.12);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--primary-600);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(37,99,235,0.12);
+  transform: translateY(-1px);
+}
+
+/* Restore btn-secondary visual style */
+.btn.btn-secondary,
+button.btn-secondary,
+a.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);                /* текст */
+  background-color: #f5f5f5;          /* фон */
+  border: 1px solid #eaeaea;          /* граница */
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+
+/* small variant */
+.btn.btn-sm.btn-secondary,
+button.btn-sm.btn-secondary,
+a.btn-sm.btn-secondary {
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 5px;
+}
+
+/* hover / focus */
+.btn.btn-secondary:hover,
+.btn.btn-secondary:focus,
+a.btn-secondary:hover,
+a.btn-secondary:focus {
+  background: rgba(37,99,235,0.08);
+  border-color: #eaeaea;
+  outline: none;
+  color: var(--accent-600);
+  transform: translateY(-1px);
+}
+
+/* active / pressed */
+.btn.btn-secondary:active,
+a.btn-secondary:active,
+button.btn-secondary:active {
+  background-color: #d6d9dc;
+  border-color: #c6cbd0;
+  transform: translateY(0.5px);
+}
+
+/* disabled */
+.btn.btn-secondary[disabled],
+.btn.btn-secondary.disabled,
+a.btn-secondary.disabled,
+button.btn-secondary[disabled] {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: default;
+}
+
+/* Размеры */
+.btn-sm { padding: 6px 10px; font-size: 13px; border-radius: var(--radius-sm); }
+.btn-xs { padding: 4px 8px; font-size: 12px; border-radius: var(--radius-sm); }
+
+/* --- Таблицы и карточки --- */
+.page-title { display:flex; align-items:center; justify-content:space-between; }
+
+/* Таблица компактная */
+.table { width:100%; border-collapse:collapse; }
+.table--compact th, .table--compact td { padding: 8px 10px; vertical-align: middle; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.04); }
+
+
+/* --- Hover highlight for table rows --- */
+.table tbody tr {
+  transition: background-color .12s ease, box-shadow .12s ease;
+}
+.table tbody tr:hover {
+  background-color: rgba(59,130,246,0.04); /* лёгкая голубая подсветка */
+  box-shadow: inset 0 0 0 1px rgba(59,130,246,0.03);
+}
+
+.table thead th { text-align:center; font-weight:600; color:var(--muted); font-size:13px; }
+
+/* Центрирование всего содержимого таблицы */
+.events-list table,
+.events-list table thead,
+.events-list table tbody {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Текст и inline-элементы по центру */
+.events-list table th,
+.events-list table td {
+  text-align: center;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* Картинки и миниатюры — по центру и не выходят за ячейку */
+.events-list td img,
+.events-list td .thumb {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  box-sizing: border-box;
+}
+
+/* Бейджи, ссылки, кнопки и элементы управления — центрируем внутри ячейки */
+.events-list td .badge,
+.events-list td a,
+.events-list td button,
+.events-list td .btn,
+.events-list td input,
+.events-list td select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Защита от full-width правил у кнопок */
+.events-list td a,
+.events-list td button,
+.events-list td .btn {
+  width: auto;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+/* Если в колонке действий кнопки вертикально (стек) — центрируем их */
+.events-list td.actions,
+.events-list td.actions.actions--center,
+.events-list .actions.actions--center {
+  display: flex;
+  flex-direction: column;    /* или row если нужно в одну строку */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+  box-sizing: border-box;
+}
+
+/* Мобильная адаптация: предотвращаем выход за границы */
+@media (max-width: 640px) {
+  .events-list table th,
+  .events-list table td {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .events-list td .btn,
+  .events-list td a,
+  .events-list td button {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  /* Если кнопки в колонке действий должны оставаться в столбик */
+  .events-list td.actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+/* Защита от псевдоэлементов, которые могут смещать визуал */
+.events-list td *::before,
+.events-list td *::after {
+  box-sizing: border-box;
+}
+
+/* Миниатюры */
+.events-list .thumb { width: 64px; height: auto; border-radius: 6px; object-fit: cover; }
+
+/* Статусы (бейджи) */
+.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; line-height: 1; color: white; background: #f3f4f6; border: 1px solid rgba(0,0,0,0.04); }
+/* Статус "Черновик" */
+.badge--draft { background:#f3f4f6; color:#374151; }
+/* Статус "Опубликовано" — светло-зелёный фон */
+.badge--published { background:#d1fae5; color:#065f46; border-color: rgba(6,95,70,0.08); }
+/* Статус "Архив" */
+.badge--archived { background:#fff7ed; color:#92400e; border-color: rgba(146,64,14,0.06); }
+
+/* No-data */
+.no-data { padding: 18px; color: var(--muted); text-align: center; }
+
+/* Toasts */
+/* Toast container: правый нижний угол */
+#toast-wrap {
+  position: fixed;
+  right: 16px;
+  bottom: 20px;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end; /* выравнивание тостов по правому краю */
+  pointer-events: none;
+  max-width: 360px;
+}
+
+/* Общий стиль тоста */
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: transform .22s ease, opacity .22s ease;
+  border: 1px solid rgba(0,0,0,0.06);
+  width: auto;
+  min-width: 160px;
+  max-width: 360px;
+  word-break: break-word;
+}
+
+/* Показать тост */
+.toast--show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Цвета по типу */
+.toast--info { background: #2f86eb; }
+.toast--success { background: #28a745; }
+.toast--error { background: #d9534f; }
+
+/* Кнопка закрытия */
+.toast__close {
+  margin-left: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.95);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+/* Мобильная адаптация: чуть левее и шире при маленьком экране */
+@media (max-width: 480px) {
+  #toast-wrap { right: 8px; left: 8px; align-items: center; }
+  .toast { max-width: calc(100% - 32px); }
+}
+
+
+
+/* Если у вас отдельный th/td с классом actions-col */
+.actions-col { width: 220px; text-align: center; }
+
+/* Кнопки внутри таблицы — минимальная ширина */
+.events-list .actions .btn { min-width: 92px; padding: 6px 10px; }
+
+/* Мобильная адаптация */
+@media (max-width: 640px) {
+  .events-list .actions .btn { min-width: 72px; padding: 6px 8px; font-size: 12px; }
+  .events-list td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .admin-header nav a { padding:6px 8px; margin-left:8px; }
+}
+
+/* Actions column vertical stack, centered, equal width, gap */
+.events-list td.actions,
+.events-list td.actions.actions--center,
+.events-list .actions.actions--center {
+  display: flex;
+  flex-direction: column;    /* кнопки друг под другом */
+  justify-content: center;   /* центр по вертикали */
+  align-items: center;       /* центр по горизонтали */
+  gap: 8px;                  /* отступ между кнопками */
+  padding: 8px 0;
+  box-sizing: border-box;
+}
+
+/* Контейнеры-кнопки: одинаковая ширина на десктопе, не выходят за границы */
+.events-list .actions > * {
+  flex: 0 0 auto;
+  width: 160px;              /* одинаковая ширина — при необходимости поменяйте */
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Кнопки/ссылки занимают всю ширину контейнера и центрируют текст */
+.events-list .actions a,
+.events-list .actions button,
+.events-list .actions .btn {
+  display: inline-flex;
+  width: 60%;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  margin: 5px;
+  box-sizing: border-box;
+}
+
+/* Мобильная адаптация: кнопки растягиваются по ширине ячейки, не выезжают */
+@media (max-width: 640px) {
+  .events-list td.actions,
+  .events-list td.actions.actions--center,
+  .events-list .actions.actions--center {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .events-list .actions > * {
+    width: calc(100% - 16px); /* оставляем небольшой внутренний отступ */
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .events-list .actions a,
+  .events-list .actions button,
+  .events-list .actions .btn {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+/* Защита от псевдоэлементов, которые могут смещать визуал */
+.events-list .actions > *::before,
+.events-list .actions > *::after {
+  display: none;
+}
+
+/* Modal base and backdrop */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Backdrop */
+.modal::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: none;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+/* Panel centered and responsive */
+.modal-panel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  max-width: 520px;
+  width: calc(100% - 32px);
+  margin: 24px;
+  transform: translateY(-6px);
+  transition: transform .18s ease, opacity .18s ease;
+  opacity: 0;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Header, body, footer */
+.modal-header { padding: 16px 20px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.modal-body { padding: 12px 16px; color: #333; }
+.modal-footer { padding: 12px 16px; border-top: 1px solid rgba(0,0,0,0.06); }
+
+/* Visible state */
+.modal[aria-hidden="false"] { display: flex; }
+.modal[aria-hidden="false"]::before { opacity: 1; }
+.modal[aria-hidden="false"] .modal-panel { transform: translateY(0); opacity: 1; }
+
+/* Buttons in footer */
+.modal-footer .btn { min-width: 96px; margin-left: 8px; }
+.modal-footer .btn:first-child { margin-left: 0; }
+
+/* Accessibility focus ring */
+.modal-panel:focus { box-shadow: 0 0 0 4px rgba(0,123,255,0.12); }
+
+/* Mobile tweaks */
+@media (max-width: 480px) {
+  .modal-panel { width: calc(100% - 24px); margin: 12px; border-radius: 6px; }
+  .modal-footer .btn { width: 100%; display: block; margin: 6px 0 0 0; }
+  .modal-footer { display: flex; flex-direction: column-reverse; align-items: stretch; }
+}
+
+
+/* Sidebar layout */
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  z-index: 1000;
+}
+.brand { display:flex; align-items:center; gap:10px; }
+.sidebar-toggle {
+  display:inline-block;
+  background:transparent;
+  border:none;
+  font-size:18px;
+  cursor:pointer;
+}
+
+/* Sidebar */
+/* Sidebar visual update */
+.admin-sidebar {
+  position: fixed;
+  left: 0;
+  top: 56px;
+  bottom: 0;
+  width: 220px;
+  background: #ffffff; /* белый фон панели */
+  color: #0f1724;
+  border-right: 1px solid #e6e9ee;
+  overflow-y: auto;
+  transition: transform .22s ease, box-shadow .22s ease;
+  z-index: 1000;
+}
+.admin-sidebar[aria-hidden="true"] { transform: translateX(-100%); }
+
+/* Sidebar inner spacing */
+.sidebar-inner { padding: 12px 10px; }
+
+/* Button-like menu items: иконка + лейбл как единый элемент */
+.sidebar-menu { display:flex; flex-direction:column; gap:8px; margin:0; padding:0; }
+.sidebar-button {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:8px;
+  text-decoration:none;
+  color: #334155; /* основной текст */
+  background: transparent;
+  border: 1px solid transparent;
+  font-family: inherit; /* тот же шрифт, что и в header */
+  font-size: 14px;
+  font-weight: 500;
+  transition: background .18s ease, color .18s ease, transform .12s ease;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Иконка внутри кнопки */
+.sidebar-button__icon {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px;
+  height:22px;
+  color: #64748b; /* нейтральный цвет иконки */
+  flex: 0 0 22px;
+}
+
+/* Лейбл */
+.sidebar-button__label { flex:1; text-align:left; white-space:nowrap; }
+
+/* Hover / focus — анимация фона и смена цвета шрифта */
+.sidebar-button:hover,
+.sidebar-button:focus {
+  background: linear-gradient(90deg, rgba(47,134,235,0.08), rgba(47,134,235,0.04));
+  color: #0f1724;
+  transform: translateY(-1px);
+  outline: none;
+}
+.sidebar-button:hover .sidebar-button__icon,
+.sidebar-button:focus .sidebar-button__icon {
+  color: #2f86eb;
+}
+
+/* Active state */
+.sidebar-button.is-active {
+  background: linear-gradient(90deg, rgba(47,134,235,0.12), rgba(47,134,235,0.06));
+  color: #0b3b66;
+  box-shadow: 0 4px 12px rgba(47,134,235,0.06);
+}
+.sidebar-button.is-active .sidebar-button__icon { color: #0b3b66; }
+
+.sidebar-submenu {
+  margin: 4px 0 10px;
+  padding: 6px 0 2px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-submenu.is-collapsed {
+  display: none;
+}
+
+.sidebar-settings-toggle {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.sidebar-settings-toggle__caret {
+  margin-left: auto;
+  color: #5d6c7d;
+  font-size: 13px;
+  line-height: 1;
+  transition: transform .14s ease;
+}
+
+.sidebar-settings-toggle[aria-expanded="true"] .sidebar-settings-toggle__caret {
+  transform: rotate(180deg);
+}
+
+.sidebar-submenu__link {
+  display: block !important;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #5d6c7d !important;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+  transition: background .14s ease, color .14s ease;
+  box-sizing: border-box;
+}
+
+.sidebar-submenu__link:hover,
+.sidebar-submenu__link:focus {
+  background: rgba(47,134,235,0.08);
+  color: #1f4f78;
+  outline: none;
+}
+
+.sidebar-submenu__link.is-active {
+  background: rgba(47,134,235,0.14);
+  color: #0b3b66;
+  border-color: rgba(47,134,235,0.2);
+  font-weight: 600;
+}
+
+/* Make sidebar buttons visually consistent with header buttons:
+   header buttons should use the same font-size, weight and hover animation.
+   Example header button rules (if not present already) */
+.header-link,
+.page-actions .btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background .18s ease, color .18s ease, transform .12s ease;
+}
+.header-link:hover,
+.page-actions .btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Layout adjustments when sidebar present */
+.with-sidebar .container { margin-left: 240px; padding: 18px; transition: margin-left .22s ease; }
+.sidebar-collapsed .admin-sidebar { transform: translateX(-100%); }
+.sidebar-collapsed .container { margin-left: 16px; }
+
+/* Responsive Sidebar*/
+@media (max-width: 900px) {
+  .admin-sidebar { width: 200px; top: 52px; }
+  .with-sidebar .container { margin-left: 0; padding: 12px; }
+  .sidebar-collapsed .container { margin-left: 0; }
+}
+
+/* Панели (независимые блоки) */
+.panel {
+  background: #fff;
+  border: 1px solid #e6e9ee;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.04);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.panel__inner { padding: 14px 16px; }
+
+/* Header panel (title + subtitle) */
+.panel--header .panel__inner {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.panel__meta { display:flex; flex-direction:column; gap:4px; }
+.panel__title { margin:0; font-size:20px; font-weight:600; color:#0f1724; }
+.panel__subtitle { color:#64748b; font-size:13px; }
+
+/* Actions in panel header (keeps same look as header buttons) */
+.panel__actions .btn { margin-left:8px; }
+
+/* Content panel: table container and floating controls */
+.table-panel { position:relative; }
+.table-panel__controls {
+  position:absolute;
+  top:12px;
+  right:12px;
+  z-index:20;
+  display:flex;
+  gap:8px;
+  pointer-events: none; /* чтобы кнопка не блокировала клики по таблице, но кнопка сама должна быть pointer-events:auto */
+}
+.table-panel__controls .floating-create {
+  pointer-events: auto;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* Table container: отступ сверху, чтобы кнопка не перекрывала заголовки таблицы */
+.table-container {
+  position:relative;
+}
+
+/* Если нужно, можно уменьшать padding-top на маленьких экранах */
+@media (max-width: 640px) {
+  .table-panel__controls { top:8px; right:8px; }
+  .table-container { padding-top: 56px; } /* кнопка может переноситься в поток на очень узких экранах */
+}
+
+/* Плавающая кнопка — визуально как обычная btn */
+.floating-create {
+  white-space:nowrap;
+  box-shadow: 0 6px 14px rgba(47,134,235,0.12);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+/* Если таблица узкая — кнопка переносится внутрь потока (адаптив) */
+@media (max-width: 520px) {
+  .table-panel__controls { position:static; margin-bottom:10px; pointer-events:auto; }
+  .table-container { padding-top: 0; }
+}
+
+/* actors form layout (использует существующие .input, .btn, .panel) */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 18px;
+  align-items: start;
+}
+.form-main { grid-column: 1 / 2; }
+.form-side { grid-column: 2 / 3; }
+
+.upload-box {
+  border: 1px dashed #e6e9ee;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  background: #fff;
+}
+.upload-preview {
+  max-width: 100%;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: block;
+}
+.file-input { width: 100%; }
+
+@media (max-width: 880px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-side { order: 2; }
+  .form-main { order: 1; }
+}
+
+
+.form-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 24px;
+}
+
+.form-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+@media (max-width: 900px) {
+    .form-two-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.poster-preview {
+    width: 100%;
+    aspect-ratio: 500 / 700; /* строгое соотношение 500x700 */
+    border-radius: 10px;
+    background: #f3f3f3;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+	margin-bottom: 20px;
+}
+
+.poster-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* или contain, если хочешь без обрезки */
+}
+
+
+/* --- Утилиты --- */
+.u-muted { color: var(--muted); font-size:13px; }
+.u-flex { display:flex; gap:8px; align-items:center; }
+
+/* Accessibility focus */
+.btn:focus { box-shadow: 0 0 0 3px rgba(37,99,235,0.12); outline: none; }
+
+/* --- Конец файла --- */

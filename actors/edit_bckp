@@ -1,0 +1,270 @@
+<?php
+require_once __DIR__ . '/../init.php';
+if (function_exists('require_login')) require_login();
+
+// Показываем ошибки в лог, но не в ответе
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+$use_sidebar = true;
+$active_menu = 'actors';
+$page_title_meta = 'Редактирование актёра';
+$panel_title = 'Редактирование актёра';
+$panel_subtitle = 'Изменение профиля актёра';
+$panel_actions = [
+  ['href'=>'/actors/list.php','label'=>'К списку актёров','class'=>'btn btn-primary btn-sm']
+];
+
+require __DIR__ . '/../includes/header.php';
+require __DIR__ . '/../includes/panel.php';
+
+$id = intval($_GET['id'] ?? 0);
+
+// Получаем профиль напрямую через PDO, чтобы исключить побочные эффекты обёрток
+try {
+    $pdo = db_connect();
+    $stmt = $pdo->prepare("SELECT * FROM event_actors WHERE id = :id LIMIT 1");
+    $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+    $actor = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    // Логируем и показываем аккуратное сообщение
+    error_log('actors/edit.php DB error: ' . $e->getMessage());
+    echo '<div class="panel panel--content"><div class="panel__inner"><div class="alert alert--danger">Ошибка при подключении к базе данных</div></div></div>';
+    require __DIR__ . '/../includes/footer.php';
+    exit;
+}
+
+if (!$actor) {
+    echo '<div class="panel panel--content"><div class="panel__inner"><div class="alert alert--danger">Актёр не найден</div></div></div>';
+    require __DIR__ . '/../includes/footer.php';
+    exit;
+}
+
+$csrf = $_SESSION['csrf_token'] ?? '';
+$links = json_decode($actor['social_links'] ?? '{}', true);
+if (!is_array($links)) $links = [];
+
+$birth = explode('-', $actor['birth_date'] ?? '');
+$bd = $birth[2] ?? '';
+$bm = $birth[1] ?? '';
+$by = $birth[0] ?? '';
+?>
+
+<link rel="stylesheet" href="/assets/css/actor_form.css">
+
+<div class="panel panel--content">
+  <div class="panel__inner">
+
+    <form id="actor-form" enctype="multipart/form-data" class="profile-layout">
+
+      <input type="hidden" name="action" value="update">
+      <input type="hidden" name="id" value="<?= h($actor['id']) ?>">
+      <input type="hidden" name="csrf_token" value="<?= h($csrf) ?>">
+
+      <!-- LEFT SIDE — PHOTO -->
+      <aside class="profile-photo">
+        <div class="photo-box">
+          <?php if (!empty($actor['photo_url'])): ?>
+            <img id="photo-preview" src="<?= h($actor['photo_url']) ?>" class="photo-preview">
+          <?php else: ?>
+            <img id="photo-preview" src="" class="photo-preview" style="display:none;">
+          <?php endif; ?>
+        </div>
+
+        <label class="btn btn-ghost btn-sm" style="margin-top:10px;">
+          Обновить фото
+          <input type="file" name="photo" id="photo-input" accept="image/*" hidden>
+        </label>
+
+        <?php if (!empty($actor['photo_url'])): ?>
+          <div style="margin-top:8px;">
+            <button type="button" class="btn btn-danger btn-sm" id="delete-photo-btn">Удалить фото</button>
+          </div>
+        <?php endif; ?>
+
+        <div class="photo-hint">JPG/PNG/WebP, до 3 МБ</div>
+      </aside>
+
+      <!-- RIGHT SIDE — FIELDS -->
+      <div class="profile-content">
+
+        <!-- CARD: Основная информация -->
+        <div class="profile-card">
+          <div class="card-title">Основная информация</div>
+
+          <label class="form-label">Имя актёра</label>
+          <input type="text" name="actor_name" class="input" required value="<?= h($actor['actor_name']) ?>">
+
+          <label class="form-label" style="margin-top:10px;">Дата рождения</label>
+          <div class="dob-grid">
+            <select name="birth_day" class="input">
+              <option value="">День</option>
+              <?php for ($d=1; $d<=31; $d++): ?>
+                <option value="<?= $d ?>" <?= ($d == intval($bd)) ? 'selected' : '' ?>><?= $d ?></option>
+              <?php endfor; ?>
+            </select>
+
+            <select name="birth_month" class="input">
+              <option value="">Месяц</option>
+              <?php
+              $months = [
+                1=>'Январь',2=>'Февраль',3=>'Март',4=>'Апрель',5=>'Май',6=>'Июнь',
+                7=>'Июль',8=>'Август',9=>'Сентябрь',10=>'Октябрь',11=>'Ноябрь',12=>'Декабрь'
+              ];
+              foreach ($months as $num=>$title): ?>
+                <option value="<?= $num ?>" <?= ($num == intval($bm)) ? 'selected' : '' ?>><?= $title ?></option>
+              <?php endforeach; ?>
+            </select>
+
+            <select name="birth_year" class="input">
+              <option value="">Год</option>
+              <?php for ($y = date('Y'); $y >= 1900; $y--): ?>
+                <option value="<?= $y ?>" <?= ($y == intval($by)) ? 'selected' : '' ?>><?= $y ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+        </div>
+
+        <!-- CARD: Контакты -->
+        <div class="profile-card">
+          <div class="card-title">Контакты</div>
+
+          <label class="form-label">E-mail</label>
+          <input type="email" name="email" class="input" value="<?= h($links['email'] ?? '') ?>">
+
+          <label class="form-label" style="margin-top:10px;">Телефон</label>
+          <input type="text" name="phone" class="input" value="<?= h($links['phone'] ?? '') ?>">
+        </div>
+
+        <!-- CARD: Соцсети -->
+        <div class="profile-card">
+          <div class="card-title">Социальные сети</div>
+
+          <label class="form-label">Instagram</label>
+          <input type="text" name="instagram" class="input" value="<?= h($links['instagram'] ?? '') ?>">
+
+          <label class="form-label" style="margin-top:10px;">Facebook</label>
+          <input type="text" name="facebook" class="input" value="<?= h($links['facebook'] ?? '') ?>">
+        </div>
+
+        <!-- CARD: Дополнительно -->
+        <div class="profile-card">
+          <div class="card-title">Дополнительно</div>
+
+          <label class="form-label">Биография</label>
+          <textarea name="bio" class="input" rows="5"><?= h($actor['bio']) ?></textarea>
+
+          <label class="form-label" style="margin-top:10px;">Порядок сортировки</label>
+          <input type="number" name="sort_order" class="input" value="<?= intval($actor['sort_order']) ?>">
+        </div>
+
+        <div id="messages" style="margin-top:12px;"></div>
+
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary">Сохранить изменения</button>
+        </div>
+
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var form = document.getElementById('actor-form');
+  var preview = document.getElementById('photo-preview');
+  var input = document.getElementById('photo-input');
+  var messages = document.getElementById('messages');
+  var deleteBtn = document.getElementById('delete-photo-btn');
+
+  if (input) {
+    input.addEventListener('change', function(){
+      var f = this.files && this.files[0];
+      if (!f) return;
+      preview.src = URL.createObjectURL(f);
+      preview.style.display = 'block';
+    });
+  }
+
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', function(){
+      if (!confirm('Удалить фото?')) return;
+
+      fetch('/ajax/actor.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          action: 'update',
+          remove_photo: '1',
+          id: '<?= h($actor['id']) ?>',
+          csrf_token: '<?= h($csrf) ?>'
+        })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(resp){
+        if (resp.success) {
+          preview.style.display = 'none';
+          preview.src = '';
+          deleteBtn.remove();
+          if (typeof window.showToast === 'function') {
+            window.showToast('Фото удалено', 'success', { duration: 1200 });
+          }
+        } else {
+          messages.innerHTML =
+            '<div class="alert alert--danger">' +
+            (resp.message || 'Ошибка удаления фото') +
+            (resp.diagnostic_text ? '<pre>'+resp.diagnostic_text+'</pre>' : '') +
+            '</div>';
+        }
+      })
+      .catch(function(err){
+        console.error(err);
+        messages.innerHTML = '<div class="alert alert--danger">Ошибка сети при удалении фото</div>';
+      });
+    });
+  }
+
+  if (!form) return;
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+
+    messages.innerHTML = '<div class="alert">Отправка...</div>';
+
+    var data = new FormData(form);
+
+    fetch('/ajax/actor.php', {
+      method: 'POST',
+      body: data,
+      credentials: 'same-origin'
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(resp){
+      if (resp.success) {
+        if (typeof window.showToast === 'function') {
+          window.showToast('Сохранено', 'success', { duration: 1200 });
+        }
+        setTimeout(function(){
+          window.location.href = '/actors/list.php';
+        }, 1200);
+      } else {
+        messages.innerHTML =
+          '<div class="alert alert--danger">' +
+          (resp.message || 'Ошибка') +
+          (resp.diagnostic_text ? '<pre>'+resp.diagnostic_text+'</pre>' : '') +
+          '</div>';
+      }
+    })
+    .catch(function(err){
+      console.error(err);
+      messages.innerHTML = '<div class="alert alert--danger">Ошибка сети</div>';
+    });
+  });
+})();
+</script>
+
+<?php require __DIR__ . '/../includes/footer.php'; ?>

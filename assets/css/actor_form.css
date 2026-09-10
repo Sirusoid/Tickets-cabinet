@@ -1,0 +1,135 @@
+/* Общий стиль формы */
+.profile-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+ 	gap: 28px;
+}
+
+/* Карточки */
+.profile-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    border: 1px solid #e8e8e8;
+	margin-bottom: 22px;
+}
+
+/* Заголовки карточек */
+.profile-card .card-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: #222;
+}
+
+/* Поля ввода */
+.input,
+textarea.input,
+select.input {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid #d5dde8;
+    background: #fff;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+
+.input:focus,
+textarea.input:focus,
+select.input:focus {
+    border-color: #4a8cff;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(74, 122, 255, .14);
+    outline: none;
+}
+
+/* Сетка даты рождения */
+.dob-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+/* Фото */
+.photo-box {
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #f3f3f3;
+    border: 1px solid #e2e2e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Кнопки */
+.btn {
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+}
+
+/* 🔥 Биография на всю ширину */
+.profile-bio-full {
+    grid-column: 1 / -1; /* растягиваем на 2 колонки */
+}
+
+.profile-bio-full textarea {
+    min-height: 180px;
+    resize: vertical;
+}
+
+.profile-card {
+    margin-bottom: 26px;
+}
+
+.photo-actions {
+    display: flex;
+    gap: 10px;              /* расстояние между кнопками */
+    margin-top: 12px;
+}
+
+.photo-actions .btn {
+    flex: 1;                /* одинаковая ширина */
+    text-align: center;
+    white-space: nowrap;
+}
+
+.actors-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.actors-select {
+    width: 100%;
+    height: calc(7 * 1.6em + 14px);
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #dcdcdc;
+    background: #fafafa;
+    font-size: 14px;
+}
+
+.other-details-textarea {
+    width: 100%;
+    height: calc(7 * 1.6em + 14px);
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #dcdcdc;
+    background: #fafafa;
+    resize: vertical;
+    font-size: 14px;
+}

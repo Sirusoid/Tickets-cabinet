@@ -1,0 +1,255 @@
+.customers-page {
+  padding: 0 18px 20px;
+}
+
+.customers-filter-panel {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 14px;
+}
+
+.customers-filters {
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  align-items: end;
+}
+
+.customers-filters label {
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.customers-filters__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 1px;
+}
+
+.customers-filter-bottom {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.customers-per-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customers-per-page label {
+  margin: 0;
+  color: #666;
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.customers-per-page .form-control {
+  width: 110px;
+}
+
+.customers-field-wrap {
+  position: relative;
+}
+
+.customers-suggestions {
+  position: absolute;
+  z-index: 1400;
+  top: calc(100% + 3px);
+  right: 0;
+  left: 0;
+  display: none;
+}
+
+.customers-suggestions .typeahead-item span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.customers-table-wrap {
+  overflow-x: auto;
+}
+
+.customers-results-card {
+  padding: 12px;
+}
+
+.customers-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+.customers-table th,
+.customers-table td {
+  vertical-align: middle;
+}
+
+.customers-table tbody tr[data-id],
+.customers-table tbody tr {
+  transition: background-color .12s ease;
+}
+
+.customers-table tbody tr:hover {
+  background: rgba(37, 99, 235, .04);
+}
+
+.customers-table td:nth-child(1),
+.customers-table td:nth-child(2) {
+  color: #6b7280;
+}
+
+.customers-table td:nth-child(4),
+.customers-table td:nth-child(5) {
+  color: #40526c;
+}
+
+.customers-empty {
+  padding: 24px 12px !important;
+  color: #6b7280;
+  text-align: center;
+}
+
+.customers-empty--error {
+  color: #b42318 !important;
+}
+
+#customersTbody.is-loading {
+  opacity: .55;
+  transition: opacity .12s ease;
+}
+
+.customers-message {
+  padding: 12px 14px;
+  border-radius: 6px;
+}
+
+.customers-message--error {
+  color: #b42318;
+  border: 1px solid #f3c5c0;
+  background: #fff8f7;
+}
+
+.customers-pager {
+  display: flex;
+  min-width: 900px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.customer-edit-modal {
+  position: fixed;
+  z-index: 2100;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.customer-edit-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .48);
+}
+
+.customer-edit-modal__box {
+  position: relative;
+  width: 620px;
+  max-width: 100%;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, .2);
+}
+
+.customer-edit-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.customer-edit-modal__head h3 {
+  margin: 0;
+  color: #243b5a;
+  font-size: 18px;
+}
+
+.customer-edit-form__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.customer-edit-form textarea {
+  min-height: 96px;
+  margin-bottom: 14px;
+}
+
+.customer-edit-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.customer-edit-form__error {
+  min-height: 20px;
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 13px;
+}
+
+  .customer-edit-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+.customers-summary {
+  color: #666;
+}
+
+.customers-pager__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.customers-pager button:disabled {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .customers-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .customers-filters__actions {
+    justify-content: flex-start;
+  }
+
+  .customers-filter-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .customers-pager {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,12 @@
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<FilesMatch "\.pdf$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+</FilesMatch>
+
+Options -Indexes -ExecCGI
+AddType application/pdf .pdf

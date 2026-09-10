@@ -1,0 +1,48 @@
+/* Стили для виджета афиши Жас Сахна на Тильде */
+
+#zhassahna-afisha {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+#zhassahna-afisha .zhassahna-buy-btn {
+    text-decoration: none;
+    display: inline-block;
+}
+
+#zhassahna-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    z-index: 2147483647 !important;
+    font-family: TildaSans, Arial, sans-serif;
+}
+
+#zhassahna-modal iframe {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+@media screen and (max-width: 768px) {
+    #zhassahna-modal {
+        padding: 0 !important;
+    }
+    #zhassahna-modal iframe {
+        height: 100vh !important;
+        border-radius: 0 !important;
+    }
+    #zhassahna-modal button {
+        top: 8px !important;
+        right: 8px !important;
+    }
+}

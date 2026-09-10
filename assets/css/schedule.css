@@ -1,0 +1,212 @@
+/* assets/css/schedule.css
+   Стили для модуля расписания (add / list)
+*/
+
+/* Layout */
+.container-full {
+  max-width: 100%;
+  padding-left: 18px;
+  padding-right: 18px;
+  box-sizing: border-box;
+}
+.page-header h3 { margin:0; }
+
+/* Top layout: left panel + right canvas */
+.schedule-layout {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Left column: control panel */
+.schedule-panel {
+  width: 560px;
+  min-width: 420px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.03);
+  box-sizing: border-box;
+}
+
+/* Compact variant: denser spacing and grid layout */
+.schedule-panel.compact { padding: 10px; }
+.compact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  align-items: start;
+}
+.schedule-panel.compact .form-group { margin: 0; }
+.schedule-panel.compact label { font-size:12px; margin-bottom:6px; font-weight:600; color:#333; }
+.schedule-panel.compact .form-control { padding:9px 12px; font-size:14px; }
+
+/* Right column: canvas */
+.schedule-canvas-wrap {
+  flex: 1;
+  min-height: 600px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+/* Canvas container and canvas */
+.canvas-inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#editor-canvas {
+  width: 100%;
+  height: 760px;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  display: block;
+}
+
+/* Full width block under both columns */
+.full-width-block {
+  margin-top: 18px;
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+
+/* Compact form */
+.schedule-panel .form-group { margin-bottom: 10px; }
+.schedule-panel label { display:block; font-weight:600; margin-bottom:6px; font-size:13px; color:#333; }
+.form-control { width:100%; padding:9px 12px; min-height:40px; font-size:14px; border:1px solid #d5dde8; border-radius:6px; box-sizing:border-box; }
+
+/* Price ranges table */
+#priceRangesTable { width:100%; border-collapse:collapse; margin-top:8px; table-layout:fixed; }
+#priceRangesTable th, #priceRangesTable td { padding:6px 8px; border-bottom:1px solid #f0f0f0; font-size:13px; vertical-align:middle; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#priceRangesTable input[type="number"], #priceRangesTable input[type="text"] { width:100%; box-sizing:border-box; padding:6px; }
+
+/* Buttons */
+.panel-actions { display:flex; gap:8px; margin-top:12px; }
+.btn { cursor:pointer; }
+.btn-ghost { background:transparent; border:1px solid #ddd; padding:6px 10px; border-radius:4px; }
+.btn-primary { background:#2f86eb; color:#fff; border:0; padding:8px 12px; border-radius:4px; }
+.btn-secondary { background:#6c757d; color:#fff; border:0; padding:8px 12px; border-radius:4px; }
+
+/* Table compact */
+.table--compact td, .table--compact th { padding: 6px 8px; font-size: 13px; }
+
+.status-label {
+  display:inline-block;
+  padding:2px 6px;
+  border-radius:4px;
+  font-size:12px;
+  font-weight:600;
+  color:#fff;
+}
+
+/* Статусные метки — унифицировано с отображением в списке мероприятий */
+.badge {
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:18px;
+  font-size:12px;
+  font-weight:400;
+  line-height:1;
+  border:1px solid transparent;
+}
+
+/* Аккуратный отступ и одинаковый размер для кнопок действий */
+.actions-col .action-buttons {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:flex-end;
+}
+.actions-col .btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  font-size:13px;
+  padding:6px 10px;
+  min-width:115px;
+  height:34px;
+  box-sizing:border-box;
+}
+.actions-col .btn.btn-xs {
+  padding:6px 10px;
+  font-size:13px;
+  height:34px;
+  min-width:86px;
+}
+.actions-col .btn-ghost {
+  background:transparent;
+  border:1px solid #d0d0d0;
+}
+.actions-col .btn-danger {
+  display: inline-flex;
+  width: 60%;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  margin: 5px;
+  box-sizing: border-box;
+}
+.table.admin-table tr[data-id] { transition: background .12s ease; }
+.table.admin-table tr[data-id]:hover { background: rgba(0,0,0,0.03); }
+
+.status-active { background:#1a7f37; }
+.status-upcoming { background:#2d6fa3; }
+.status-draft { background:#b36b00; }
+.status-archive { background:#555; }
+.status-cancelled { background:#a00; }
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .schedule-layout { flex-direction: column; }
+  .schedule-panel { width:100%; }
+  #editor-canvas { height:420px; }
+  .compact-grid { grid-template-columns: 1fr; }
+}
+
+/* --- Дополнительные правки для фильтров --- */
+/* Класс для белых лейблов в фильтрах */
+.filter-label--white {
+  color: #fff !important;
+}
+
+/* --- Typeahead dropdown styles (минимальные) --- */
+.typeahead-dropdown {
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.typeahead-item {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #f5f5f5;
+  background: #fff;
+}
+.typeahead-item:hover {
+  background: #f6f9ff;
+}
+.typeahead-item strong {
+  font-weight:700;
+}
+
+.has-overlap {
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12) inset, 0 0 0 2px rgba(192, 57, 43, 0.06);
+  border-color: #e74c3c !important;
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}

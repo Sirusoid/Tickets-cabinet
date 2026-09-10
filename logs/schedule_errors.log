@@ -1,0 +1,4 @@
+2026-08-08T16:21:42+05:00 CREATE ERROR: SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'base_price' cannot be null
+#0 /var/www/vhosts/zhassahna.kz/cabinet.zhassahna.kz/ajax/schedule.php(251): PDOStatement->execute()
+#1 {main}
+

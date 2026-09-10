@@ -1,0 +1,183 @@
+/* ============================================================
+   FORMS — unified styling for all admin forms
+   Author: Фёдор + Copilot
+   ============================================================ */
+
+/* --- Base form layout --- */
+.form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    width: 100%;
+}
+
+/* --- Form blocks (sections) --- */
+.form-block {
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px 26px;
+    box-shadow: 0 6px 18px rgba(20,20,30,0.04);
+    border: 1px solid #ececec;
+}
+
+.form-block h2 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #111;
+}
+
+/* --- Form groups --- */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid #d5dde8;
+    background: #fff;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #4a7aff;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(74, 122, 255, .14);
+    outline: none;
+}
+
+/* --- Textarea --- */
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* --- Grid rows --- */
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 18px;
+}
+
+/* --- Image preview --- */
+.image-preview {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f6f7fb, #f3f5fb);
+    border: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.image-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* --- Image actions --- */
+.image-actions-inline {
+    display: flex;
+    gap: 10px;
+}
+
+.image-actions-inline button {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+	margin: auto;
+}
+
+/* --- Bottom actions --- */
+.form-actions-bottom {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+}
+
+/* --- Alerts --- */
+.alert {
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.alert--danger {
+    background: #ffe5e5;
+    border: 1px solid #ffb3b3;
+    color: #a30000;
+}
+
+.alert--warning {
+    background: #fff7e0;
+    border: 1px solid #ffe7a3;
+    color: #7a5a00;
+}
+
+/* --- Responsive --- */
+@media (max-width: 720px) {
+    .form-row-2,
+    .form-row-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.actors-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.actors-select {
+    width: 100%;
+    min-height: 40px;
+    height: calc(7 * 1.6em + 14px);
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid #d5dde8;
+    background: #fff;
+    font-size: 14px;
+}
+
+.other-details-textarea {
+    width: 100%;
+    height: calc(7 * 1.6em + 14px);
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid #d5dde8;
+    background: #fff;
+    resize: vertical;
+    font-size: 14px;
+}
+
+

@@ -1,0 +1,105 @@
+/* /assets/css/actors_grid.css */
+
+/* Сетка карточек */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+  align-items: start;
+  margin: 0;
+  padding: 0;
+}
+
+/* Карточка актёра */
+.actor-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(20,20,30,0.04);
+  border: 1px solid #ececec;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: transform .12s ease, box-shadow .12s ease;
+  overflow: hidden;
+}
+
+.actor-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(20,20,30,0.06);
+}
+
+/* Ссылка-обёртка (кликабельная область) */
+.card-link {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+  flex: 1 1 auto;
+}
+
+/* Фото */
+/* Квадратное фото в карточке */
+.card-photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;           /* современный способ: всегда квадрат */
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg,#f6f7fb,#f3f5fb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;             /* сохраняет кадрирование без искажений */
+  display: block;
+}
+
+/* Инфо */
+.card-info h3 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  line-height: 1.2;
+  color: #111;
+  font-weight: 600;
+}
+
+.card-info .meta {
+  font-size: 13px;
+  color: #556;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Действия */
+.card-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Кнопки */
+.btn {
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* Плейсхолдер фото */
+.photo-placeholder {
+  color: #9aa;
+  font-size: 13px;
+  padding: 12px;
+  text-align: center;
+}
+
+/* Адаптив: на маленьких экранах делаем карточки чуть выше */
+@media (max-width: 520px) {
+  .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}

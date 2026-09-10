@@ -1,0 +1,124 @@
+/* assets/css/cashier.css */
+.layout-columns { display:flex; gap:16px; }
+.col-left { flex: 1 1 60%; }
+.col-right { flex: 0 0 340px; }
+.card { background:#fff; border:1px solid #e6e6e6; padding:12px; border-radius:6px; }
+.session-row { padding:8px 6px; border-bottom:1px solid #f0f0f0; display:flex; justify-content:space-between; align-items:center; }
+#cartList div { padding:6px 0; display:flex; justify-content:space-between; align-items:center; }
+/* assets/css/cashier.css */
+
+/* Badge styles for statuses */
+.cash-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #999;
+  line-height: 1;
+}
+
+/* Ожидание: тёмно-синий фон, белый текст */
+.cash-badge--upcoming {
+  background: #0b3d91; /* dark blue */
+  color: #ffffff;
+}
+
+/* Активный: тёмно-зелёный фон, белый текст */
+.cash-badge--active {
+  background: #1f6f3a; /* dark green */
+  color: #ffffff;
+}
+
+/* Table tweaks */
+.table--striped tbody tr:nth-child(odd) {
+  background: #fff;
+}
+.table--striped tbody tr:nth-child(even) {
+  background: #fbfbfb;
+}
+
+/* Table cells */
+#sessionsTable td, #sessionsTable th {
+  padding: 10px 8px;
+  vertical-align: middle;
+  border-bottom: 1px solid #eee;
+	  text-align: center;
+}
+
+/* Ensure two-line date/time look */
+#sessionsTable td div {
+  white-space: nowrap;
+}
+
+/* Price column: increased by 25% (from 100px to 125px) */
+#sessionsTable th.col-price,
+#sessionsTable td.col-price {
+  width: 125px;
+  max-width: 125px;
+  white-space: nowrap;
+}
+
+/* Small adjustments for action button */
+#sessionsTable .btn {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+/* Responsive: allow table to scroll horizontally on small screens */
+#sessionsContainer {
+  overflow-x: auto;
+}
+
+/* Optional: visually separate badge cell */
+.cash-badge-cell {
+  text-align: left;
+}
+
+.seats-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 18px;
+}
+.seats-loader .loader {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0,0,0,0.12);
+  border-top-color: rgba(0,0,0,0.45);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* small visual tweak for updated seat numbers */
+.seats-number {
+  font-weight: 600;
+  color: #222;
+}
+
+  /* Make disabled release button visually distinct */
+  #releaseHoldBtn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(20%);
+    box-shadow: none !important;
+    transform: none !important;
+  }
+  /* Optional stronger visual when enabled */
+  #releaseHoldBtn:not([disabled]) {
+    opacity: 1;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  #releaseHoldBtn:not([disabled]):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  }
+  /* Accessible focus outline */
+  #releaseHoldBtn:focus {
+    outline: 3px solid rgba(255, 221, 87, 0.35);
+    outline-offset: 2px;
+  }
