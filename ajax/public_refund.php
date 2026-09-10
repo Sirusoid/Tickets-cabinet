@@ -160,11 +160,24 @@ curl_close($ch);
 
 if ($body === false || $curlError !== '') {
     error_log('[BCC REFUND] Gateway request error for ' . $order . ': ' . $curlError);
+    try {
+        // Сетевой сбой означает, что BCC не подтвердил получение запроса.
+        // Освобождаем заявку, чтобы возврат можно было повторить после восстановления банка.
+        bcc_mark_refund_result($pdo, $order, [
+            'ACTION' => '',
+            'RC' => 'TRANSPORT_ERROR',
+            'RC_TEXT' => $curlError !== '' ? $curlError : 'BCC gateway connection failed',
+            'ORDER' => $order,
+        ], false, 'bcc_refund_transport_error');
+    } catch (Throwable $exception) {
+        error_log('[BCC REFUND] Could not mark transport error for ' . $order . ': ' . $exception->getMessage());
+    }
     public_refund_response([
-        'success' => true,
-        'state' => 'processing',
-        'message' => 'Запрос на возврат принят. Банк подтвердит результат отдельно.',
-    ], 202);
+        'success' => false,
+        'state' => 'rejected',
+        'code' => 'transport_error',
+        'message' => 'Не удалось подключиться к банку. Возврат не отправлен, повторите попытку позже.',
+    ], 502);
 }
 
 $responseData = bcc_parse_gateway_response((string)$body);
