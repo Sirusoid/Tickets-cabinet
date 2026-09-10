@@ -170,7 +170,7 @@ require __DIR__ . '/../includes/panel.php';
 	<?php endif; ?>
 
 	<form method="post" class="form-grid settings-form">
-		<section class="form-block settings-block">
+		<section class="form-block settings-block" style="width:100%">
 			<h2 class="settings-block__title">Матрица ролей</h2>
 			<p class="settings-hint">Права применяются к отображению разделов в меню и к доступу в страницы настроек. У роли Администратор доступ всегда полный.</p>
 
