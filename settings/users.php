@@ -156,7 +156,7 @@ require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
 ?>
 
-<div class="settings-shell">
+<div class="settings-shell settings-users-page">
 	<?php if ($saveSuccess): ?>
 		<div class="alert settings-alert settings-alert--success"><?= h($saveSuccess) ?></div>
 	<?php endif; ?>
