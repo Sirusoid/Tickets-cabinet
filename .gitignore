@@ -1,0 +1,6 @@
+.env
+*.log
+uploads/reports/*
+uploads/tickets/*
+!uploads/reports/.gitkeep
+!uploads/tickets/.gitkeep
