@@ -63,3 +63,20 @@ https://cabinet.zhassahna.kz/payment/bcc/return.php
 ```
 https://zhassahna.kz/widget-test
 ```
+
+## Безопасный production-деплой
+
+Перед публикацией задайте в окружении PHP-FPM/Apache/Plesk переменные из `.env.example`:
+
+- `ZHASSAHNA_APP_ENV=production`;
+- `ZHASSAHNA_DB_HOST`, `ZHASSAHNA_DB_PORT`, `ZHASSAHNA_DB_NAME`;
+- `ZHASSAHNA_DB_USER`, `ZHASSAHNA_DB_PASS`;
+- `ZHASSAHNA_TICKET_PUBLIC_SECRET` — длинная случайная строка.
+
+В Plesk задайте переменные в настройках домена/обработчика PHP или в окружении PHP-FPM. Значения должны быть доступны именно PHP-процессу, а не только shell-пользователю. Секрет `ZHASSAHNA_TICKET_PUBLIC_SECRET` должен оставаться неизменным, иначе старые публичные ссылки на заказы перестанут проходить проверку.
+
+Не храните реальные значения в `config.php`, `.env` или репозитории. После изменения окружения перезапустите PHP-FPM/OPcache.
+
+Корень сайта направляет неавторизованных пользователей на `/login.php`, а авторизованных — на `/dashboard.php`. Сессия использует HttpOnly/SameSite cookie, strict mode, регенерацию ID после входа и таймаут бездействия 8 часов.
+
+Корневой `.htaccess` и правила внутренних каталогов закрывают исходники, зависимости, SQL, логи, служебные скрипты и выполнение PHP из `uploads/`. Не удаляйте эти правила при публикации.

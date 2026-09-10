@@ -49,7 +49,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // 4) Пути
 if (!defined('APP_ROOT')) {
-    define('APP_ROOT', realpath(__DIR__ . '/..'));
+    define('APP_ROOT', realpath(__DIR__));
 }
 if (!defined('APP_NAME')) {
     // Если по какой-то причине APP_NAME не задан в config.php — ставим безопасный дефолт
@@ -146,6 +146,9 @@ $GLOBALS['currentUser'] = $currentUser;
 if (!function_exists('db_fetch_all')) {
     function db_fetch_all($sql, $params = []) {
         global $pdo;
+        if (!isset($pdo) || !($pdo instanceof PDO)) {
+            throw new RuntimeException('Database connection is not available');
+        }
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -154,6 +157,9 @@ if (!function_exists('db_fetch_all')) {
 if (!function_exists('db_fetch_one')) {
     function db_fetch_one($sql, $params = []) {
         global $pdo;
+        if (!isset($pdo) || !($pdo instanceof PDO)) {
+            throw new RuntimeException('Database connection is not available');
+        }
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -162,6 +168,9 @@ if (!function_exists('db_fetch_one')) {
 if (!function_exists('db_query')) {
     function db_query($sql, $params = []) {
         global $pdo;
+        if (!isset($pdo) || !($pdo instanceof PDO)) {
+            throw new RuntimeException('Database connection is not available');
+        }
         $stmt = $pdo->prepare($sql);
         return $stmt->execute($params);
     }

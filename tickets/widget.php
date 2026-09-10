@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/payment/bcc.php';
+require_once __DIR__ . '/../includes/settings_manager.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     @session_start();
@@ -14,6 +15,19 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     if (!isset($pdo) || !($pdo instanceof PDO)) {
         $pdo = db_connect();
     }
+}
+
+if (app_setting_enabled($pdo, 'system.maintenance_enabled')) {
+    $skip_require_login = true;
+    $use_sidebar = false;
+    $hide_admin_header = true;
+    require_once __DIR__ . '/../includes/header.php';
+    $maintenanceHtml = function_exists('maintenance_response_html')
+        ? maintenance_response_html($pdo)
+        : '<div style="padding:48px;text-align:center;font-family:Arial,sans-serif"><h1>Мы скоро вернёмся</h1><p>Сайт временно обновляется. Спасибо за терпение.</p></div>';
+    echo $maintenanceHtml;
+    require_once __DIR__ . '/../includes/footer.php';
+    exit;
 }
 
 $cfg = bcc_config($pdo);

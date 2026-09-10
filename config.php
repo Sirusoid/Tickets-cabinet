@@ -2,16 +2,38 @@
 // config.php — централизованные настройки приложения
 // Все основные константы должны задаваться только в этом файле.
 
+// Локальный fallback для Plesk/Apache, где переменные окружения PHP-FPM не проброшены.
+// В production предпочтительно задавать их в окружении домена, а не хранить в web-root.
+$envFile = __DIR__ . DIRECTORY_SEPARATOR . '.env';
+if (is_file($envFile) && is_readable($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $envLine) {
+        $envLine = trim($envLine);
+        if ($envLine === '' || $envLine[0] === '#' || strpos($envLine, '=') === false) {
+            continue;
+        }
+        [$envKey, $envValue] = explode('=', $envLine, 2);
+        $envKey = trim($envKey);
+        $envValue = trim($envValue);
+        if ($envValue !== '' && (($envValue[0] === '"' && substr($envValue, -1) === '"') || ($envValue[0] === "'" && substr($envValue, -1) === "'"))) {
+            $envValue = substr($envValue, 1, -1);
+        }
+        if ($envKey !== '' && getenv($envKey) === false) {
+            putenv($envKey . '=' . $envValue);
+        }
+    }
+}
+
 // База данных
-define('DB_HOST', 'localhost');
-define('DB_PORT', '3306');
-define('DB_NAME', 'p-318444_theater_db');
-define('DB_USER', 'p-318444_theater_user');
-define('DB_PASS', 'Zhas_sahna_123');
+// База данных. Значения задаются переменными окружения на сервере.
+define('DB_HOST', getenv('ZHASSAHNA_DB_HOST') ?: 'localhost');
+define('DB_PORT', getenv('ZHASSAHNA_DB_PORT') ?: '3306');
+define('DB_NAME', getenv('ZHASSAHNA_DB_NAME') ?: '');
+define('DB_USER', getenv('ZHASSAHNA_DB_USER') ?: '');
+define('DB_PASS', getenv('ZHASSAHNA_DB_PASS') ?: '');
 
 // Окружение приложения: 'development' или 'production'
 // Раскомментируйте для локальной разработки:
-define('APP_ENV', 'development');
+define('APP_ENV', getenv('ZHASSAHNA_APP_ENV') ?: 'production');
 if (!defined('APP_ENV')) {
     define('APP_ENV', getenv('APP_ENV') ?: 'production');
 }
@@ -36,7 +58,7 @@ define('TILDA_WIDGET_ORIGIN', 'https://zhassahna.kz');
 
 // Секрет для подписи публичных ссылок на билеты (order + uid).
 // При смене этого ключа старые ссылки перестанут работать.
-define('TICKET_PUBLIC_SECRET', '90675a6dd98235c5a29e9369a4f473aa7cd047726055a2f5bf46801be4eae25a');
+define('TICKET_PUBLIC_SECRET', getenv('ZHASSAHNA_TICKET_PUBLIC_SECRET') ?: '');
 
 // Таймзона по умолчанию
 define('DEFAULT_TIMEZONE', 'Asia/Almaty');

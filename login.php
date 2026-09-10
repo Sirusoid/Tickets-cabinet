@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $now = time();
     $lockedUntil = (int)($_SESSION['login_locked_until'] ?? 0);
+    $maxAttempts = security_setting_int('security.max_login_attempts', 5);
+    $lockoutMinutes = security_setting_int('security.login_lockout_minutes', 15);
 
     if ($lockedUntil > $now) {
         $error = 'Слишком много попыток. Повторите вход позже.';
@@ -22,8 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('dashboard.php');
     } else {
         $_SESSION['login_attempts'] = (int)($_SESSION['login_attempts'] ?? 0) + 1;
-        if ($_SESSION['login_attempts'] >= 5) {
-            $_SESSION['login_locked_until'] = $now + 900;
+        if ($_SESSION['login_attempts'] >= $maxAttempts) {
+            $_SESSION['login_locked_until'] = $now + ($lockoutMinutes * 60);
         }
         $error = 'Неверный логин или пароль.';
     }

@@ -4,11 +4,37 @@ function current_user()
     return $_SESSION['user'] ?? null;
 }
 
+function security_setting_int(string $key, int $default): int
+{
+    global $pdo;
+    if (!isset($pdo) || !($pdo instanceof PDO)) {
+        return $default;
+    }
+    return max(1, (int)app_setting_value($pdo, $key, $default));
+}
+
+function password_policy_errors(string $password): array
+{
+    global $pdo;
+    $minLength = security_setting_int('security.password_min_length', 8);
+    $errors = [];
+    if (strlen($password) < $minLength) {
+        $errors[] = 'Пароль должен содержать минимум ' . $minLength . ' символов.';
+    }
+    if (isset($pdo) && $pdo instanceof PDO) {
+        if (app_setting_enabled($pdo, 'security.password_require_uppercase') && !preg_match('/[A-ZА-ЯЁ]/u', $password)) $errors[] = 'Пароль должен содержать заглавную букву.';
+        if (app_setting_enabled($pdo, 'security.password_require_lowercase') && !preg_match('/[a-zа-яё]/u', $password)) $errors[] = 'Пароль должен содержать строчную букву.';
+        if (app_setting_enabled($pdo, 'security.password_require_number') && !preg_match('/\d/', $password)) $errors[] = 'Пароль должен содержать цифру.';
+        if (app_setting_enabled($pdo, 'security.password_require_special') && !preg_match('/[^\p{L}\p{N}]/u', $password)) $errors[] = 'Пароль должен содержать специальный символ.';
+    }
+    return $errors;
+}
+
 function require_login()
 {
     $user = $_SESSION['user'] ?? null;
     $now = time();
-    $idleTimeout = 8 * 60 * 60;
+    $idleTimeout = security_setting_int('security.session_idle_minutes', 480) * 60;
 
     if (!is_array($user) || empty($user['id'])) {
         redirect('/login.php');

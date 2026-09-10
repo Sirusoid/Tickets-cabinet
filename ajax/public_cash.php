@@ -42,6 +42,10 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     json_response(['success' => false, 'message' => 'База данных недоступна']);
 }
 
+if (app_setting_enabled($pdo, 'system.maintenance_enabled')) {
+    json_response(['success' => false, 'message' => 'Сайт временно обновляется. Скоро вернёмся.']);
+}
+
 $raw = file_get_contents('php://input');
 $input = [];
 if ($raw) {

@@ -27,6 +27,11 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     exit;
 }
 
+if (app_setting_enabled($pdo, 'system.maintenance_enabled')) {
+    echo json_encode(['html' => maintenance_response_html($pdo), 'maintenance' => true], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $widgetBaseUrl = defined('PUBLIC_BASE_URL') ? (string)constant('PUBLIC_BASE_URL') : 'https://cabinet.zhassahna.kz';
 $widgetBaseUrl = rtrim($widgetBaseUrl, '/');
 

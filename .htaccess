@@ -1,0 +1,37 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+# Never expose repository metadata, configuration, dependency metadata, or backups.
+<FilesMatch "^(?:\.env(?:\..*)?|\.git|composer\.(?:json|lock)|config(?:\.local)?\.php|init\.php|.*\.(?:bak|bck|dist|ini|log|sql|md|yml|yaml|sqlite|db))$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Disable direct access to one-off administrative, diagnostic, and maintenance scripts.
+<FilesMatch "^(?:add_admin|diagnose|install(?:_bckp)?|update_admin_password|fix_bcc_backref_db)\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Do not expose internal application directories through Apache.
+RewriteEngine On
+RewriteRule ^(?:includes|vendor|sql|logs|tools|tests|cgi-bin)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:\.git|\.vscode)(?:/|$) - [F,L,NC]
+RewriteRule ^widget/diag\.php$ - [F,L,NC]
+
+# Do not allow executable files to be served from upload directories.
+RewriteRule ^uploads/.*\.(?:php[0-9]?|phtml|phar|cgi|pl|py|sh)$ - [F,L,NC]
+
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+</IfModule>

@@ -58,9 +58,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						if (!isset($roles[$role])) {
 								$saveErrors[] = 'Указана недопустимая роль.';
 						}
-						if (strlen($password) < 8) {
-								$saveErrors[] = 'Пароль должен содержать минимум 8 символов.';
-						}
+						$saveErrors = array_merge($saveErrors, password_policy_errors($password));
 						if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 								$saveErrors[] = 'Некорректный email.';
 						}
@@ -133,9 +131,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						if ($userId <= 0) {
 								$saveErrors[] = 'Некорректный идентификатор пользователя.';
 						}
-						if (strlen($newPassword) < 8) {
-								$saveErrors[] = 'Новый пароль должен содержать минимум 8 символов.';
-						}
+						$saveErrors = array_merge($saveErrors, password_policy_errors($newPassword));
 
 						if (empty($saveErrors)) {
 								$stmt = $pdo->prepare('UPDATE users SET password_hash = :password_hash, password_changed_at = NOW(), failed_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = :id');

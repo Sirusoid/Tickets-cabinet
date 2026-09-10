@@ -4,6 +4,7 @@
 // Использует $pdo из init.php. Включает безопасную проверку CSRF.
 
 require_once __DIR__ . '/../init.php';
+require_login();
 header('Content-Type: application/json; charset=utf-8');
 
 $action = $_REQUEST['action'] ?? '';

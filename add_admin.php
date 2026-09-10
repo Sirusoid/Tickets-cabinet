@@ -1,5 +1,10 @@
 <?php
-// add_or_update_admin.php
+// Bootstrap utility. Run from CLI only with a one-time environment password.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 require_once __DIR__ . '/init.php';
 
 try {
@@ -8,8 +13,11 @@ try {
         die("Ошибка: db_connect() не вернул объект PDO");
     }
 
-    $username      = "admin";
-    $plainPassword = "admin123";
+    $username      = getenv('ZHASSAHNA_BOOTSTRAP_ADMIN_USER') ?: 'admin';
+    $plainPassword = getenv('ZHASSAHNA_BOOTSTRAP_ADMIN_PASSWORD') ?: '';
+    if ($plainPassword === '') {
+        throw new RuntimeException('Set ZHASSAHNA_BOOTSTRAP_ADMIN_PASSWORD for this one-time CLI utility.');
+    }
     $passwordHash  = password_hash($plainPassword, PASSWORD_DEFAULT);
 
     $fullName = "Администратор";
@@ -29,7 +37,7 @@ try {
             WHERE username = ?
         ");
         $stmt->execute([$passwordHash, $fullName, $role, $email, $username]);
-        echo "Пароль пользователя '{$username}' обновлён! Новый пароль: {$plainPassword}";
+        echo "Пользователь '{$username}' обновлён." . PHP_EOL;
     } else {
         // Добавляем нового пользователя
         $stmt = $pdo->prepare("
@@ -37,7 +45,7 @@ try {
             VALUES (?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([$username, $passwordHash, $fullName, $role, $email]);
-        echo "Пользователь '{$username}' добавлен! Пароль: {$plainPassword}";
+        echo "Пользователь '{$username}' добавлен." . PHP_EOL;
     }
 } catch (Throwable $e) {
     echo "Ошибка: " . $e->getMessage();

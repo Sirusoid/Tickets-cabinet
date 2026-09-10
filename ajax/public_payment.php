@@ -44,6 +44,10 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     json_response(['success' => false, 'message' => 'База данных недоступна']);
 }
 
+if (app_setting_enabled($pdo, 'system.maintenance_enabled')) {
+    json_response(['success' => false, 'message' => 'Сайт временно обновляется. Скоро вернёмся.']);
+}
+
 if (!bcc_is_enabled($pdo)) {
     json_response(['success' => false, 'message' => 'Оплата картой временно недоступна']);
 }

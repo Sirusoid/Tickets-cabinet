@@ -4,6 +4,45 @@ function h($value)
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+if (!function_exists('app_setting_value')) {
+    function app_setting_value(PDO $pdo, string $key, $default = null)
+    {
+        try {
+            $row = db_fetch_one('SELECT value FROM settings WHERE `key` = ? LIMIT 1', [$key]);
+            return $row && array_key_exists('value', $row) && $row['value'] !== null
+                ? $row['value']
+                : $default;
+        } catch (Throwable $exception) {
+            return $default;
+        }
+    }
+}
+
+if (!function_exists('app_setting_enabled')) {
+    function app_setting_enabled(PDO $pdo, string $key, bool $default = false): bool
+    {
+        $value = strtolower(trim((string)app_setting_value($pdo, $key, $default ? '1' : '0')));
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
+    }
+}
+
+if (!function_exists('maintenance_response_html')) {
+    function maintenance_response_html(PDO $pdo): string
+    {
+        $title = trim((string)app_setting_value($pdo, 'system.maintenance_title', 'Мы скоро вернёмся'));
+        $message = trim((string)app_setting_value($pdo, 'system.maintenance_message', 'Мы обновляем сайт и скоро снова будем доступны. Спасибо за терпение!'));
+        $title = $title !== '' ? $title : 'Мы скоро вернёмся';
+        $message = $message !== '' ? $message : 'Мы обновляем сайт и скоро снова будем доступны. Спасибо за терпение!';
+        return '<div style="min-height:70vh;display:flex;align-items:center;justify-content:center;padding:32px;background:#f7f8fb;font-family:Arial,sans-serif;color:#172b4d">'
+            . '<div style="max-width:620px;text-align:center;padding:42px 34px;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 18px 50px rgba(23,43,77,.10)">'
+            . '<div style="font-size:48px;line-height:1;margin-bottom:18px">✦</div>'
+            . '<h1 style="margin:0 0 14px;font-size:30px">' . htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1>'
+            . '<p style="margin:0;color:#60728a;font-size:17px;line-height:1.65">' . nl2br(htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>'
+            . '<p style="margin:24px 0 0;color:#8a97a6;font-size:13px">Приносим извинения за неудобства. Спасибо, что вы с нами.</p>'
+            . '</div></div>';
+    }
+}
+
 function customer_phone_digits($phone): string
 {
     return preg_replace('/\D+/', '', trim((string)$phone));
