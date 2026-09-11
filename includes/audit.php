@@ -43,4 +43,25 @@ if (!function_exists('audit_log_event')) {
             error_log('[AUDIT] Не удалось записать действие: ' . $e->getMessage());
         }
     }
+
+    if (!function_exists('audit_action_label')) {
+        function audit_action_label($action): string
+        {
+            $labels = [
+                'auth.login' => 'Вход в систему',
+                'auth.logout' => 'Выход из системы',
+                'sale:create' => 'Продажа в кассе',
+                'hold:create' => 'Резервирование мест',
+                'ticket.create' => 'Создание билета',
+                'ticket.refund' => 'Возврат билета',
+                'payment.sale_completed' => 'Онлайн-покупка',
+                'payment.refund_completed' => 'Возврат через BCC',
+                'payment.refund_rejected' => 'Отклонённый возврат BCC',
+                'report.export_xlsx' => 'Экспорт отчёта продаж',
+                'report.ticket_export_xlsx' => 'Экспорт списка билетов',
+            ];
+            $key = (string)$action;
+            return $labels[$key] ?? ($key !== '' ? $key : 'Системное действие');
+        }
+    }
 }

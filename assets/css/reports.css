@@ -38,6 +38,12 @@
   gap: 8px;
 }
 
+.dashboard-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .reports-eyebrow {
   margin-bottom: 6px;
   color: #2563eb;

@@ -41,8 +41,14 @@ try {
             s.start_time,
             e.title AS event_title,
             h.name AS hall_name,
-            COUNT(t.id) AS sold_tickets,
-            COALESCE(SUM(t.price), 0) AS sold_amount
+            COUNT(CASE WHEN t.payment_status = 'paid'
+                AND t.status <> 'cancelled'
+                AND COALESCE(t.refund_status, 'none') <> 'refunded' THEN 1 END) AS sold_tickets,
+            COALESCE(SUM(CASE WHEN t.payment_status = 'paid'
+                AND t.status <> 'cancelled'
+                AND COALESCE(t.refund_status, 'none') <> 'refunded' THEN t.price ELSE 0 END), 0) AS sold_amount,
+            COUNT(CASE WHEN t.refund_status = 'refunded' THEN 1 END) AS refund_tickets,
+            COALESCE(SUM(CASE WHEN t.refund_status = 'refunded' THEN t.price ELSE 0 END), 0) AS refund_amount
         FROM schedules s
         LEFT JOIN events e ON e.id = s.event_id
         LEFT JOIN halls h ON h.id = s.hall_id
@@ -50,7 +56,9 @@ try {
             AND t.payment_status = 'paid'
             AND t.status <> 'cancelled'
             AND COALESCE(t.refund_status, 'none') <> 'refunded'
-        WHERE DATE(s.start_time) = CURDATE()
+        WHERE s.start_time >= NOW()
+            AND s.start_time < DATE_ADD(NOW(), INTERVAL 7 DAY)
+            AND s.status IN ('upcoming', 'active')
         GROUP BY s.id, s.start_time, e.title, h.name
         ORDER BY s.start_time ASC");
 } catch (Throwable $e) {
@@ -71,7 +79,7 @@ require __DIR__ . '/includes/panel.php';
         <div class="reports-toolbar__intro">
             <div class="reports-eyebrow">Рабочий день</div>
             <h3>Сегодня, <?= h(reporting_format_date(date('Y-m-d'))) ?></h3>
-            <p>Основные показатели кассы и ближайшие сеансы без лишних деталей.</p>
+            <p>Основные показатели кассы и сеансы на ближайшие 7 дней.</p>
         </div>
         <div class="dashboard-actions">
             <a class="btn btn-primary" href="/cash/index.php">Открыть кассу</a>
@@ -105,33 +113,40 @@ require __DIR__ . '/includes/panel.php';
     <section class="card reports-section reports-section--wide">
         <div class="reports-section__head">
             <div>
-                <h3>Сеансы сегодня</h3>
-                <p>Продажи сгруппированы по спектаклю и времени сеанса.</p>
+                <h3>Ближайшие сеансы</h3>
+                <p>Продажи сгруппированы по спектаклю и времени сеанса. Excel выгружается отдельно по каждому сеансу.</p>
             </div>
         </div>
         <div class="reports-table-wrap">
             <table class="admin-table table--compact reports-table reports-table--wide">
                 <thead>
                     <tr>
-                        <th>Время</th>
+                        <th>Дата и время</th>
                         <th>Спектакль</th>
                         <th>Зал</th>
                         <th>Продано</th>
                         <th>Выручка</th>
+                        <th>Возвраты</th>
                         <th>Действие</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!$todaySessions): ?>
-                        <tr><td colspan="6" class="reports-empty">На сегодня сеансов нет.</td></tr>
+                        <tr><td colspan="7" class="reports-empty">На ближайшие 7 дней сеансов нет.</td></tr>
                     <?php else: foreach ($todaySessions as $session): ?>
                         <tr>
-                            <td><?= h(date('H:i', strtotime((string)$session['start_time']))) ?></td>
+                            <td><?= h(reporting_format_date($session['start_time'], true)) ?></td>
                             <td><strong><?= h($session['event_title'] ?? 'Без названия') ?></strong></td>
                             <td><?= h($session['hall_name'] ?? '—') ?></td>
                             <td><?= number_format((int)$session['sold_tickets'], 0, '.', ' ') ?></td>
                             <td><?= number_format((float)$session['sold_amount'], 2, '.', ' ') ?> тг</td>
-                            <td><a class="btn btn-ghost btn-sm" href="/cash/sell.php?session_id=<?= (int)$session['id'] ?>">Открыть кассу</a></td>
+                            <td><?= number_format((float)$session['refund_amount'], 2, '.', ' ') ?> тг</td>
+                            <td>
+                                <div class="dashboard-row-actions">
+                                    <a class="btn btn-ghost btn-sm" href="/cash/sell.php?session_id=<?= (int)$session['id'] ?>">Касса</a>
+                                    <a class="btn btn-secondary btn-sm" href="/reports/session_export_excel.php?session_id=<?= (int)$session['id'] ?>">Excel</a>
+                                </div>
+                            </td>
                         </tr>
                     <?php endforeach; endif; ?>
                 </tbody>
