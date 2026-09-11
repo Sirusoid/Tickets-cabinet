@@ -1,6 +1,7 @@
 <?php
 // Компактная рабочая панель кассира и администратора.
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/includes/reporting.php';
 require_login();
 
 $use_sidebar = true;
@@ -69,7 +70,7 @@ require __DIR__ . '/includes/panel.php';
     <div class="reports-toolbar card dashboard-toolbar">
         <div class="reports-toolbar__intro">
             <div class="reports-eyebrow">Рабочий день</div>
-            <h3>Сегодня, <?= h(date('d.m.Y')) ?></h3>
+            <h3>Сегодня, <?= h(reporting_format_date(date('Y-m-d'))) ?></h3>
             <p>Основные показатели кассы и ближайшие сеансы без лишних деталей.</p>
         </div>
         <div class="dashboard-actions">

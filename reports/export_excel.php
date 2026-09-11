@@ -88,9 +88,9 @@ foreach ($rows as $row) {
     $totals['paid'] += $financials['paid'];
 
     $details[] = [
-        !empty($row['purchased_at']) ? date('d.m.Y H:i', strtotime($row['purchased_at'])) : '',
+        !empty($row['purchased_at']) ? reporting_format_date($row['purchased_at'], true) : '',
         (string)($row['event_title'] ?? ''),
-        !empty($row['session_start']) ? date('d.m.Y H:i', strtotime($row['session_start'])) : '',
+        !empty($row['session_start']) ? reporting_format_date($row['session_start'], true) : '',
         (string)($row['ticket_uid'] ?? ''),
         str_replace(':', ' - ', (string)($row['seat_identifier'] ?? '')),
         reporting_segment_label($row['customer_segment'] ?? ''),
@@ -121,7 +121,7 @@ $summarySheet = $spreadsheet->getActiveSheet();
 $summarySheet->setTitle('Сводка');
 $summarySheet->fromArray([
     ['Отчёт продаж', null, null, null, null, null],
-    ['Период', $dateFrom . ' — ' . $dateTo, null, null, null, null],
+    ['Период', reporting_format_date_range($dateFrom, $dateTo), null, null, null, null],
     ['Билетов', $totals['tickets'], 'Цена без скидки, тг', $totals['original'], 'Скидка, тг', $totals['discount']],
     ['Оплачено, тг', $totals['paid'], null, null, null, null],
     [],
@@ -131,7 +131,7 @@ $summaryRow = 7;
 foreach ($summary as $item) {
     $summarySheet->fromArray([[
         $item['event_title'],
-        $item['session_start'] !== '' ? date('d.m.Y H:i', strtotime($item['session_start'])) : '',
+        $item['session_start'] !== '' ? reporting_format_date($item['session_start'], true) : '',
         $item['tickets'],
         round($item['original'], 2),
         round($item['discount'], 2),

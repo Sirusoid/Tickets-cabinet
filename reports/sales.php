@@ -194,6 +194,7 @@ $avgDiscount = $totals['tickets'] > 0 ? ($totals['discount'] / $totals['tickets'
 $netAfterRefunds = max(0.0, $totals['net'] - $refundTotals['amount']);
 $today = date('Y-m-d');
 $yesterday = date('Y-m-d', strtotime('-1 day'));
+$displayDateRange = reporting_format_date_range($dateFrom, $dateTo);
 $exportUrl = '/reports/export_excel.php?' . http_build_query([
 		'date_from' => $dateFrom,
 		'date_to' => $dateTo,
@@ -250,7 +251,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 		</div>
 
 		<div class="reports-meta-row">
-			<div><span>Период</span><strong><?= h($dateFrom) ?> — <?= h($dateTo) ?></strong></div>
+			<div><span>Период</span><strong><?= h($displayDateRange) ?></strong></div>
 			<div><span>Средняя скидка</span><strong><?= number_format((float)$avgDiscount, 2, '.', ' ') ?> тг на билет</strong></div>
 			<div class="reports-meta-row__refund"><span>Возвраты</span><strong>-<?= number_format((float)$refundTotals['amount'], 2, '.', ' ') ?> тг</strong></div>
 		</div>
@@ -320,7 +321,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 					?>
 						<tr>
 							<td><strong><?= h($item['event_title']) ?></strong></td>
-							<td><?= $item['schedule_start'] !== '' ? h(date('d.m.Y H:i', strtotime($item['schedule_start']))) : '—' ?></td>
+							<td><?= $item['schedule_start'] !== '' ? h(reporting_format_date($item['schedule_start'], true)) : '—' ?></td>
 							<td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td>
 							<td><?= number_format((float)$item['original'], 2, '.', ' ') ?> тг</td>
 							<td class="reports-number--discount">-<?= number_format((float)$item['discount'], 2, '.', ' ') ?> тг</td>
