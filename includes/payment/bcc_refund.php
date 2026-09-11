@@ -184,15 +184,18 @@ if (!function_exists('bcc_build_refund_form')) {
 if (!function_exists('bcc_parse_gateway_response')) {
     function bcc_parse_gateway_response(string $body): array
     {
-        $data = [];
-        parse_str(trim($body), $data);
-        if (!empty($data)) {
-            return $data;
+        $trimmedBody = trim($body);
+        if ($trimmedBody !== '') {
+            $json = json_decode($trimmedBody, true);
+            if (is_array($json)) {
+                return $json;
+            }
         }
 
-        $json = json_decode($body, true);
-        if (is_array($json)) {
-            return $json;
+        $data = [];
+        parse_str($trimmedBody, $data);
+        if (!empty($data)) {
+            return $data;
         }
 
         if (preg_match_all('/name=["\']([^"\']+)["\'][^>]*value=["\']([^"\']*)["\']/i', $body, $matches, PREG_SET_ORDER)) {
