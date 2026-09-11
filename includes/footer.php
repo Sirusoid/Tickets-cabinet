@@ -124,7 +124,6 @@ $page_scripts = $page_scripts ?? [];
         var id = btn.getAttribute('data-id') || '';
         var name = btn.getAttribute('data-name') || '';
         if (!id) {
-          console.warn('delete button without data-id');
           return;
         }
         // meta.action и meta.id используются для автоматического удаления в этом файле
@@ -160,9 +159,7 @@ $page_scripts = $page_scripts ?? [];
       // Навигация на страницу редактирования актёра
       try {
         window.location.href = '/actors/edit.php?id=' + encodeURIComponent(id);
-      } catch (err) {
-        console.error('Row/card navigation failed', err);
-      }
+      } catch (err) {}
     }, false);
 
     // Кнопки модалки
@@ -247,9 +244,7 @@ $page_scripts = $page_scripts ?? [];
                 }
               }
             }
-          } catch (e) {
-            console.warn('Remove element by data-id failed', e);
-          }
+          } catch (e) {}
 
           // Обновляем счётчик "Всего", если он есть
           try {
@@ -278,8 +273,7 @@ $page_scripts = $page_scripts ?? [];
             alert(msg);
           }
         }
-      }).catch(function(err){
-        console.error('Delete request failed', err);
+      }).catch(function(){
         btnConfirm.disabled = false;
         btnConfirm.textContent = prevText;
         hideModalDelete();

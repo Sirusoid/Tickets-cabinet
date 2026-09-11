@@ -145,8 +145,7 @@
             else if (typeof window.showToast === 'function') window.showToast(msg, 'error', { duration: 3000 });
           }
         })
-        .catch(function (err) {
-          console.error('Image upload failed', err);
+        .catch(function () {
           setPreview(null);
           if (typeof window.showInfoModal === 'function') window.showInfoModal('Ошибка сети при загрузке изображения', 'Ошибка');
           else if (typeof window.showToast === 'function') window.showToast('Ошибка сети при загрузке изображения', 'error', { duration: 3000 });
@@ -183,8 +182,7 @@
           else if (typeof window.showToast === 'function') window.showToast(msg, 'error', { duration: 3000 });
         }
       })
-      .catch(function (err) {
-        console.error('Image delete failed', err);
+      .catch(function () {
         if (typeof window.showInfoModal === 'function') window.showInfoModal('Ошибка сети при удалении изображения', 'Ошибка');
         else if (typeof window.showToast === 'function') window.showToast('Ошибка сети при удалении изображения', 'error', { duration: 3000 });
       });
@@ -229,8 +227,7 @@
         html += '</div>';
         actorsListWrap.innerHTML = html;
       })
-      .catch(function (err) {
-        console.error('Load actors failed', err);
+      .catch(function () {
         actorsListWrap.innerHTML = '<div class="alert alert--danger">Ошибка сети</div>';
       });
   }
@@ -372,7 +369,6 @@
               namesArr = parsed.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
             }
           } catch (e) {
-            console.warn('Failed to parse cast_list JSON string', e);
           }
         }
       }
@@ -397,8 +393,7 @@
             if (submitBtn) submitBtn.disabled = false;
           }
         })
-        .catch(function (err) {
-          console.error('Event save failed', err);
+        .catch(function () {
           if (typeof window.showInfoModal === 'function') window.showInfoModal('Ошибка сети при сохранении мероприятия', 'Ошибка');
           else if (typeof window.showToast === 'function') window.showToast('Ошибка сети при сохранении мероприятия', 'error', { duration: 3000 });
           if (submitBtn) submitBtn.disabled = false;

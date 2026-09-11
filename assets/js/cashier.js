@@ -79,7 +79,6 @@ var Cashier = (function () {
       try { return fn(); }
       catch (e) {
         window._cashier_last_error = { name: name || 'anonymous', message: e.message, stack: e.stack };
-        console.error('Cashier runtime error in', name || 'anonymous', e);
         return null;
       }
     }
@@ -393,12 +392,10 @@ var Cashier = (function () {
             price: price
           });
         } catch (inner) {
-          console.warn('buildSeatsPayload inner error for key', k, inner && inner.message);
         }
       });
       return seats;
     } catch (e) {
-      console.error('buildSeatsPayload error', e);
       return [];
     }
   }
@@ -769,7 +766,6 @@ var Cashier = (function () {
           });
         }
       } catch (e) {
-        console.error('SeatmapViewer fallback error', e);
       }
     } else if (typeof window.seatmapViewer !== 'undefined' && window.seatmapViewer._internal) {
       try {
@@ -807,10 +803,8 @@ var Cashier = (function () {
           } catch (err) { /* ignore */ }
         });
       } catch (e) {
-        console.error('legacy seatmapViewer integration error', e);
       }
     } else {
-      console.warn('No seatmap renderer available. Canvas will remain empty.');
       showToast('seatmap renderer не загружен. Схема не будет отрисована.');
     }
   }
@@ -904,7 +898,6 @@ var Cashier = (function () {
       }
     }
     if (!canvasEl) {
-      console.error('Canvas element not found: ' + ids.canvasId);
       return;
     }
 
@@ -932,7 +925,6 @@ var Cashier = (function () {
       try {
         if (onSessionLoaded && session) onSessionLoaded(session);
       } catch (e) {
-        console.error('onSessionLoaded callback error', e);
       }
 
       var seatMap = null, priceRanges = null;
@@ -987,7 +979,6 @@ var Cashier = (function () {
             renderer.render();
           });
         } catch (err) {
-          console.error('Renderer init error', err);
           initLegacyViewerFallback(seatMap, pricedSeats, pricedColors, sold);
         }
       } else if (typeof window.SeatmapRenderer !== 'undefined' && typeof window.SeatmapRenderer.create === 'function') {
@@ -1025,7 +1016,6 @@ var Cashier = (function () {
             renderer.render();
           });
         } catch (err) {
-          console.error('Renderer global init error', err);
           initLegacyViewerFallback(seatMap, pricedSeats, pricedColors, sold);
         }
       } else {
@@ -1107,7 +1097,6 @@ var Cashier = (function () {
           };
 
           // debug (temporary)
-          // console.log('SELL payload', payload);
 
           ajax('sell', payload, function (resp) {
             if (!resp || !resp.success) {

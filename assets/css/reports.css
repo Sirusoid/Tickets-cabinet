@@ -27,6 +27,17 @@
   font-size: 13px;
 }
 
+.dashboard-toolbar {
+  grid-template-columns: minmax(230px, 1fr) auto;
+}
+
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .reports-eyebrow {
   margin-bottom: 6px;
   color: #2563eb;
@@ -142,6 +153,10 @@
   padding: 18px;
 }
 
+.reports-section--wide {
+  margin-top: 14px;
+}
+
 .reports-section__head {
   display: flex;
   justify-content: space-between;
@@ -156,11 +171,16 @@
 .reports-table td, .reports-table th { padding: 11px 10px; }
 .reports-table tbody tr:last-child td { border-bottom: 0; }
 .reports-number--success { color: #15803d !important; }
+.reports-number--discount { color: #b45309 !important; }
+.reports-number--refund { color: #b42318 !important; }
 .reports-empty { padding: 28px 12px !important; color: #718096 !important; text-align: center; }
 .reports-alert--danger { margin-bottom: 14px; color: #b42318; border-color: #f3c5c0; background: #fff8f7; }
+.reports-table--wide { min-width: 820px; }
 
 @media (max-width: 1100px) {
   .reports-toolbar { grid-template-columns: 1fr; gap: 15px; }
+  .dashboard-toolbar { grid-template-columns: 1fr; }
+  .dashboard-actions { justify-content: flex-start; }
   .reports-kpi-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
 }
 

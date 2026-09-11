@@ -11,14 +11,13 @@
         s.src = src;
         s.async = true;
         s.onload = cb;
-        s.onerror = function () { console.error('Failed to load ' + src); };
+        s.onerror = function () {};
         document.head.appendChild(s);
     }
 
     function init() {
         var container = document.getElementById(containerId);
         if (!container) {
-            console.warn('Zhassahna widget: container #' + containerId + ' not found');
             return;
         }
 
@@ -40,7 +39,6 @@
             }
         })
         .catch(function (err) {
-            console.error(err);
             container.innerHTML = '<h3 style="text-align:center;">Ошибка загрузки афиши</h3>';
         });
     }

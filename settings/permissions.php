@@ -34,6 +34,7 @@ $roles = [
 
 $modules = [
 		'dashboard' => ['label' => 'Панель', 'path' => '/dashboard.php'],
+		'reports' => ['label' => 'Отчёты', 'path' => '/reports/sales.php'],
 		'cash' => ['label' => 'Касса', 'path' => '/cash/index.php'],
 		'schedule' => ['label' => 'Расписание', 'path' => '/schedule/list.php'],
 		'events' => ['label' => 'Мероприятия', 'path' => '/events/list.php'],
@@ -56,6 +57,7 @@ $defaultMatrix = [
 		'admin' => [],
 		'manager' => [
 				'dashboard' => true,
+				'reports' => true,
 				'cash' => true,
 				'schedule' => true,
 				'events' => true,
@@ -75,6 +77,7 @@ $defaultMatrix = [
 		],
 		'cashier' => [
 				'dashboard' => true,
+				'reports' => true,
 				'cash' => true,
 				'schedule' => true,
 				'events' => false,

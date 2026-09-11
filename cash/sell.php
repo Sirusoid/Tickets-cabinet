@@ -731,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function(){
       fetch('/ajax/cash.php?action=customer_search&phone=' + encodeURIComponent(q), { credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(res){ if (res && res.success) renderResults(phoneResults, res.data); })
-        .catch(function(e){ console.error('customer_search phone error', e); });
+        .catch(function(){});
     }
 
     function searchByName() {
@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', function(){
       fetch('/ajax/cash.php?action=customer_search&query=' + encodeURIComponent(q), { credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(res){ if (res && res.success) renderResults(nameResults, res.data); })
-        .catch(function(e){ console.error('customer_search name error', e); });
+        .catch(function(){});
     }
 
     if (phoneEl) {
@@ -1004,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', function(){
           var badge2 = cartItem.querySelector('.badge-reserved, .hold-label');
           if (badge2) badge2.remove();
         }
-      } catch(e){ console.error(e); }
+      } catch(e){ }
 
       if (btnRelease) {
         btnRelease.textContent = prevText;
@@ -1012,7 +1012,6 @@ document.addEventListener('DOMContentLoaded', function(){
       }
       if (typeof onDone === 'function') onDone({ success: true, data: json.data });
     }).catch(function(err){
-      console.error(err);
       alert('Ошибка сети при снятии резерва');
       if (btnRelease) {
         btnRelease.textContent = prevText;

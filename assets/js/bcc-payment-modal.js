@@ -279,8 +279,7 @@
                 updateReservationUi();
                 initSeatmap(currentSession);
             })
-            .catch(err => {
-                console.error(err);
+            .catch(() => {
                 showError('Ошибка загрузки сеанса');
             });
     }
@@ -637,10 +636,9 @@
                 logDebug('Server response', data);
                 submitBccForm(data.action, data.fields);
             })
-            .catch(err => {
+            .catch(() => {
                 payBtn.disabled = false;
                 payBtn.textContent = 'Оплатить';
-                console.error(err);
                 showError('Ошибка соединения с сервером');
             });
     }

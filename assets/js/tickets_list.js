@@ -361,7 +361,6 @@
         tbody.appendChild(renderRow(t));
       });
     }).catch(function(err){
-      console.error(err);
       showToast('Ошибка сети при загрузке', 'error');
     });
   }
@@ -401,7 +400,6 @@
         populateRefundModal(t);
         showRefundModal();
       }).catch(function(err){
-        console.error(err);
         showToast('Ошибка сети при получении билета', 'error');
       });
   }
@@ -470,7 +468,6 @@
       hideRefundModal();
       setTimeout(function(){ loadTickets(); }, 400);
     }).catch(function(err){
-      console.error(err);
       showToast('Ошибка сети при возврате', 'error');
     });
   }

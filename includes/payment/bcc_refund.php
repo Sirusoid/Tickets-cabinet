@@ -249,6 +249,15 @@ if (!function_exists('bcc_mark_refund_result')) {
                     ]);
                 }
                 $pdo->commit();
+                if (function_exists('audit_log_event')) {
+                    audit_log_event($pdo, 'payment.refund_rejected', 'payment_session', (int)$session['id'], $order, [], [
+                        'order' => $order,
+                        'transaction_ref' => $transactionRef !== '' ? $transactionRef : null,
+                        'action' => $data['ACTION'] ?? null,
+                        'rc' => $data['RC'] ?? null,
+                        'rc_text' => $data['RC_TEXT'] ?? null,
+                    ]);
+                }
                 return ['status' => 'rejected', 'ticket_uids' => []];
             }
 
@@ -290,6 +299,14 @@ if (!function_exists('bcc_mark_refund_result')) {
             ]);
 
             $pdo->commit();
+            if (function_exists('audit_log_event')) {
+                audit_log_event($pdo, 'payment.refund_completed', 'payment_session', (int)$session['id'], $order, [], [
+                    'order' => $order,
+                    'amount_cents' => (int)$session['amount_cents'],
+                    'transaction_ref' => $transactionRef !== '' ? $transactionRef : null,
+                    'ticket_uids' => $ticketUids,
+                ]);
+            }
             return ['status' => 'refunded', 'ticket_uids' => $ticketUids];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {

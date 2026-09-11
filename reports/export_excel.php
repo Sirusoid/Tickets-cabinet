@@ -1,22 +1,17 @@
 <?php
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/reporting.php';
 require_login();
 
-$excelAutoload = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
-if (!is_file($excelAutoload)) {
-    http_response_code(500);
-    exit('PhpSpreadsheet не установлен или недоступен.');
-}
-require_once $excelAutoload;
-if (!class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
+require_once __DIR__ . '/../includes/excel.php';
+if (!function_exists('excel_autoload') || !excel_autoload()) {
     http_response_code(500);
     exit('PhpSpreadsheet не установлен или недоступен.');
 }
 
 $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
-$segmentFilter = trim((string)($_GET['segment'] ?? ''));
-
+$segment = trim((string)($_GET['segment'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
     $dateFrom = date('Y-m-01');
 }
@@ -24,84 +19,171 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
     $dateTo = date('Y-m-d');
 }
 
-$params = [':date_from' => $dateFrom . ' 00:00:00', ':date_to' => $dateTo . ' 23:59:59'];
+$params = [
+    ':date_from' => $dateFrom . ' 00:00:00',
+    ':date_to' => $dateTo . ' 23:59:59',
+];
 $segmentSql = '';
-if ($segmentFilter !== '') {
-    $segmentSql = ' AND t.customer_segment = :segment ';
-    $params[':segment'] = $segmentFilter;
+if ($segment !== '') {
+    $segmentSql = ' AND t.customer_segment = :segment';
+    $params[':segment'] = $segment;
 }
 
-$rows = db_fetch_all("SELECT
-        t.purchased_at,
-        e.title AS event_title,
-        s.start_time AS schedule_start,
-        t.ticket_uid,
-        REPLACE(t.seat_identifier, ':', ' - ') AS seat,
-        t.customer_segment,
-        t.price,
-        COALESCE(tx.payment_method, CASE WHEN t.channel IN ('web', 'mobile') THEN 'card' ELSE 'cash' END) AS payment_method,
-        t.channel,
-        t.status
-    FROM tickets t
-    LEFT JOIN schedules s ON s.id = t.schedule_id
-    LEFT JOIN events e ON e.id = t.event_id
-    LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
-    WHERE t.purchased_at BETWEEN :date_from AND :date_to
-        AND t.payment_status = 'paid'
-        AND t.status <> 'cancelled'
-        AND COALESCE(t.refund_status, 'none') IN ('none', '', 'no')
-        $segmentSql
-    ORDER BY t.purchased_at DESC, t.id DESC", $params);
+try {
+    $rows = db_fetch_all("SELECT
+            t.id, t.ticket_uid, t.seat_identifier, t.price, t.discount,
+            t.customer_segment, t.channel, t.payment_status, t.status,
+            t.refund_status, t.purchased_at,
+            tx.payload AS tx_payload,
+            tx.payment_method AS tx_payment_method,
+            ps.order_number,
+            COALESCE(c.full_name, '') AS customer_name,
+            COALESCE(e.title, '') AS event_title,
+            s.start_time AS session_start
+        FROM tickets t
+        LEFT JOIN customers c ON c.id = t.customer_id
+        LEFT JOIN schedules s ON s.id = t.schedule_id
+        LEFT JOIN events e ON e.id = t.event_id
+        LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+        LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+        WHERE t.purchased_at BETWEEN :date_from AND :date_to
+            AND t.payment_status = 'paid'
+            $segmentSql
+        ORDER BY t.purchased_at DESC, t.id DESC", $params);
+} catch (Throwable $e) {
+    error_log('[REPORT] Ошибка подготовки XLSX: ' . $e->getMessage());
+    http_response_code(500);
+    exit('Не удалось подготовить отчёт.');
+}
 
-$segmentNames = [
+$segmentOptions = [
     'adult' => 'Взрослый', 'child' => 'Детский', 'children' => 'Детский',
     'student' => 'Студенческий', 'senior' => 'Пенсионный', 'pensioner' => 'Пенсионный', 'vip' => 'VIP',
 ];
+$channelOptions = ['web' => 'Веб', 'mobile' => 'Мобильный', 'kassa' => 'Касса', 'agent' => 'Агент', 'qr' => 'QR', 'admin' => 'Админ'];
 
-$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-$sheet = $spreadsheet->getActiveSheet();
-$sheet->setTitle('Продажи');
-$sheet->fromArray([
-    ['Отчёт продаж', null, null, null, null, null, null, null, null],
-    ['Период', $dateFrom . ' — ' . $dateTo, null, null, null, null, null, null, null],
-    [],
-    ['Дата', 'Спектакль', 'Сеанс', 'UID билета', 'Место', 'Тип билета', 'Цена, тг', 'Оплата', 'Канал'],
-], null, 'A1');
-
-$rowNumber = 5;
+$details = [];
+$summary = [];
+$totals = ['tickets' => 0, 'original' => 0.0, 'discount' => 0.0, 'paid' => 0.0];
 foreach ($rows as $row) {
-    $sheet->fromArray([[
+    $financials = reporting_ticket_financials($row);
+    $key = (string)($row['session_start'] ?? '') . '|' . (string)($row['event_title'] ?? '');
+    if (!isset($summary[$key])) {
+        $summary[$key] = [
+            'event_title' => (string)($row['event_title'] ?? 'Без названия'),
+            'session_start' => (string)($row['session_start'] ?? ''),
+            'tickets' => 0,
+            'original' => 0.0,
+            'discount' => 0.0,
+            'paid' => 0.0,
+        ];
+    }
+    $summary[$key]['tickets']++;
+    $summary[$key]['original'] += $financials['original'];
+    $summary[$key]['discount'] += $financials['discount'];
+    $summary[$key]['paid'] += $financials['paid'];
+    $totals['tickets']++;
+    $totals['original'] += $financials['original'];
+    $totals['discount'] += $financials['discount'];
+    $totals['paid'] += $financials['paid'];
+
+    $details[] = [
         !empty($row['purchased_at']) ? date('d.m.Y H:i', strtotime($row['purchased_at'])) : '',
         (string)($row['event_title'] ?? ''),
-        !empty($row['schedule_start']) ? date('d.m.Y H:i', strtotime($row['schedule_start'])) : '',
+        !empty($row['session_start']) ? date('d.m.Y H:i', strtotime($row['session_start'])) : '',
         (string)($row['ticket_uid'] ?? ''),
-        (string)($row['seat'] ?? ''),
-        $segmentNames[(string)($row['customer_segment'] ?? '')] ?? (string)($row['customer_segment'] ?? '—'),
-        (float)($row['price'] ?? 0),
-        (string)($row['payment_method'] ?? ''),
-        (string)($row['channel'] ?? ''),
-    ]], null, 'A' . $rowNumber++);
+        str_replace(':', ' - ', (string)($row['seat_identifier'] ?? '')),
+        reporting_segment_label($row['customer_segment'] ?? ''),
+        $financials['original'],
+        $financials['discount'],
+        $financials['paid'],
+        reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? ''),
+        $channelOptions[(string)($row['channel'] ?? '')] ?? (string)($row['channel'] ?? 'Другое'),
+        (string)($row['order_number'] ?? ''),
+        (string)($row['customer_name'] ?? ''),
+        (string)($row['payment_status'] ?? ''),
+        (string)($row['status'] ?? ''),
+        (string)($row['refund_status'] ?? 'none'),
+    ];
 }
 
-$sheet->mergeCells('A1:I1');
-$sheet->mergeCells('B2:I2');
-$sheet->getStyle('A1:I1')->getFont()->setBold(true)->setSize(16);
-$sheet->getStyle('A4:I4')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$sheet->getStyle('A4:I4')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
-$sheet->getStyle('G5:G' . max(5, $rowNumber - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-$sheet->freezePane('A5');
-
-foreach (range('A', 'I') as $column) {
-    $sheet->getColumnDimension($column)->setAutoSize(true);
+if (isset($pdo) && $pdo instanceof PDO && function_exists('audit_log_event')) {
+    audit_log_event($pdo, 'report.export_xlsx', 'report', null, 'Продажи', [], [
+        'date_from' => $dateFrom,
+        'date_to' => $dateTo,
+        'segment' => $segment,
+        'tickets' => $totals['tickets'],
+    ]);
 }
-$sheet->getColumnDimension('B')->setWidth(32);
-$sheet->getColumnDimension('D')->setWidth(24);
+
+$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+$summarySheet = $spreadsheet->getActiveSheet();
+$summarySheet->setTitle('Сводка');
+$summarySheet->fromArray([
+    ['Отчёт продаж', null, null, null, null, null],
+    ['Период', $dateFrom . ' — ' . $dateTo, null, null, null, null],
+    ['Билетов', $totals['tickets'], 'Цена без скидки, тг', $totals['original'], 'Скидка, тг', $totals['discount']],
+    ['Оплачено, тг', $totals['paid'], null, null, null, null],
+    [],
+    ['Спектакль', 'Дата и время сеанса', 'Билетов', 'Цена без скидки, тг', 'Скидка, тг', 'Продажи, тг'],
+], null, 'A1');
+$summaryRow = 7;
+foreach ($summary as $item) {
+    $summarySheet->fromArray([[
+        $item['event_title'],
+        $item['session_start'] !== '' ? date('d.m.Y H:i', strtotime($item['session_start'])) : '',
+        $item['tickets'],
+        round($item['original'], 2),
+        round($item['discount'], 2),
+        round($item['paid'], 2),
+    ]], null, 'A' . $summaryRow++);
+}
+
+$detailSheet = $spreadsheet->createSheet();
+$detailSheet->setTitle('Билеты');
+$detailSheet->fromArray([
+    ['Дата покупки', 'Спектакль', 'Сеанс', 'UID билета', 'Ряд - Место', 'Тип билета',
+        'Цена без скидки, тг', 'Скидка, тг', 'Оплачено, тг', 'Форма оплаты', 'Канал',
+        'Номер заказа', 'Клиент', 'Оплата', 'Статус', 'Возврат'],
+], null, 'A1');
+$detailRow = 2;
+foreach ($details as $detail) {
+    $detailSheet->fromArray([$detail], null, 'A' . $detailRow++);
+}
+
+foreach ([$summarySheet, $detailSheet] as $sheet) {
+    $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()->setVertical(
+        \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP
+    );
+    $headerRow = $sheet === $summarySheet ? 6 : 1;
+    $sheet->getStyle('A' . $headerRow . ':' . $sheet->getHighestColumn() . $headerRow)->getFont()->setBold(true);
+    $sheet->getStyle('A' . $headerRow . ':' . $sheet->getHighestColumn() . $headerRow)->getFill()
+        ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+        ->getStartColor()->setARGB('FF2563EB');
+    $sheet->getStyle('A' . $headerRow . ':' . $sheet->getHighestColumn() . $headerRow)->getFont()->getColor()->setARGB('FFFFFFFF');
+    foreach (range('A', $sheet->getHighestColumn()) as $column) {
+        $sheet->getColumnDimension($column)->setAutoSize(true);
+    }
+    $sheet->freezePane($sheet === $summarySheet ? 'A7' : 'A2');
+}
+$summarySheet->getStyle('D3:F' . max(3, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$summarySheet->getStyle('A7:F' . max(7, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('G2:I' . max(2, $detailRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 
 $filename = 'sales-report-' . $dateFrom . '-' . $dateTo . '.xlsx';
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Cache-Control: max-age=0');
 
-$writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-$writer->save('php://output');
+try {
+    $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+    $writer->save('php://output');
+} catch (Throwable $e) {
+    error_log('[REPORT] Ошибка записи XLSX: ' . $e->getMessage());
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+    }
+    echo 'Не удалось сформировать XLSX-файл.';
+}
 exit;

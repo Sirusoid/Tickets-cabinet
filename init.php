@@ -61,6 +61,7 @@ $requiredFiles = [
     __DIR__ . '/includes/db.php',
     __DIR__ . '/includes/helper.php',
     __DIR__ . '/includes/auth.php',
+    __DIR__ . '/includes/audit.php',
 ];
 
 foreach ($requiredFiles as $f) {
@@ -174,11 +175,6 @@ if (!function_exists('db_query')) {
         $stmt = $pdo->prepare($sql);
         return $stmt->execute($params);
     }
-}
-
-// 11) Логирование окружения (опционально, только в development)
-if (defined('APP_ENV') && APP_ENV === 'development') {
-    error_log('init.php loaded. APP_ENV=' . APP_ENV . ' USER=' . ($currentUser['id'] ?? 'guest'));
 }
 
 // Единые защитные заголовки для административных страниц и AJAX.

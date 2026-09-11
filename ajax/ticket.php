@@ -685,20 +685,11 @@ try {
         $updOcc = $pdo->prepare("UPDATE seat_occupancy SET ticket_id = :tid WHERE id = :id");
         $updOcc->execute([':tid' => $newTicketId, ':id' => $occId]);
 
-        // 5) Optional audit log (non-blocking)
-        try {
-            $audSql = "INSERT INTO audit_logs (user_id, action, target_type, target_id, details, created_at)
-                       VALUES (:user_id, :action, :target_type, :target_id, :details, NOW())";
-            $audStmt = $pdo->prepare($audSql);
-            $audStmt->execute([
-                ':user_id' => $_SESSION['user_id'] ?? null,
-                ':action' => 'ticket_create',
-                ':target_type' => 'ticket',
-                ':target_id' => $newTicketId,
-                ':details' => json_encode(['ticket_id' => $newTicketId, 'schedule_id' => $schedule_id, 'seat' => $seat_identifier], JSON_UNESCAPED_UNICODE)
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'ticket.create', 'ticket', $newTicketId, $ticket_uid, [], [
+                'schedule_id' => $schedule_id,
+                'seat' => $seat_identifier,
             ]);
-        } catch (Exception $e) {
-            // ignore audit errors
         }
 
         $pdo->commit();
@@ -823,27 +814,13 @@ if ($action === 'refund') {
             error_log('ajax/ticket.php cash_transactions refund insert error: ' . $e->getMessage());
         }
 
-        // audit log for refund action (we do not insert into refunds table per request)
-        try {
-            $audSql = "INSERT INTO audit_logs (user_id, action, target_type, target_id, details, created_at)
-                       VALUES (:user_id, :action, :target_type, :target_id, :details, NOW())";
-            $audStmt = $pdo->prepare($audSql);
-            $audStmt->execute([
-                ':user_id' => $_SESSION['user_id'] ?? null,
-                ':action' => 'ticket_refund',
-                ':target_type' => 'ticket',
-                ':target_id' => $ticket_id,
-                ':details' => json_encode([
-                    'ticket_id' => $ticket_id,
-                    'ticket_uid' => $t['ticket_uid'] ?? null,
-                    'schedule_id' => $t['schedule_id'] ?? null,
-                    'refund_amount' => $refund_amount,
-                    'refund_method' => $refund_method,
-                    'reason' => $reason
-                ], JSON_UNESCAPED_UNICODE)
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'ticket.refund', 'ticket', $ticket_id, $t['ticket_uid'] ?? null, [], [
+                'schedule_id' => $t['schedule_id'] ?? null,
+                'refund_amount' => $refund_amount,
+                'refund_method' => $refund_method,
+                'reason' => $reason,
             ]);
-        } catch (Exception $e) {
-            // ignore audit errors
         }
 
         $pdo->commit();

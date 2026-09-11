@@ -565,9 +565,6 @@ if (!function_exists('ticket_pdf_render_html')) {
         $pdf_payment_label = null;
 
         if (isset($ticket['pdf_fields']) && is_array($ticket['pdf_fields'])) {
-            // Log for debug
-            error_log('DEBUG pdf_fields for ' . ($ticket['ticket_uid'] ?? 'no-uid') . ': ' . json_encode($ticket['pdf_fields'], JSON_UNESCAPED_UNICODE));
-
             $pf = $ticket['pdf_fields'];
             if (isset($pf['price_label'])) $pdf_price_label = is_numeric($pf['price_label']) ? (float)$pf['price_label'] : null;
             if (isset($pf['discount_label_percent'])) $pdf_discount_percent = is_numeric($pf['discount_label_percent']) ? (int)$pf['discount_label_percent'] : null;
@@ -581,9 +578,6 @@ if (!function_exists('ticket_pdf_render_html')) {
             // Also accept 'price' and 'discount_percent' as fallbacks inside pdf_fields
             if ($pdf_price_label === null && isset($pf['price'])) $pdf_price_label = is_numeric($pf['price']) ? (float)$pf['price'] : null;
             if ($pdf_discount_percent === null && isset($pf['discount_percent'])) $pdf_discount_percent = is_numeric($pf['discount_percent']) ? (int)$pf['discount_percent'] : null;
-        } else {
-            // Log absence of pdf_fields
-            error_log('DEBUG pdf_fields missing for ' . ($ticket['ticket_uid'] ?? 'no-uid'));
         }
 
         // If pdf_fields provided, we DO NOT override them with tx_payload values.

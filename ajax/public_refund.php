@@ -140,20 +140,6 @@ try {
 
 $cfg = bcc_config($pdo);
 $refundForm = bcc_build_refund_form($cfg, $session, $originalResponse, (int)$session['amount_cents']);
-$refundBody = http_build_query($refundForm['fields'], '', '&');
-
-// Optional one-run capture for bank support; keep the file outside the web root.
-$debugDumpPath = getenv('ZHASSAHNA_BCC_REFUND_DEBUG_FILE');
-if (is_string($debugDumpPath) && trim($debugDumpPath) !== '') {
-    $debugDumpPath = trim($debugDumpPath);
-    $written = file_put_contents($debugDumpPath, $refundBody, LOCK_EX);
-    if ($written === false) {
-        error_log('[BCC REFUND] Could not write debug request dump: ' . $debugDumpPath);
-    } else {
-        chmod($debugDumpPath, 0600);
-    }
-}
-
 $ch = curl_init($refundForm['action']);
 if ($ch === false) {
     public_refund_response(['success' => true, 'state' => 'processing', 'message' => 'Запрос на возврат принят и обрабатывается.'], 202);
@@ -161,7 +147,7 @@ if ($ch === false) {
 
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => $refundBody,
+    CURLOPT_POSTFIELDS => http_build_query($refundForm['fields'], '', '&'),
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_TIMEOUT => 20,

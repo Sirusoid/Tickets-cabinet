@@ -386,7 +386,6 @@ foreach ($schedules_raw as $s) {
           }
         })
         .catch(function(err){
-          console.error('AJAX filter error', err);
           showToast('Ошибка получения списка: ' + (err.message || err), 'error');
         })
         .finally(function(){
@@ -525,7 +524,6 @@ foreach ($schedules_raw as $s) {
               showToast(msg, 'error');
             }
           }).catch(function(err){
-            console.error(err);
             confirmBtn.disabled = false;
             confirmBtn.textContent = prevText;
             try { if (typeof hideModalFn === 'function') hideModalFn(); } catch(e){}
@@ -625,7 +623,6 @@ foreach ($schedules_raw as $s) {
             showToast(msg, 'error');
           }
         }).catch(function(err){
-          console.error(err);
           confirmBtn.disabled = false;
           confirmBtn.textContent = prevText;
           try { window.hideModalDelete && window.hideModalDelete(); } catch(e){}
@@ -678,7 +675,6 @@ foreach ($schedules_raw as $s) {
         showToast(msg, 'error');
       }
     }).catch(function(err){
-      console.error(err);
       showToast('Ошибка сети при удалении', 'error');
     });
   }
@@ -715,7 +711,6 @@ foreach ($schedules_raw as $s) {
         showToast(msg, 'error');
       }
     }).catch(function(err){
-      console.error(err);
       showToast('Ошибка сети при дублировании', 'error');
     }).finally(function(){
       if (btn) {

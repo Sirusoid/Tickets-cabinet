@@ -36,6 +36,7 @@ $isAllowed = function ($permKey, $fallback = true) use ($currentRole, $permissio
 // Основное меню (простые ссылки)
 $menu = [
   ['id'=>'dashboard','href'=>'/dashboard.php','label'=>'Панель','perm'=>'dashboard','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 13h8V3H3v10zM3 21h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="currentColor"/></svg>'],
+  ['id'=>'reports','href'=>'/reports/sales.php','label'=>'Отчёты','perm'=>'reports','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M12 16V7M16 16v-8M20 16v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
   ['id'=>'cash','href'=>'/cash/index.php','label'=>'Касса','perm'=>'cash','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7h18v10H3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 11h10M7 15h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="16" y="3" width="5" height="4" rx="1" fill="currentColor"/></svg>'],
   ['id'=>'schedule','href'=>'/schedule/list.php','label'=>'Расписание','perm'=>'schedule','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 11h10M7 15h6M3 7h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
   ['id'=>'events','href'=>'/events/list.php','label'=>'Спектакли','perm'=>'events','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16v10H4z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
@@ -44,6 +45,9 @@ $menu = [
   ['id'=>'actors','href'=>'/actors/list.php','label'=>'Актёры','perm'=>'actors','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm-7 18c0-3.866 3.582-7 8-7s8 3.134 8 7v1H5v-1z" fill="currentColor"/></svg>'],
   ['id'=>'halls','href'=>'/halls/list.php','label'=>'Залы','perm'=>'halls','icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 21h18M5 3v18M19 3v18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
 ];
+if ($currentRole === 'admin') {
+  $menu[] = ['id'=>'audit','href'=>'/admin/audit.php','label'=>'Журнал действий','perm'=>null,'icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'];
+}
 
 $settingsPermMap = [
   'general' => 'settings_general',

@@ -57,10 +57,7 @@
           }, 200);
         } catch (e) {}
       }, durationMs);
-    } catch (e) {
-      // last resort
-      console.log((type || 'info') + ': ' + msg);
-    }
+    } catch (e) {}
   }
 
   function showAlertAsToast(message) {
@@ -187,8 +184,7 @@
             return;
           }
           renderList(resp.data || []);
-        }).catch(function (err) {
-          console.error('Load schedules error', err);
+        }).catch(function () {
           showToast('Ошибка загрузки списка', 'error', 8000);
         });
     }
@@ -243,8 +239,7 @@
           } else {
             showToast((resp && resp.message) ? resp.message : 'Ошибка удаления', 'error', 8000);
           }
-        }).catch(function (err) {
-          console.error('Delete schedule error', err);
+        }).catch(function () {
           if (btn) { btn.disabled = false; btn.innerHTML = btn._orig || 'Удалить'; }
           showToast('Ошибка сети', 'error', 8000);
         });
@@ -376,10 +371,7 @@
               _lastOverlap = { overlap: false, conflicting: null };
               removeFieldHighlight(startEl, endEl, hallEl);
             }
-          }).catch(function (err) {
-            // network or server error — do not block user, but log
-            console.error('Overlap check error', err);
-          });
+          }).catch(function () {});
         }, _overlapDebounceMs);
       }
 
@@ -512,9 +504,7 @@
           // all checks passed
           _salesError = { hasError: false, fields: [], message: '' };
           removeFieldHighlight(salesStartEl, salesEndEl, null);
-        } catch (e) {
-          console.error('Sales validation error', e);
-        }
+        } catch (e) {}
       }
 
       // attach listeners for sales fields
@@ -653,8 +643,6 @@
 		  var end = (form.end_time && form.end_time.value) ? form.end_time.value : '';
 
 		  if (!eventId || !hallId || !start || !end) {
-			// Для отладки можно временно логировать, какие поля пусты:
-			console.warn('submitForm: missing fields', { eventId:eventId, hallId:hallId, start:start, end:end });
 			showToast('Заполните обязательные поля', 'error');
 			return;
 		  }
@@ -729,8 +717,7 @@
           } else {
             showToast((resp && resp.message) ? resp.message : 'Ошибка сохранения', 'error', 8000);
           }
-        }).catch(function (err) {
-          console.error('Save schedule error', err);
+        }).catch(function () {
           showToast('Ошибка сети', 'error', 8000);
         });
     }

@@ -318,7 +318,6 @@ require_once __DIR__ . '/../includes/panel.php';
 
         loadScript(JQUERY_CDN, function(err){
             if (err) {
-                console.error('Не удалось загрузить jQuery:', err);
                 return;
             }
             runListScript(window.jQuery);

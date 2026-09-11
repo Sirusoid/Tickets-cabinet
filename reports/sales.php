@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/reporting.php';
 require_login();
 
 $reportsEmbedded = !empty($reportsEmbedded);
@@ -39,6 +40,8 @@ try {
 		$sql = "SELECT
 								t.id,
 								t.price,
+								t.discount,
+								t.seat_identifier,
 								t.customer_segment,
 								t.purchased_at,
 								t.payment_status,
@@ -47,8 +50,11 @@ try {
 								t.payment_transaction_id,
 								COALESCE(tx.payment_method, CASE WHEN t.channel IN ('web', 'mobile') THEN 'card' ELSE 'cash' END) AS payment_method,
 								tx.payload AS tx_payload,
-								(SELECT COUNT(*) FROM tickets t2 WHERE t2.payment_transaction_id = t.payment_transaction_id) AS tx_ticket_count
+								e.title AS event_title,
+								s.start_time AS schedule_start
 						FROM tickets t
+						LEFT JOIN schedules s ON s.id = t.schedule_id
+						LEFT JOIN events e ON e.id = t.event_id
 						LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
 						WHERE t.purchased_at BETWEEN :date_from AND :date_to
 							AND t.payment_status = 'paid'
@@ -61,56 +67,6 @@ try {
 		$errorText = 'Ошибка загрузки данных: ' . $e->getMessage();
 }
 
-$segmentNames = [
-		'adult' => 'Взрослый',
-		'child' => 'Детский',
-		'children' => 'Детский',
-		'student' => 'Студенческий',
-		'senior' => 'Пенсионный',
-		'pensioner' => 'Пенсионный',
-		'vip' => 'VIP',
-];
-
-$safeNum = function ($v) {
-		return is_numeric($v) ? (float)$v : 0.0;
-};
-
-$parseDiscount = function ($payloadRaw) use ($safeNum) {
-		$result = [
-				'total_discount' => 0.0,
-				'final_total' => 0.0,
-		];
-		if (!is_string($payloadRaw) || trim($payloadRaw) === '') {
-				return $result;
-		}
-		$payload = json_decode($payloadRaw, true);
-		if (!is_array($payload)) {
-				return $result;
-		}
-		$discount = isset($payload['discount']) && is_array($payload['discount']) ? $payload['discount'] : [];
-		if (empty($discount)) {
-				return $result;
-		}
-		$result['total_discount'] = max(0.0, $safeNum($discount['total_discount'] ?? 0));
-		$result['final_total'] = max(0.0, $safeNum($discount['final_total'] ?? 0));
-		return $result;
-};
-
-$calcTicketDiscount = function ($price, array $discountInfo, $count) use ($safeNum) {
-		$ticketPrice = max(0.0, $safeNum($price));
-		$totalDiscount = max(0.0, $safeNum($discountInfo['total_discount'] ?? 0));
-		$finalTotal = max(0.0, $safeNum($discountInfo['final_total'] ?? 0));
-		$count = max(1, (int)$count);
-
-		if ($totalDiscount <= 0.0) {
-				return 0.0;
-		}
-		if ($finalTotal > 0.0 && $ticketPrice > 0.0) {
-				return round($totalDiscount * ($ticketPrice / $finalTotal), 2);
-		}
-		return round($totalDiscount / $count, 2);
-};
-
 $totals = [
 		'tickets' => 0,
 		'gross' => 0.0,
@@ -118,12 +74,14 @@ $totals = [
 		'net' => 0.0,
 ];
 $bySegment = [];
+$byPerformance = [];
 $byPaymentMethod = [
 		'card' => ['label' => 'Карта', 'tickets' => 0, 'net' => 0.0],
 		'cash' => ['label' => 'Наличные', 'tickets' => 0, 'net' => 0.0],
 		'other' => ['label' => 'Другое', 'tickets' => 0, 'net' => 0.0],
 ];
 $refundTotals = ['tickets' => 0, 'amount' => 0.0];
+$refundByPerformance = [];
 
 foreach ($rows as $row) {
 		$segmentKey = (string)($row['customer_segment'] ?? 'other');
@@ -132,7 +90,7 @@ foreach ($rows as $row) {
 		}
 		if (!isset($bySegment[$segmentKey])) {
 				$bySegment[$segmentKey] = [
-						'segment' => $segmentNames[$segmentKey] ?? $segmentKey,
+						'segment' => reporting_segment_label($segmentKey),
 						'tickets' => 0,
 						'gross' => 0.0,
 						'discount' => 0.0,
@@ -140,10 +98,10 @@ foreach ($rows as $row) {
 				];
 		}
 
-		$price = max(0.0, $safeNum($row['price'] ?? 0));
-		$discountInfo = $parseDiscount($row['tx_payload'] ?? null);
-		$ticketDiscount = $calcTicketDiscount($price, $discountInfo, $row['tx_ticket_count'] ?? 1);
-		$base = $price + $ticketDiscount;
+		$financials = reporting_ticket_financials($row);
+		$price = $financials['paid'];
+		$ticketDiscount = $financials['discount'];
+		$base = $financials['original'];
 
 		$totals['tickets']++;
 		$totals['gross'] += $base;
@@ -165,6 +123,22 @@ foreach ($rows as $row) {
 		$bySegment[$segmentKey]['gross'] += $base;
 		$bySegment[$segmentKey]['discount'] += $ticketDiscount;
 		$bySegment[$segmentKey]['net'] += $price;
+
+		$performanceKey = (string)($row['schedule_start'] ?? '') . '|' . (string)($row['event_title'] ?? '');
+		if (!isset($byPerformance[$performanceKey])) {
+				$byPerformance[$performanceKey] = [
+						'event_title' => (string)($row['event_title'] ?? 'Без названия'),
+						'schedule_start' => (string)($row['schedule_start'] ?? ''),
+						'tickets' => 0,
+						'original' => 0.0,
+						'discount' => 0.0,
+						'paid' => 0.0,
+				];
+		}
+		$byPerformance[$performanceKey]['tickets']++;
+		$byPerformance[$performanceKey]['original'] += $base;
+		$byPerformance[$performanceKey]['discount'] += $ticketDiscount;
+		$byPerformance[$performanceKey]['paid'] += $price;
 }
 
 try {
@@ -184,6 +158,27 @@ try {
 			'tickets' => (int)($refundRow['tickets'] ?? 0),
 			'amount' => (float)($refundRow['amount'] ?? 0),
 		];
+	$refundRows = db_fetch_all("SELECT
+			e.title AS event_title,
+			s.start_time AS schedule_start,
+			COUNT(*) AS tickets,
+			COALESCE(SUM(t.price), 0) AS amount
+		FROM tickets t
+		LEFT JOIN schedules s ON s.id = t.schedule_id
+		LEFT JOIN events e ON e.id = t.event_id
+		WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
+			AND t.payment_status = 'paid'
+			AND t.refund_status = 'refunded'
+			$refundSegmentSql
+		GROUP BY e.title, s.start_time
+		ORDER BY s.start_time DESC", $refundParams);
+	foreach ($refundRows as $refundItem) {
+		$key = (string)($refundItem['schedule_start'] ?? '') . '|' . (string)($refundItem['event_title'] ?? '');
+		$refundByPerformance[$key] = [
+			'tickets' => (int)($refundItem['tickets'] ?? 0),
+			'amount' => (float)($refundItem['amount'] ?? 0),
+		];
+	}
 } catch (Throwable $e) {
 		$errorText = $errorText !== '' ? $errorText : 'Ошибка загрузки возвратов: ' . $e->getMessage();
 }
@@ -191,9 +186,14 @@ try {
 usort($bySegment, function ($a, $b) {
 		return ($b['net'] <=> $a['net']);
 });
+usort($byPerformance, function ($a, $b) {
+		return strcmp($b['schedule_start'], $a['schedule_start']);
+});
 
 $avgDiscount = $totals['tickets'] > 0 ? ($totals['discount'] / $totals['tickets']) : 0.0;
 $netAfterRefunds = max(0.0, $totals['net'] - $refundTotals['amount']);
+$today = date('Y-m-d');
+$yesterday = date('Y-m-d', strtotime('-1 day'));
 $exportUrl = '/reports/export_excel.php?' . http_build_query([
 		'date_from' => $dateFrom,
 		'date_to' => $dateTo,
@@ -231,6 +231,8 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 			</div>
 			<div class="reports-filters__actions">
 				<a href="/reports/sales.php" class="btn btn-ghost">Сбросить</a>
+				<a href="?date_from=<?= h($today) ?>&date_to=<?= h($today) ?>&segment=<?= h($segmentFilter) ?>" class="btn btn-ghost">Сегодня</a>
+				<a href="?date_from=<?= h($yesterday) ?>&date_to=<?= h($yesterday) ?>&segment=<?= h($segmentFilter) ?>" class="btn btn-ghost">Вчера</a>
 				<button type="submit" class="btn btn-primary">Показать</button>
 				<a href="<?= h($exportUrl) ?>" class="btn btn-secondary">Скачать XLSX</a>
 			</div>
@@ -277,6 +279,60 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 				</div>
 			</section>
 		</div>
+
+		<section class="card reports-section reports-section--wide">
+			<div class="reports-section__head">
+				<div>
+					<h3>Отчёт по спектаклям и датам</h3>
+					<p>Продажи сгруппированы по конкретному сеансу; скидка уже вычтена из оплаченной суммы.</p>
+				</div>
+			</div>
+			<div class="reports-table-wrap">
+				<table class="admin-table table--compact reports-table reports-table--wide">
+					<thead>
+						<tr>
+							<th>Спектакль</th>
+							<th>Дата и время</th>
+							<th>Билетов</th>
+							<th>Цена без скидки</th>
+							<th>Скидка</th>
+							<th>Продажи</th>
+							<th>Возвраты</th>
+							<th>Итого после возвратов</th>
+						</tr>
+					</thead>
+					<tbody>
+					<?php if (empty($byPerformance) && empty($refundByPerformance)): ?>
+						<tr><td colspan="8" class="reports-empty">Данные за выбранный период не найдены</td></tr>
+					<?php else:
+						$performanceKeys = array_unique(array_merge(array_keys($byPerformance), array_keys($refundByPerformance)));
+						foreach ($performanceKeys as $performanceKey):
+							$item = $byPerformance[$performanceKey] ?? [
+								'event_title' => 'Без названия',
+								'schedule_start' => '',
+								'tickets' => 0,
+								'original' => 0.0,
+								'discount' => 0.0,
+								'paid' => 0.0,
+							];
+							$refundItem = $refundByPerformance[$performanceKey] ?? ['tickets' => 0, 'amount' => 0.0];
+							$netPerformance = max(0.0, (float)$item['paid'] - (float)$refundItem['amount']);
+					?>
+						<tr>
+							<td><strong><?= h($item['event_title']) ?></strong></td>
+							<td><?= $item['schedule_start'] !== '' ? h(date('d.m.Y H:i', strtotime($item['schedule_start']))) : '—' ?></td>
+							<td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td>
+							<td><?= number_format((float)$item['original'], 2, '.', ' ') ?> тг</td>
+							<td class="reports-number--discount">-<?= number_format((float)$item['discount'], 2, '.', ' ') ?> тг</td>
+							<td><?= number_format((float)$item['paid'], 2, '.', ' ') ?> тг</td>
+							<td class="reports-number--refund">-<?= number_format((float)$refundItem['amount'], 2, '.', ' ') ?> тг</td>
+							<td><strong><?= number_format($netPerformance, 2, '.', ' ') ?> тг</strong></td>
+						</tr>
+					<?php endforeach; endif; ?>
+					</tbody>
+				</table>
+			</div>
+		</section>
 	<?php endif; ?>
 </div>
 

@@ -24,23 +24,25 @@ function json_response($data) {
 }
 
 function current_user_id() {
-    return isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+    return isset($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : 0;
 }
 
 function audit_log($pdo, $user_id, $action, $target_type = null, $target_id = null, $details = null) {
-    try {
-        if (!isset($pdo) || !($pdo instanceof PDO)) return;
-        $stmt = $pdo->prepare("INSERT INTO cash_audit_log (user_id, action, target_type, target_id, details, created_at) VALUES (:user_id, :action, :target_type, :target_id, :details, NOW())");
-        $stmt->execute([
-            ':user_id' => $user_id,
-            ':action' => $action,
-            ':target_type' => $target_type,
-            ':target_id' => $target_id,
-            ':details' => $details
-        ]);
-    } catch (Exception $e) {
-        error_log("Audit log error: " . $e->getMessage());
+    if (!isset($pdo) || !($pdo instanceof PDO) || !function_exists('audit_log_event')) {
+        return;
     }
+    $decodedDetails = is_string($details) ? json_decode($details, true) : $details;
+    $decodedDetails = is_array($decodedDetails) ? $decodedDetails : [];
+    unset($decodedDetails['phone'], $decodedDetails['customer_phone'], $decodedDetails['email']);
+    audit_log_event(
+        $pdo,
+        (string)$action,
+        (string)($target_type ?: 'cash'),
+        $target_id !== null ? (int)$target_id : null,
+        null,
+        [],
+        $decodedDetails
+    );
 }
 
 function column_exists($pdo, $table, $column) {
@@ -582,21 +584,6 @@ case 'sell':
         ]);
         $transaction_id = $pdo->lastInsertId();
 		
-		// --- TEMP DEBUG: log transaction payload that will be stored in cash_transactions.payload ---
-			try {
-				// raw JSON string (as stored)
-				error_log('DEBUG cash_transactions.payload (raw JSON): ' . $payload);
-				// decoded array for easier inspection in logs (optional)
-				$tmpPayload = json_decode($payload, true);
-				if (is_array($tmpPayload)) {
-					error_log('DEBUG cash_transactions.payload (decoded): ' . json_encode($tmpPayload, JSON_UNESCAPED_UNICODE));
-				}
-			} catch (Throwable $e) {
-				// ignore logging errors
-			}
-			// --- END TEMP DEBUG ---
-		
-
         // --- find or create customer (by phone, fallback email) ---
         $customer_id = null;
 
@@ -1022,26 +1009,12 @@ case 'sell':
             'discount' => $discountApplied
         ];
 		
-// --- TEMP DEBUG: include transaction payload in API response when requested ---
-// If client sent __debug_tx = true in input, include the payload object in response for inspection.
-// Otherwise include only when server-side debug flag is enabled (optional).
-if (isset($input['__debug_tx']) && $input['__debug_tx']) {
-    // decode payload to array for JSON response
-    $decodedPayload = json_decode($payload, true);
-    $response['debug_tx_payload'] = is_array($decodedPayload) ? $decodedPayload : $payload;
-    // also include raw JSON string if needed
-    $response['debug_tx_payload_raw'] = $payload;
-}
-		
-		
-		
         if (!empty($pdf_generation_errors)) {
             $response['pdf_generation_errors'] = $pdf_generation_errors;
         }
         json_response($response);
     } catch (Exception $e) {
         $pdo->rollBack();
-        error_log("Sell debug: schedule_id=" . intval($session_id) . ", last_ticket_uid='" . (isset($ticket_uid) ? $ticket_uid : '') . "'");
         error_log("Sell error: " . $e->getMessage());
         if ($debug) json_response(['success' => false, 'message' => 'Ошибка при продаже', 'error' => $e->getMessage()]);
         json_response(['success' => false, 'message' => 'Ошибка при продаже']);
@@ -1070,7 +1043,6 @@ if (isset($input['__debug_tx']) && $input['__debug_tx']) {
                         $rows = $stmt2->fetchAll(PDO::FETCH_ASSOC);
                     }
                 } catch (Exception $e) {
-                    error_log("customer_search error (phone): " . $e->getMessage());
                     if ($debug) json_response(['success' => false, 'message' => 'Search error', 'error' => $e->getMessage()]);
                     json_response(['success' => false, 'message' => 'Search error']);
                 }
@@ -1090,7 +1062,6 @@ if (isset($input['__debug_tx']) && $input['__debug_tx']) {
 							$stmt->execute([':q1' => $q, ':q2' => $q]);
 							$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 						} catch (Exception $e) {
-							error_log("customer_search error (query): " . $e->getMessage());
 							if ($debug) json_response(['success' => false, 'message' => 'Search error', 'error' => $e->getMessage()]);
 							json_response(['success' => false, 'message' => 'Search error']);
 						}
@@ -1475,7 +1446,6 @@ if (isset($input['__debug_tx']) && $input['__debug_tx']) {
 
                 json_response(['success' => true, 'data' => $out, 'meta' => ['total'=>$total,'page'=>$page,'per_page'=>$perPage]]);
             } catch (Exception $e) {
-                error_log("sessions_list error: " . $e->getMessage());
                 json_response(['success' => false, 'message' => 'Internal server error']);
             }
             break;
@@ -1568,7 +1538,6 @@ if (isset($input['__debug_tx']) && $input['__debug_tx']) {
                 json_response(['success' => true, 'message' => 'Резерв создан', 'held' => $seat_keys, 'expires_at' => $expires_at]);
             } catch (Exception $e) {
                 $pdo->rollBack();
-                error_log("Hold error: " . $e->getMessage());
                 if ($debug) json_response(['success' => false, 'message' => 'Ошибка при создании резерва', 'error' => $e->getMessage()]);
                 json_response(['success' => false, 'message' => 'Ошибка при создании резерва']);
             }
@@ -1756,7 +1725,6 @@ if (isset($input['__debug_tx']) && $input['__debug_tx']) {
 
                 json_response(['success' => true, 'data' => $resp]);
             } catch (Exception $e) {
-                error_log("free_seats error: " . $e->getMessage());
                 json_response(['success' => false, 'message' => 'Internal server error']);
             }
             break;

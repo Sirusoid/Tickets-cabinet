@@ -81,11 +81,21 @@ function login_user($username, $password)
     $_SESSION['last_activity'] = time();
     unset($_SESSION['login_attempts'], $_SESSION['login_locked_until']);
 
+    global $pdo;
+    if (isset($pdo) && $pdo instanceof PDO && function_exists('audit_log_event')) {
+        audit_log_event($pdo, 'auth.login', 'user', (int)$user['id'], (string)$user['username']);
+    }
+
     return true;
 }
 
 function logout_user()
 {
+    global $pdo;
+    $user = $_SESSION['user'] ?? [];
+    if (isset($pdo) && $pdo instanceof PDO && !empty($user['id']) && function_exists('audit_log_event')) {
+        audit_log_event($pdo, 'auth.logout', 'user', (int)$user['id'], (string)($user['username'] ?? ''));
+    }
     $params = session_get_cookie_params();
     $_SESSION = [];
     if (session_id() !== '') {

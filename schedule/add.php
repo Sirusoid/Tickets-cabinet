@@ -352,7 +352,7 @@ require __DIR__ . '/../includes/panel.php';
               sc.setLayout(layout);
             }
           }
-        } catch (e) { console.warn('setLayout failed', e); }
+        } catch (e) { }
 
         try {
           var editor = (window.SessionPriceEditor && typeof window.SessionPriceEditor.getInstance === 'function') ? window.SessionPriceEditor.getInstance() : null;
@@ -370,7 +370,6 @@ require __DIR__ . '/../includes/panel.php';
       })
       .catch(function (err) {
         try { window.showToast && window.showToast('Не удалось загрузить схему зала: ' + (err.message || err), 'error'); } catch (e) {}
-        console.error('loadHallLayoutById error', err);
         throw err;
       });
   }

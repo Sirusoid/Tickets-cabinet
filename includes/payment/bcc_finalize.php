@@ -176,6 +176,16 @@ if (!function_exists('bcc_finalize_payment_session')) {
 
             $pdo->commit();
 
+            if (function_exists('audit_log_event')) {
+                audit_log_event($pdo, 'payment.sale_completed', 'payment_session', $paymentSessionId, (string)($data['ORDER'] ?? ''), [], [
+                    'source' => $source,
+                    'order' => $data['ORDER'] ?? null,
+                    'amount_cents' => (int)$lockedSession['amount_cents'],
+                    'transaction_id' => $transactionId,
+                    'ticket_uids' => $ticketUids,
+                ]);
+            }
+
             if (!empty($ticketUids) && function_exists('ticket_pdf_generate_by_ticket_uid')) {
                 foreach ($ticketUids as $ticketUid) {
                     $pdfError = null;

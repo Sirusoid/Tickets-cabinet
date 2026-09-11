@@ -16,7 +16,6 @@
       var canvasId = opts.canvasId || 'editor-canvas';
       var canvas = document.getElementById(canvasId);
       if (!canvas) {
-        console.warn('SessionPriceEditor: canvas not found', canvasId);
         return null;
       }
 
@@ -26,7 +25,6 @@
         sc = global.SeatingCanvasRender.init(canvasId, opts.seatingOptions || { seatSize: 28, gapX: 8, gapY: 12, showGrid: true });
       }
       if (!sc) {
-        console.warn('SessionPriceEditor: SeatingCanvasRender not available');
         return null;
       }
 
@@ -424,7 +422,6 @@
             try { seatMapField.setAttribute('value', compact); } catch (e) {}
           }
         } catch (e) {
-          console.error('updateHiddenSeatMap error', e);
         }
       }
 

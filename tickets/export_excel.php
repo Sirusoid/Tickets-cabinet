@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/reporting.php';
 require_login();
 require_once __DIR__ . '/../includes/excel.php';
 
@@ -72,16 +73,6 @@ if ($filters['refund'] === 'yes') {
 }
 $whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
 
-function ticket_export_discount_info($payload): array
-{
-	$decoded = is_string($payload) ? json_decode($payload, true) : null;
-	$discount = is_array($decoded) && is_array($decoded['discount'] ?? null) ? $decoded['discount'] : [];
-	return [
-		'total' => is_numeric($discount['total_discount'] ?? null) ? max(0, (float)$discount['total_discount']) : 0,
-		'final_total' => is_numeric($discount['final_total'] ?? null) ? max(0, (float)$discount['final_total']) : 0,
-	];
-}
-
 function ticket_export_payment_label($channel, $method): string
 {
 	$method = strtolower(trim((string)$method));
@@ -126,6 +117,13 @@ try {
 	exit('Не удалось загрузить билеты для экспорта.');
 }
 
+if (isset($pdo) && $pdo instanceof PDO && function_exists('audit_log_event')) {
+	audit_log_event($pdo, 'report.ticket_export_xlsx', 'report', null, 'Билеты', [], [
+		'filters' => $filters,
+		'rows' => count($rows),
+	]);
+}
+
 $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Билеты');
@@ -153,25 +151,17 @@ $sheet->fromArray([
 	['Отчёт по билетам', null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
 	['Фильтры', $filterTitle, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
 	['Итоги', null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-	['Билетов', 0, 'База, тг', 0, 'Скидка, тг', 0, 'Итого, тг', 0, null, null, null, null, null, null, null, null, null],
+	['Билетов', 0, 'Цена без скидки, тг', 0, 'Скидка, тг', 0, 'Оплачено, тг', 0, null, null, null, null, null, null, null, null, null],
 	[],
-	['№', 'ID', 'Дата заказа', 'Сеанс', 'Клиент', 'Ряд - Место', 'Тип', 'База, тг', 'Скидка, тг', 'Цена, тг', 'Канал', 'Форма оплаты', 'Номер заказа', 'UID билета', 'Оплата', 'Статус', 'Возврат'],
+	['№', 'ID', 'Дата заказа', 'Сеанс', 'Клиент', 'Ряд - Место', 'Тип', 'Цена без скидки, тг', 'Скидка, тг', 'Оплачено, тг', 'Канал', 'Форма оплаты', 'Номер заказа', 'UID билета', 'Оплата', 'Статус', 'Возврат'],
 ], null, 'A1');
 
 $rowNumber = 7;
 foreach ($rows as $index => $row) {
-	$price = is_numeric($row['price'] ?? null) ? (float)$row['price'] : 0.0;
-	$dbDiscount = is_numeric($row['discount'] ?? null) ? (int)$row['discount'] : null;
-	$discountInfo = ticket_export_discount_info($row['tx_payload'] ?? null);
-	if ($dbDiscount !== null && $dbDiscount > 0 && $dbDiscount < 100) {
-		$base = round($price / (1 - ($dbDiscount / 100)), 2);
-		$discount = round($base - $price, 2);
-	} else {
-		$discount = $discountInfo['total'] > 0 && $discountInfo['final_total'] > 0
-			? round($discountInfo['total'] * ($price / $discountInfo['final_total']), 2)
-			: 0.0;
-		$base = round($price + $discount, 2);
-	}
+	$financials = reporting_ticket_financials($row);
+	$base = $financials['original'];
+	$discount = $financials['discount'];
+	$price = $financials['paid'];
 	$totals['tickets']++;
 	$totals['base'] += $base;
 	$totals['discount'] += $discount;
