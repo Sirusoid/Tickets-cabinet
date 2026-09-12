@@ -88,6 +88,28 @@ if (!function_exists('reporting_payment_label')) {
     }
 }
 
+if (!function_exists('reporting_discount_label')) {
+    function reporting_discount_label(array $row): string
+    {
+        $payload = reporting_decode_payload($row['tx_payload'] ?? null);
+        $discount = is_array($payload['discount'] ?? null) ? $payload['discount'] : [];
+        $applied = is_array($discount['applied'] ?? null) ? $discount['applied'] : [];
+        $totalDiscount = is_numeric($discount['total_discount'] ?? null) ? (float)$discount['total_discount'] : 0.0;
+        if ($totalDiscount <= 0) {
+            return 'Без скидки';
+        }
+        $customType = (string)($applied['custom_type'] ?? 'none');
+        if ($customType === 'percent') {
+            return 'Ручная, процентная';
+        }
+        if ($customType === 'fixed') {
+            return 'Ручная, фиксированная';
+        }
+        $segment = (string)($applied['segment'] ?? $row['customer_segment'] ?? '');
+        return $segment !== '' ? 'По типу: ' . reporting_segment_label($segment) : 'Скидка';
+    }
+}
+
 if (!function_exists('reporting_ticket_financials')) {
     function reporting_ticket_financials(array $row): array
     {

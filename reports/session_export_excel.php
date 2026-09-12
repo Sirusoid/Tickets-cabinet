@@ -30,15 +30,21 @@ try {
     $rows = db_fetch_all("SELECT
             t.id, t.ticket_uid, t.seat_identifier, t.price, t.discount,
             t.customer_segment, t.channel, t.payment_status, t.status,
-            t.refund_status, t.purchased_at,
+            t.refund_status, t.refund_at, t.purchased_at,
             tx.payload AS tx_payload,
             tx.payment_method AS tx_payment_method,
             ps.order_number,
-            COALESCE(c.full_name, '') AS customer_name
+            COALESCE(c.full_name, '') AS customer_name,
+            r.refund_amount AS refund_record_amount,
+            r.refund_transaction_id AS refund_record_transaction_id,
+            r.processed_by AS refund_processed_by
         FROM tickets t
         LEFT JOIN customers c ON c.id = t.customer_id
         LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
         LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+        LEFT JOIN refunds r ON r.id = (
+            SELECT MAX(r2.id) FROM refunds r2 WHERE r2.ticket_id = t.id
+        )
         WHERE t.schedule_id = :session_id
             AND t.payment_status = 'paid'
         ORDER BY t.purchased_at ASC, t.id ASC", [':session_id' => $sessionId]);
@@ -60,9 +66,13 @@ $details = [];
 foreach ($rows as $row) {
     $financials = reporting_ticket_financials($row);
     $isRefunded = (string)($row['refund_status'] ?? '') === 'refunded';
+    $refundAmount = $isRefunded ? max(0.0, (float)($row['refund_record_amount'] ?? $financials['paid'])) : 0.0;
+    $paymentMethod = reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
+    $purchaseSource = in_array(strtolower((string)($row['channel'] ?? '')), ['web', 'mobile', 'online'], true)
+        || $paymentMethod === 'Карта' ? 'Онлайн' : 'Касса';
     if ($isRefunded) {
         $summary['refunded_tickets']++;
-        $summary['refunds'] += $financials['paid'];
+        $summary['refunds'] += $refundAmount;
     } elseif ((string)($row['status'] ?? '') !== 'cancelled') {
         $summary['sold_tickets']++;
         $summary['original'] += $financials['original'];
@@ -71,18 +81,25 @@ foreach ($rows as $row) {
     }
 
     $details[] = [
+        $isRefunded ? 'Возврат' : 'Покупка',
+        $isRefunded ? ((int)($row['refund_processed_by'] ?? 0) > 0 ? 'Кассир' : 'Клиент') : $purchaseSource,
         !empty($row['purchased_at']) ? reporting_format_date($row['purchased_at'], true) : '',
+        $isRefunded && !empty($row['refund_at']) ? reporting_format_date($row['refund_at'], true) : '',
         str_replace(':', ' - ', (string)($row['seat_identifier'] ?? '')),
         (string)($row['ticket_uid'] ?? ''),
         reporting_segment_label($row['customer_segment'] ?? ''),
+        reporting_discount_label($row),
         $financials['original'],
         $financials['discount'],
         $financials['paid'],
-        reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? ''),
+        $refundAmount,
+        max(0.0, $financials['paid'] - $refundAmount),
+        $paymentMethod,
         (string)($row['channel'] ?? ''),
         (string)($row['order_number'] ?? ''),
         (string)($row['customer_name'] ?? ''),
         $isRefunded ? 'Возвращён' : ((string)($row['status'] ?? '') === 'cancelled' ? 'Отменён' : 'Выдан'),
+        (string)($row['refund_record_transaction_id'] ?? ''),
     ];
 }
 
@@ -115,8 +132,10 @@ $summarySheet->fromArray([
 $detailSheet = $spreadsheet->createSheet();
 $detailSheet->setTitle('Билеты');
 $detailSheet->fromArray([
-    ['Дата покупки', 'Ряд - Место', 'UID билета', 'Тип билета', 'Цена без скидки, тг',
-        'Скидка, тг', 'Оплачено, тг', 'Форма оплаты', 'Канал', 'Номер заказа', 'Клиент', 'Статус'],
+    ['Операция', 'Источник', 'Дата покупки', 'Дата возврата', 'Ряд - Место', 'UID билета',
+        'Тип билета', 'Тип скидки', 'Цена без скидки, тг', 'Скидка, тг', 'Продажа, тг',
+        'Возврат, тг', 'Итог, тг', 'Форма оплаты', 'Канал', 'Номер заказа', 'Клиент',
+        'Статус', 'Транзакция возврата'],
 ], null, 'A1');
 foreach ($details as $index => $detail) {
     $detailSheet->fromArray([$detail], null, 'A' . ($index + 2));
@@ -125,10 +144,10 @@ foreach ($details as $index => $detail) {
 $summarySheet->getStyle('A1:B1')->getFont()->setBold(true)->setSize(15);
 $summarySheet->getStyle('A6:B6')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
 $summarySheet->getStyle('A6:B6')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
-$detailSheet->getStyle('A1:L1')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$detailSheet->getStyle('A1:L1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
+$detailSheet->getStyle('A1:S1')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+$detailSheet->getStyle('A1:S1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
 $summarySheet->getStyle('B8:B13')->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('E2:G' . max(2, count($details) + 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('I2:M' . max(2, count($details) + 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $summarySheet->freezePane('A7');
 $detailSheet->freezePane('A2');
 foreach ([$summarySheet, $detailSheet] as $sheet) {

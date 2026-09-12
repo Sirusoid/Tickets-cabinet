@@ -19,6 +19,7 @@ if (!$reportsEmbedded) {
 $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $segmentFilter = trim((string)($_GET['segment'] ?? ''));
+$eventFilter = (int)($_GET['event_id'] ?? 0);
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
 		$dateFrom = date('Y-m-01');
@@ -33,12 +34,20 @@ if ($segmentFilter !== '') {
 		$segmentSql = ' AND t.customer_segment = :segment ';
 		$params[':segment'] = $segmentFilter;
 }
+$eventSql = '';
+if ($eventFilter > 0) {
+		$eventSql = ' AND COALESCE(t.event_id, s.event_id) = :event_id ';
+		$params[':event_id'] = $eventFilter;
+}
 
 $rows = [];
 $errorText = '';
+$events = [];
 try {
+		$events = db_fetch_all('SELECT id, title FROM events ORDER BY title');
 		$sql = "SELECT
 								t.id,
+								t.schedule_id,
 								t.price,
 								t.discount,
 								t.seat_identifier,
@@ -54,13 +63,14 @@ try {
 								s.start_time AS schedule_start
 						FROM tickets t
 						LEFT JOIN schedules s ON s.id = t.schedule_id
-						LEFT JOIN events e ON e.id = t.event_id
+						LEFT JOIN events e ON e.id = COALESCE(t.event_id, s.event_id)
 						LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
 						WHERE t.purchased_at BETWEEN :date_from AND :date_to
 							AND t.payment_status = 'paid'
 							AND t.status <> 'cancelled'
 							AND COALESCE(t.refund_status, 'none') IN ('none', '', 'no')
 							$segmentSql
+							$eventSql
 						ORDER BY t.purchased_at DESC, t.id DESC";
 		$rows = db_fetch_all($sql, $params);
 } catch (Throwable $e) {
@@ -127,6 +137,7 @@ foreach ($rows as $row) {
 		$performanceKey = (string)($row['schedule_start'] ?? '') . '|' . (string)($row['event_title'] ?? '');
 		if (!isset($byPerformance[$performanceKey])) {
 				$byPerformance[$performanceKey] = [
+								'schedule_id' => (int)($row['schedule_id'] ?? 0),
 						'event_title' => (string)($row['event_title'] ?? 'Без названия'),
 						'schedule_start' => (string)($row['schedule_start'] ?? ''),
 						'tickets' => 0,
@@ -148,33 +159,44 @@ try {
 			$refundSegmentSql = ' AND t.customer_segment = :refund_segment ';
 			$refundParams[':refund_segment'] = $segmentFilter;
 		}
+		$refundEventSql = '';
+		if ($eventFilter > 0) {
+			$refundEventSql = ' AND COALESCE(t.event_id, s.event_id) = :refund_event_id ';
+			$refundParams[':refund_event_id'] = $eventFilter;
+		}
 		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.price), 0) AS amount
 			FROM tickets t
 			WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 				AND t.payment_status = 'paid'
 				AND t.refund_status = 'refunded'
-				$refundSegmentSql", $refundParams);
+				$refundSegmentSql
+				$refundEventSql", $refundParams);
 		$refundTotals = [
 			'tickets' => (int)($refundRow['tickets'] ?? 0),
 			'amount' => (float)($refundRow['amount'] ?? 0),
 		];
 	$refundRows = db_fetch_all("SELECT
-			e.title AS event_title,
+		s.id AS schedule_id,
+		e.title AS event_title,
 			s.start_time AS schedule_start,
 			COUNT(*) AS tickets,
 			COALESCE(SUM(t.price), 0) AS amount
 		FROM tickets t
 		LEFT JOIN schedules s ON s.id = t.schedule_id
-		LEFT JOIN events e ON e.id = t.event_id
+		LEFT JOIN events e ON e.id = COALESCE(t.event_id, s.event_id)
 		WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 			AND t.payment_status = 'paid'
 			AND t.refund_status = 'refunded'
 			$refundSegmentSql
+			$refundEventSql
 		GROUP BY e.title, s.start_time
 		ORDER BY s.start_time DESC", $refundParams);
 	foreach ($refundRows as $refundItem) {
 		$key = (string)($refundItem['schedule_start'] ?? '') . '|' . (string)($refundItem['event_title'] ?? '');
 		$refundByPerformance[$key] = [
+			'schedule_id' => (int)($refundItem['schedule_id'] ?? 0),
+			'event_title' => (string)($refundItem['event_title'] ?? 'Без названия'),
+			'schedule_start' => (string)($refundItem['schedule_start'] ?? ''),
 			'tickets' => (int)($refundItem['tickets'] ?? 0),
 			'amount' => (float)($refundItem['amount'] ?? 0),
 		];
@@ -190,7 +212,6 @@ usort($byPerformance, function ($a, $b) {
 		return strcmp($b['schedule_start'], $a['schedule_start']);
 });
 
-$avgDiscount = $totals['tickets'] > 0 ? ($totals['discount'] / $totals['tickets']) : 0.0;
 $netAfterRefunds = max(0.0, $totals['net'] - $refundTotals['amount']);
 $today = date('Y-m-d');
 $yesterday = date('Y-m-d', strtotime('-1 day'));
@@ -199,6 +220,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 		'date_from' => $dateFrom,
 		'date_to' => $dateTo,
 		'segment' => $segmentFilter,
+		'event_id' => $eventFilter,
 ]);
 
 ?>
@@ -230,10 +252,19 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 					<option value="vip" <?= $segmentFilter === 'vip' ? 'selected' : '' ?>>VIP</option>
 				</select>
 			</div>
+			<div>
+				<label for="report-event">Спектакль</label>
+				<select id="report-event" name="event_id" class="form-control">
+					<option value="0">Все спектакли</option>
+					<?php foreach ($events as $event): ?>
+						<option value="<?= (int)$event['id'] ?>" <?= $eventFilter === (int)$event['id'] ? 'selected' : '' ?>><?= h($event['title']) ?></option>
+					<?php endforeach; ?>
+				</select>
+			</div>
 			<div class="reports-filters__actions">
 				<a href="/reports/sales.php" class="btn btn-ghost">Сбросить</a>
-				<a href="?date_from=<?= h($today) ?>&date_to=<?= h($today) ?>&segment=<?= h($segmentFilter) ?>" class="btn btn-ghost">Сегодня</a>
-				<a href="?date_from=<?= h($yesterday) ?>&date_to=<?= h($yesterday) ?>&segment=<?= h($segmentFilter) ?>" class="btn btn-ghost">Вчера</a>
+				<a href="?date_from=<?= h($today) ?>&date_to=<?= h($today) ?>&segment=<?= h($segmentFilter) ?>&event_id=<?= (int)$eventFilter ?>" class="btn btn-ghost">Сегодня</a>
+				<a href="?date_from=<?= h($yesterday) ?>&date_to=<?= h($yesterday) ?>&segment=<?= h($segmentFilter) ?>&event_id=<?= (int)$eventFilter ?>" class="btn btn-ghost">Вчера</a>
 				<button type="submit" class="btn btn-primary">Показать</button>
 				<a href="<?= h($exportUrl) ?>" class="btn btn-secondary">Скачать XLSX</a>
 			</div>
@@ -252,7 +283,6 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 
 		<div class="reports-meta-row">
 			<div><span>Период</span><strong><?= h($displayDateRange) ?></strong></div>
-			<div><span>Средняя скидка</span><strong><?= number_format((float)$avgDiscount, 2, '.', ' ') ?> тг на билет</strong></div>
 			<div class="reports-meta-row__refund"><span>Возвраты</span><strong>-<?= number_format((float)$refundTotals['amount'], 2, '.', ' ') ?> тг</strong></div>
 		</div>
 
@@ -300,17 +330,19 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							<th>Продажи</th>
 							<th>Возвраты</th>
 							<th>Итого после возвратов</th>
+							<th>Excel</th>
 						</tr>
 					</thead>
 					<tbody>
 					<?php if (empty($byPerformance) && empty($refundByPerformance)): ?>
-						<tr><td colspan="8" class="reports-empty">Данные за выбранный период не найдены</td></tr>
+						<tr><td colspan="9" class="reports-empty">Данные за выбранный период не найдены</td></tr>
 					<?php else:
 						$performanceKeys = array_unique(array_merge(array_keys($byPerformance), array_keys($refundByPerformance)));
 						foreach ($performanceKeys as $performanceKey):
 							$item = $byPerformance[$performanceKey] ?? [
-								'event_title' => 'Без названия',
-								'schedule_start' => '',
+								'event_title' => $refundByPerformance[$performanceKey]['event_title'] ?? 'Без названия',
+								'schedule_id' => $refundByPerformance[$performanceKey]['schedule_id'] ?? 0,
+								'schedule_start' => $refundByPerformance[$performanceKey]['schedule_start'] ?? '',
 								'tickets' => 0,
 								'original' => 0.0,
 								'discount' => 0.0,
@@ -328,6 +360,13 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							<td><?= number_format((float)$item['paid'], 2, '.', ' ') ?> тг</td>
 							<td class="reports-number--refund">-<?= number_format((float)$refundItem['amount'], 2, '.', ' ') ?> тг</td>
 							<td><strong><?= number_format($netPerformance, 2, '.', ' ') ?> тг</strong></td>
+							<td>
+								<?php if ((int)$item['schedule_id'] > 0): ?>
+									<a class="btn btn-secondary btn-sm" href="/reports/session_export_excel.php?session_id=<?= (int)$item['schedule_id'] ?>">Excel</a>
+								<?php else: ?>
+									—
+								<?php endif; ?>
+							</td>
 						</tr>
 					<?php endforeach; endif; ?>
 					</tbody>
