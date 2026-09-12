@@ -258,7 +258,8 @@ if (!function_exists('bcc_process_refund_request')) {
                     ':schedule_id' => (int)$session['session_id'],
                     ':refund_amount' => number_format((float)$ticket['price'], 2, '.', ''),
                     ':reason' => $refundOrigin,
-                    ':processed_by' => !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null,
+                    // refunds.processed_by ссылается на staff.id, а кабинет использует users.id.
+                    ':processed_by' => null,
                 ]);
             }
             $pdo->commit();

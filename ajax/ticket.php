@@ -856,7 +856,8 @@ if ($action === 'refund') {
             ':refund_provider' => $refund_provider !== '' ? $refund_provider : null,
             ':refund_transaction_id' => $refund_transaction_id !== '' ? $refund_transaction_id : null,
             ':reason' => $reason !== '' ? $reason : 'Возврат кассиром',
-            ':processed_by' => !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null,
+            // refunds.processed_by ссылается на staff.id; сотрудник уже фиксируется в audit_logs.
+            ':processed_by' => null,
         ]);
 
         // cash_transactions trace for refund
