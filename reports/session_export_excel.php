@@ -117,6 +117,7 @@ $summarySheet->fromArray([
     ['Отчёт по сеансу', null, null, null],
     ['Спектакль', (string)($session['event_title'] ?? 'Без названия'), null, null],
     ['Дата и время', reporting_format_date($session['start_time'], true), null, null],
+    ['Номер сеанса', $sessionId, null, null],
     ['Зал', (string)($session['hall_name'] ?? '—'), null, null],
     [],
     ['Показатель', 'Значение', null, null],
@@ -140,15 +141,27 @@ $detailSheet->fromArray([
 foreach ($details as $index => $detail) {
     $detailSheet->fromArray([$detail], null, 'A' . ($index + 2));
 }
+$sessionDetailTotalRow = count($details) + 2;
+$detailSheet->fromArray([[
+    'ИТОГО', null, null, null, null, null, null, null,
+    round($summary['original'], 2),
+    round($summary['discount'], 2),
+    round($summary['sales'], 2),
+    round($summary['refunds'], 2),
+    max(0.0, round($summary['sales'] - $summary['refunds'], 2)),
+    null, null, null, null, null, null,
+]], null, 'A' . $sessionDetailTotalRow);
 
 $summarySheet->getStyle('A1:B1')->getFont()->setBold(true)->setSize(15);
-$summarySheet->getStyle('A6:B6')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$summarySheet->getStyle('A6:B6')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
+$summarySheet->getStyle('A7:B7')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+$summarySheet->getStyle('A7:B7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
 $detailSheet->getStyle('A1:S1')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
 $detailSheet->getStyle('A1:S1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
-$summarySheet->getStyle('B8:B13')->getNumberFormat()->setFormatCode('#,##0.00');
+$summarySheet->getStyle('B9:B14')->getNumberFormat()->setFormatCode('#,##0.00');
 $detailSheet->getStyle('I2:M' . max(2, count($details) + 1))->getNumberFormat()->setFormatCode('#,##0.00');
-$summarySheet->freezePane('A7');
+$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':S' . $sessionDetailTotalRow)->getFont()->setBold(true);
+$detailSheet->getStyle('I' . $sessionDetailTotalRow . ':M' . $sessionDetailTotalRow)->getNumberFormat()->setFormatCode('#,##0.00');
+$summarySheet->freezePane('A8');
 $detailSheet->freezePane('A2');
 foreach ([$summarySheet, $detailSheet] as $sheet) {
     foreach (range('A', $sheet->getHighestColumn()) as $column) {

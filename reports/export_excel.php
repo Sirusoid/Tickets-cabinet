@@ -123,6 +123,7 @@ foreach ($rows as $row) {
         $isRefunded && !empty($row['refund_at']) ? reporting_format_date($row['refund_at'], true) : '',
         (string)($row['event_title'] ?? ''),
         !empty($row['session_start']) ? reporting_format_date($row['session_start'], true) : '',
+        (int)($row['schedule_id'] ?? 0),
         (string)($row['ticket_uid'] ?? ''),
         str_replace(':', ' - ', (string)($row['seat_identifier'] ?? '')),
         reporting_segment_label($row['customer_segment'] ?? ''),
@@ -181,8 +182,8 @@ foreach ($summary as $item) {
 $detailSheet = $spreadsheet->createSheet();
 $detailSheet->setTitle('Билеты');
 $detailSheet->fromArray([
-    ['Операция', 'Источник', 'Дата покупки', 'Дата возврата', 'Спектакль', 'Сеанс',
-        'UID билета', 'Ряд - Место', 'Тип билета', 'Тип скидки', 'Цена без скидки, тг',
+    ['Операция', 'Источник', 'Дата покупки', 'Дата возврата', 'Название спектакля', 'Дата спектакля',
+        '№ сеанса', 'UID билета', 'Ряд - Место', 'Тип билета', 'Тип скидки', 'Цена без скидки, тг',
         'Скидка, тг', 'Продажа, тг', 'Возврат, тг', 'Итог, тг', 'Форма оплаты', 'Канал',
         'Номер заказа', 'Клиент', 'Оплата', 'Статус', 'Возврат', 'Транзакция возврата'],
 ], null, 'A1');
@@ -190,6 +191,15 @@ $detailRow = 2;
 foreach ($details as $detail) {
     $detailSheet->fromArray([$detail], null, 'A' . $detailRow++);
 }
+$detailSheet->fromArray([[
+    'ИТОГО', null, null, null, null, null, null, null, null, null, null,
+    round($totals['original'], 2),
+    round($totals['discount'], 2),
+    round($totals['paid'], 2),
+    round($totals['refunds'], 2),
+    max(0.0, round($totals['paid'] - $totals['refunds'], 2)),
+    null, null, null, null, null, null, null,
+]], null, 'A' . $detailRow);
 
 foreach ([$summarySheet, $detailSheet] as $sheet) {
     $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()->setVertical(
@@ -209,6 +219,8 @@ foreach ([$summarySheet, $detailSheet] as $sheet) {
 $summarySheet->getStyle('D3:H' . max(3, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $summarySheet->getStyle('A7:H' . max(7, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $detailSheet->getStyle('K2:O' . max(2, $detailRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('A' . $detailRow . ':W' . $detailRow)->getFont()->setBold(true);
+$detailSheet->getStyle('L' . $detailRow . ':P' . $detailRow)->getNumberFormat()->setFormatCode('#,##0.00');
 
 $filename = 'sales-report-' . $dateFrom . '-' . $dateTo . '.xlsx';
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
