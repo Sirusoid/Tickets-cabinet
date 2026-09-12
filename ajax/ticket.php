@@ -7,6 +7,7 @@
 // - Refund: update tickets.refund_status = 'refunded' and remove occupancy row (free seat). No inserts into refunds table.
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/reporting.php';
 require_once __DIR__ . '/../includes/payment/bcc_refund.php';
 require_login();
 
@@ -508,9 +509,9 @@ if ($action === 'list') {
             foreach ($all as $a) {
                 $sessionLabel = ($a['event_title'] ?? '') . ($a['session_start'] ? ' / ' . $a['session_start'] : '');
                 $seatOut = $a['seat_label'] ?: ($a['seat_identifier'] ?? '');
-                $discountInfo = extract_discount_from_transaction_payload($a['tx_payload'] ?? null);
-                $ticketDiscount = allocate_ticket_discount($a['price'] ?? 0, $discountInfo, $a['tx_ticket_count'] ?? 1);
-                $ticketBasePrice = round(((float)($a['price'] ?? 0)));
+                $ticketFinancials = reporting_ticket_financials($a);
+                $ticketDiscount = $ticketFinancials['discount'];
+                $ticketBasePrice = $ticketFinancials['original'];
                 $paymentType = map_payment_type_display($a['channel'] ?? '', $a['tx_payment_method'] ?? null);
                 fputcsv($out, [
                     $a['id'],
@@ -522,7 +523,7 @@ if ($action === 'list') {
                     $a['customer_segment'],
                     $ticketBasePrice,
                     $ticketDiscount,
-                    $a['price'],
+                    $ticketFinancials['paid'],
                     $a['channel'],
                     $paymentType,
                     $a['order_number'] ?? '',
@@ -541,41 +542,10 @@ if ($action === 'list') {
 
     $outRows = [];
     foreach ($rows as $r) {
-        // Prefer discount stored in tickets.discount (percent) when available
-        $dbDiscountPercent = null;
-        if (isset($r['discount']) && $r['discount'] !== null && $r['discount'] !== '') {
-            if (is_numeric($r['discount'])) {
-                $dbDiscountPercent = (int)$r['discount'];
-            } else {
-                // try to cast numeric-like strings
-                $tmp = filter_var($r['discount'], FILTER_SANITIZE_NUMBER_INT);
-                if ($tmp !== '') $dbDiscountPercent = (int)$tmp;
-            }
-        }
-
-        $priceValue = is_numeric($r['price']) ? (float)$r['price'] : 0.0;
-
-        // If DB discount percent is present and price is numeric, compute base and discount amount from percent
-        if ($dbDiscountPercent !== null && $priceValue !== null) {
-            $discount_percent = max(0, min(100, $dbDiscountPercent));
-            if ($discount_percent >= 100) {
-                // avoid division by zero; treat base as price (no meaningful base)
-                $ticketDiscount = round((float)0, 2);
-                $ticketBasePrice = round($priceValue, 2);
-            } else {
-                // base = price / (1 - p/100)
-                $ticketBasePrice = round($priceValue / (1 - ($discount_percent / 100.0)), 2);
-                $ticketDiscount = round($ticketBasePrice - $priceValue, 2);
-            }
-        } else {
-            // Fallback: use transaction payload allocation as before
-            $discountInfo = extract_discount_from_transaction_payload($r['tx_payload'] ?? null);
-            $ticketDiscount = allocate_ticket_discount($r['price'] ?? 0, $discountInfo, $r['tx_ticket_count'] ?? 1);
-            $ticketBasePrice = round(((float)($r['price'] ?? 0)) + $ticketDiscount, 2);
-        }
-
-        // Ensure numeric formatting for price
-        $priceOut = is_numeric($r['price']) ? (float)$r['price'] : null;
+        $ticketFinancials = reporting_ticket_financials($r);
+        $ticketBasePrice = $ticketFinancials['original'];
+        $ticketDiscount = $ticketFinancials['discount'];
+        $priceOut = $ticketFinancials['paid'];
 
         $outRows[] = [
             'id' => (string)$r['id'],
@@ -587,8 +557,8 @@ if ($action === 'list') {
             'customer_name' => $r['customer_name'] ?? null,
             'customer_segment' => $r['customer_segment'] ?? null,
             'base_price' => $priceOut,
-            'discount_amount' => $priceOut*($dbDiscountPercent/100),
-            'price' => $priceOut - $priceOut*($dbDiscountPercent/100),
+            'discount_amount' => $ticketDiscount,
+            'price' => $priceOut,
             'channel' => $r['channel'],
             'payment_type' => map_payment_type_display($r['channel'] ?? '', $r['tx_payment_method'] ?? null),
             'tx_payment_method' => $r['tx_payment_method'] ?? null,
@@ -599,7 +569,7 @@ if ($action === 'list') {
             'payment_status' => $r['payment_status'],
             'status' => $r['status'],
             'refund_status' => $r['refund_status'] ?? 'none',
-            'discount' => isset($dbDiscountPercent) && $dbDiscountPercent !== null ? $dbDiscountPercent : null
+            'discount' => isset($r['discount']) && is_numeric($r['discount']) ? (float)$r['discount'] : null
         ];
     }
 
