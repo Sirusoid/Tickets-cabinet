@@ -6,6 +6,46 @@ require_login();
 if (isset($pdo) && $pdo instanceof PDO) {
 	$notificationSettings = [
 		[
+			'key' => 'notifications.order_email_enabled',
+			'label' => 'Отправлять письма с билетами',
+			'value' => '1',
+			'type' => 'bool',
+			'description' => 'После успешной онлайн-покупки клиент получает номер заказа и ссылку на билеты.',
+			'sort' => 1,
+		],
+		[
+			'key' => 'notifications.email_from',
+			'label' => 'Email отправителя',
+			'value' => getenv('ZHASSAHNA_EMAIL_FROM') ?: 'noreply@zhassahna.kz',
+			'type' => 'string',
+			'description' => 'Адрес отправителя. Желательно использовать адрес домена театра.',
+			'sort' => 2,
+		],
+		[
+			'key' => 'notifications.email_from_name',
+			'label' => 'Имя отправителя',
+			'value' => defined('APP_NAME') ? (string)APP_NAME : 'Театр «Жас сахна»',
+			'type' => 'string',
+			'description' => 'Название, которое увидит клиент в почтовом ящике.',
+			'sort' => 3,
+		],
+		[
+			'key' => 'notifications.email_reply_to',
+			'label' => 'Адрес для ответа',
+			'value' => getenv('ZHASSAHNA_EMAIL_REPLY_TO') ?: '',
+			'type' => 'string',
+			'description' => 'Ответы клиентов будут направляться на этот адрес.',
+			'sort' => 4,
+		],
+		[
+			'key' => 'notifications.email_feedback',
+			'label' => 'Email обратной связи',
+			'value' => getenv('ZHASSAHNA_EMAIL_FEEDBACK') ?: '',
+			'type' => 'string',
+			'description' => 'Адрес обратной связи театра. Используется, если адрес для ответа не задан.',
+			'sort' => 5,
+		],
+		[
 			'key' => 'notifications.bcc_notify_url',
 			'label' => 'BCC NOTIFY URL',
 			'value' => defined('PUBLIC_BASE_URL') ? (string)PUBLIC_BASE_URL : 'https://cabinet.zhassahna.kz',
