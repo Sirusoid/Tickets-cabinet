@@ -287,31 +287,6 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 			<div class="reports-meta-row__refund"><span>Возвраты</span><strong>-<?= number_format((float)$refundTotals['amount'], 2, '.', ' ') ?> тг</strong></div>
 		</div>
 
-		<div class="reports-table-grid">
-			<section class="card reports-section">
-				<div class="reports-section__head"><div><h3>Продажи по типам</h3><p>Количество билетов и сумма после скидок.</p></div></div>
-				<div class="reports-table-wrap">
-					<table class="admin-table table--compact reports-table">
-						<thead><tr><th>Тип билета</th><th>Билетов</th><th>До скидки</th><th>Скидка</th><th>Итого</th></tr></thead>
-						<tbody>
-						<?php if (empty($bySegment)): ?><tr><td colspan="5" class="reports-empty">Данные за выбранный период не найдены</td></tr>
-						<?php else: foreach ($bySegment as $item): ?><tr><td><strong><?= h($item['segment']) ?></strong></td><td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td><td><?= number_format((float)$item['gross'], 2, '.', ' ') ?> тг</td><td class="reports-number--success">-<?= number_format((float)$item['discount'], 2, '.', ' ') ?> тг</td><td><strong><?= number_format((float)$item['net'], 2, '.', ' ') ?> тг</strong></td></tr><?php endforeach; endif; ?>
-						</tbody>
-					</table>
-				</div>
-			</section>
-
-			<section class="card reports-section">
-				<div class="reports-section__head"><div><h3>Способы оплаты</h3><p>Распределение выручки по каналам.</p></div></div>
-				<div class="reports-table-wrap">
-					<table class="admin-table table--compact reports-table">
-						<thead><tr><th>Способ</th><th>Билетов</th><th>Выручка</th></tr></thead>
-						<tbody><?php foreach ($byPaymentMethod as $method): ?><tr><td><strong><?= h($method['label']) ?></strong></td><td><?= number_format((float)$method['tickets'], 0, '.', ' ') ?></td><td><strong><?= number_format((float)$method['net'], 2, '.', ' ') ?> тг</strong></td></tr><?php endforeach; ?></tbody>
-					</table>
-				</div>
-			</section>
-		</div>
-
 		<section class="card reports-section reports-section--wide">
 			<div class="reports-section__head">
 				<div>
@@ -374,6 +349,32 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 				</table>
 			</div>
 		</section>
+
+		<div class="reports-table-grid">
+			<section class="card reports-section">
+				<div class="reports-section__head"><div><h3>Продажи по типам</h3><p>Количество билетов и сумма после скидок.</p></div></div>
+				<div class="reports-table-wrap">
+					<table class="admin-table table--compact reports-table">
+						<thead><tr><th>Тип билета</th><th>Билетов</th><th>До скидки</th><th>Скидка</th><th>Итого</th></tr></thead>
+						<tbody>
+						<?php if (empty($bySegment)): ?><tr><td colspan="5" class="reports-empty">Данные за выбранный период не найдены</td></tr>
+						<?php else: foreach ($bySegment as $item): ?><tr><td><strong><?= h($item['segment']) ?></strong></td><td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td><td><?= number_format((float)$item['gross'], 2, '.', ' ') ?> тг</td><td class="reports-number--success">-<?= number_format((float)$item['discount'], 2, '.', ' ') ?> тг</td><td><strong><?= number_format((float)$item['net'], 2, '.', ' ') ?> тг</strong></td></tr><?php endforeach; endif; ?>
+						</tbody>
+					</table>
+				</div>
+			</section>
+
+			<section class="card reports-section">
+				<div class="reports-section__head"><div><h3>Способы оплаты</h3><p>Распределение выручки по каналам.</p></div></div>
+				<div class="reports-table-wrap">
+					<table class="admin-table table--compact reports-table">
+						<thead><tr><th>Способ</th><th>Билетов</th><th>Выручка</th></tr></thead>
+						<tbody><?php foreach ($byPaymentMethod as $method): ?><tr><td><strong><?= h($method['label']) ?></strong></td><td><?= number_format((float)$method['tickets'], 0, '.', ' ') ?></td><td><strong><?= number_format((float)$method['net'], 2, '.', ' ') ?> тг</strong></td></tr><?php endforeach; ?></tbody>
+					</table>
+				</div>
+			</section>
+		</div>
+
 	<?php endif; ?>
 </div>
 
