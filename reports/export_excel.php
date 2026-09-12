@@ -30,9 +30,14 @@ if ($segment !== '') {
     $params[':segment'] = $segment;
 }
 $eventSql = '';
+$eventTitle = 'Все спектакли';
 if ($eventId > 0) {
     $eventSql = ' AND COALESCE(t.event_id, s.event_id) = :event_id';
     $params[':event_id'] = $eventId;
+    $eventRow = db_fetch_one('SELECT title FROM events WHERE id = :id LIMIT 1', [':id' => $eventId]);
+    if ($eventRow) {
+        $eventTitle = (string)$eventRow['title'];
+    }
 }
 
 try {
@@ -159,13 +164,16 @@ $summarySheet = $spreadsheet->getActiveSheet();
 $summarySheet->setTitle('Сводка');
 $summarySheet->fromArray([
     ['Отчёт продаж', null, null, null, null, null],
-    ['Период', reporting_format_date_range($dateFrom, $dateTo), null, null, null, null],
+    ['Спектакль', $eventTitle, null, null, null, null],
+    ['Дата спектакля', reporting_format_date_range($dateFrom, $dateTo), null, null, null, null],
+    ['Номер сеанса', $eventId > 0 ? 'Все сеансы' : 'Все спектакли', null, null, null, null],
+    ['Период отчёта', reporting_format_date_range($dateFrom, $dateTo), null, null, null, null],
     ['Билетов', $totals['tickets'], 'Цена без скидки, тг', $totals['original'], 'Скидка, тг', $totals['discount'], 'Возвраты, тг', $totals['refunds']],
     ['Оплачено, тг', $totals['paid'], 'Возвращено билетов', $totals['refunded_tickets'], 'Итого после возвратов, тг', max(0.0, $totals['paid'] - $totals['refunds']), null, null],
     [],
     ['Спектакль', 'Дата и время сеанса', 'Билетов', 'Цена без скидки, тг', 'Скидка, тг', 'Продажи, тг', 'Возвраты, тг', 'Итого после возвратов, тг'],
 ], null, 'A1');
-$summaryRow = 7;
+$summaryRow = 10;
 foreach ($summary as $item) {
     $summarySheet->fromArray([[
         $item['event_title'],
@@ -205,7 +213,7 @@ foreach ([$summarySheet, $detailSheet] as $sheet) {
     $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()->setVertical(
         \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP
     );
-    $headerRow = $sheet === $summarySheet ? 6 : 1;
+    $headerRow = $sheet === $summarySheet ? 9 : 1;
     $sheet->getStyle('A' . $headerRow . ':' . $sheet->getHighestColumn() . $headerRow)->getFont()->setBold(true);
     $sheet->getStyle('A' . $headerRow . ':' . $sheet->getHighestColumn() . $headerRow)->getFill()
         ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
@@ -214,10 +222,10 @@ foreach ([$summarySheet, $detailSheet] as $sheet) {
     foreach (range('A', $sheet->getHighestColumn()) as $column) {
         $sheet->getColumnDimension($column)->setAutoSize(true);
     }
-    $sheet->freezePane($sheet === $summarySheet ? 'A7' : 'A2');
+    $sheet->freezePane($sheet === $summarySheet ? 'A10' : 'A2');
 }
-$summarySheet->getStyle('D3:H' . max(3, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-$summarySheet->getStyle('A7:H' . max(7, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$summarySheet->getStyle('D6:H' . max(6, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$summarySheet->getStyle('A10:H' . max(10, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $detailSheet->getStyle('K2:O' . max(2, $detailRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $detailSheet->getStyle('A' . $detailRow . ':W' . $detailRow)->getFont()->setBold(true);
 $detailSheet->getStyle('L' . $detailRow . ':P' . $detailRow)->getNumberFormat()->setFormatCode('#,##0.00');
