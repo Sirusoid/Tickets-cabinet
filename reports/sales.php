@@ -166,6 +166,7 @@ try {
 		}
 		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.price), 0) AS amount
 			FROM tickets t
+			LEFT JOIN schedules s ON s.id = t.schedule_id
 			WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 				AND t.payment_status = 'paid'
 				AND t.refund_status = 'refunded'
