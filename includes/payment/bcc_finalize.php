@@ -10,7 +10,7 @@ if (!function_exists('bcc_finalize_payment_session')) {
 
         $pdo->beginTransaction();
         try {
-            $lockStmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, amount_cents, seats_payload, ticket_uids, customer_phone, customer_name, customer_email
+            $lockStmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, amount_cents, seats_payload, ticket_uids, customer_phone, customer_name, customer_email, order_number, order_email_sent_at
                 FROM payment_sessions WHERE id = :id LIMIT 1 FOR UPDATE");
             $lockStmt->execute([':id' => $paymentSessionId]);
             $lockedSession = $lockStmt->fetch(PDO::FETCH_ASSOC);
@@ -184,6 +184,16 @@ if (!function_exists('bcc_finalize_payment_session')) {
                     'transaction_id' => $transactionId,
                     'ticket_uids' => $ticketUids,
                 ]);
+            }
+
+            if (
+                function_exists('send_order_access_email')
+                && empty($lockedSession['order_email_sent_at'])
+                && !empty($lockedSession['customer_email'])
+                && send_order_access_email((string)$lockedSession['customer_email'], (string)$lockedSession['order_number'])
+            ) {
+                $emailSentStmt = $pdo->prepare('UPDATE payment_sessions SET order_email_sent_at = NOW(), updated_at = NOW() WHERE id = :id AND order_email_sent_at IS NULL');
+                $emailSentStmt->execute([':id' => $paymentSessionId]);
             }
 
             if (!empty($ticketUids) && function_exists('ticket_pdf_generate_by_ticket_uid')) {
