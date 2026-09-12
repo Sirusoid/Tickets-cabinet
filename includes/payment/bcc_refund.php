@@ -366,6 +366,16 @@ if (!function_exists('bcc_mark_refund_result')) {
                 }
             }
             if ($allRefunded) {
+                // Повторный callback не должен оставлять билет выданным или место занятым.
+                $syncTicket = $pdo->prepare("UPDATE tickets
+                    SET refund_status = 'refunded', refund_at = COALESCE(refund_at, NOW()),
+                        status = 'cancelled', updated_at = NOW()
+                    WHERE id = :id");
+                $deleteOccupancy = $pdo->prepare("DELETE FROM seat_occupancy WHERE ticket_id = :ticket_id");
+                foreach ($tickets as $ticket) {
+                    $syncTicket->execute([':id' => (int)$ticket['id']]);
+                    $deleteOccupancy->execute([':ticket_id' => (int)$ticket['id']]);
+                }
                 $pdo->commit();
                 return ['status' => 'refunded', 'ticket_uids' => array_column($tickets, 'ticket_uid')];
             }
