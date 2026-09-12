@@ -842,6 +842,23 @@ if ($action === 'refund') {
             error_log('ajax/ticket.php refund delete seat_occupancy error: ' . $e->getMessage());
         }
 
+        $refundInsert = $pdo->prepare("INSERT INTO refunds
+            (ticket_id, ticket_uid, schedule_id, refund_amount, refund_status, refund_method,
+             refund_provider, refund_transaction_id, approved_at, reason, processed_by, created_at)
+            VALUES (:ticket_id, :ticket_uid, :schedule_id, :refund_amount, 'refunded', :refund_method,
+                :refund_provider, :refund_transaction_id, NOW(), :reason, :processed_by, NOW())");
+        $refundInsert->execute([
+            ':ticket_id' => $ticket_id,
+            ':ticket_uid' => $t['ticket_uid'] ?? null,
+            ':schedule_id' => (int)$t['schedule_id'],
+            ':refund_amount' => $refund_amount,
+            ':refund_method' => $refund_method,
+            ':refund_provider' => $refund_provider !== '' ? $refund_provider : null,
+            ':refund_transaction_id' => $refund_transaction_id !== '' ? $refund_transaction_id : null,
+            ':reason' => $reason !== '' ? $reason : 'Возврат кассиром',
+            ':processed_by' => !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null,
+        ]);
+
         // cash_transactions trace for refund
         try {
             if (column_exists($pdo, 'cash_transactions', 'type') && column_exists($pdo, 'cash_transactions', 'ticket_uids')) {

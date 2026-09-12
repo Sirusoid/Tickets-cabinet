@@ -246,15 +246,19 @@ if (!function_exists('bcc_process_refund_request')) {
             }
 
             $insertRefund = $pdo->prepare("INSERT INTO refunds
-                (ticket_id, ticket_uid, schedule_id, refund_amount, refund_status, refund_method, refund_provider, reason, created_at)
-                VALUES (:ticket_id, :ticket_uid, :schedule_id, :refund_amount, 'requested', 'bank', 'bcc', :reason, NOW())");
+                (ticket_id, ticket_uid, schedule_id, refund_amount, refund_status, refund_method, refund_provider, reason, processed_by, created_at)
+                VALUES (:ticket_id, :ticket_uid, :schedule_id, :refund_amount, 'requested', 'bank', 'bcc', :reason, :processed_by, NOW())");
+            $refundOrigin = !empty($_SESSION['user']['id'])
+                ? 'Возврат кассиром через BCC'
+                : 'Самостоятельный возврат клиента';
             foreach ($tickets as $ticket) {
                 $insertRefund->execute([
                     ':ticket_id' => (int)$ticket['id'],
                     ':ticket_uid' => $ticket['ticket_uid'],
                     ':schedule_id' => (int)$session['session_id'],
                     ':refund_amount' => number_format((float)$ticket['price'], 2, '.', ''),
-                    ':reason' => 'Возврат кассиром через BCC',
+                    ':reason' => $refundOrigin,
+                    ':processed_by' => !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null,
                 ]);
             }
             $pdo->commit();
