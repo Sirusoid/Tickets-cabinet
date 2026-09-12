@@ -213,11 +213,6 @@ require __DIR__ . '/../includes/panel.php';
       <div id="refundBccFields" style="display:none; grid-column:1 / -1; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px;">
         <div><label>Номер заказа</label><input id="refund_order_display" class="form-control" readonly /></div>
         <div><label>Исходная сумма</label><input id="refund_original_amount_display" class="form-control" readonly /></div>
-        <div><label>Валюта</label><input id="refund_currency_display" class="form-control" readonly /></div>
-        <div><label>RRN</label><input id="refund_rrn_display" class="form-control" readonly /></div>
-        <div><label>INT_REF</label><input id="refund_int_ref_display" class="form-control" readonly /></div>
-        <div><label>MERCH_RN_ID</label><input id="refund_merch_rn_id_display" class="form-control" readonly /></div>
-        <div><label>Терминал</label><input id="refund_terminal_display" class="form-control" readonly /></div>
       </div>
 
       <div id="refundReasonField" style="grid-column: 1 / -1;">
