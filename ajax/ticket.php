@@ -778,6 +778,10 @@ if ($action === 'refund') {
             && strtolower(trim((string)($t['payment_provider'] ?? ''))) === 'bcc';
         if ($isOnlineBcc) {
             $pdo->rollBack();
+            if (!function_exists('bcc_process_refund_request')) {
+                error_log('[BCC REFUND] Не загружен обработчик cashier BCC refund.');
+                json_resp(['success' => false, 'message' => 'Сервис возврата BCC не обновлён на сервере.'], 500);
+            }
             try {
                 $sessionStmt = $pdo->prepare("SELECT ps.*, s.start_time AS schedule_start
                     FROM payment_sessions ps
