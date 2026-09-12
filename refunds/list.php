@@ -185,13 +185,12 @@ $queryParams = [
                         <th>Сумма</th>
                         <th>Способ / провайдер</th>
                         <th>Статус</th>
-                        <th>Причина</th>
                         <th>Транзакция</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="11" class="refunds-empty">Возвратов за выбранный период нет.</td></tr>
+                    <tr><td colspan="10" class="refunds-empty">Возвратов за выбранный период нет.</td></tr>
                 <?php else: foreach ($rows as $row):
                     $originLabel = $row['origin'] === 'cashier' ? 'Кассир' : 'Клиент';
                     $statusLabel = $statusLabels[$row['refund_status']] ?? $row['refund_status'];
@@ -209,7 +208,6 @@ $queryParams = [
                         <td><strong><?= number_format((float)$row['refund_amount'], 2, '.', ' ') ?> тг</strong></td>
                         <td><?= h($methodLabels[$row['refund_method']] ?? $row['refund_method']) ?><small><?= h($row['refund_provider'] ?: '—') ?></small></td>
                         <td><span class="refunds-status <?= $statusClass ?>"><?= h($statusLabel) ?></span></td>
-                        <td class="refunds-reason"><?= h((string)($row['reason'] ?: '—')) ?></td>
                         <td><?= h($row['refund_transaction_id'] ?: '—') ?></td>
                     </tr>
                 <?php endforeach; endif; ?>
