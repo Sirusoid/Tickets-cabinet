@@ -185,6 +185,12 @@
     tr.appendChild(sessionTd);
 
     var clientTd = document.createElement('td');
+    clientTd.style.width = '150px';
+    clientTd.style.maxWidth = '150px';
+    clientTd.style.overflow = 'hidden';
+    clientTd.style.textOverflow = 'ellipsis';
+    clientTd.style.whiteSpace = 'nowrap';
+    clientTd.title = t.customer_name || '';
     clientTd.textContent = t.customer_name || '—';
     tr.appendChild(clientTd);
 
@@ -421,9 +427,26 @@
         amtEl.value = '';
       }
     }
-    qs('refund_method').value = 'cash';
-    qs('refund_provider').value = '';
-    qs('refund_transaction_id').value = '';
+    var isBcc = t.is_online_bcc === true || t.refund_mode === 'bcc';
+    var bccNotice = qs('refundBccNotice');
+    var bccFields = qs('refundBccFields');
+    var methodField = qs('refundMethodField');
+    var reasonField = qs('refundReasonField');
+    if (bccNotice) bccNotice.style.display = isBcc ? 'block' : 'none';
+    if (bccFields) bccFields.style.display = isBcc ? 'grid' : 'none';
+    if (methodField) methodField.style.display = isBcc ? 'none' : 'block';
+    if (reasonField) reasonField.style.display = isBcc ? 'none' : 'block';
+    if (amtEl) {
+      amtEl.readOnly = isBcc;
+      if (isBcc && t.refund_original_amount) amtEl.value = t.refund_original_amount;
+    }
+    if (qs('refund_order_display')) qs('refund_order_display').value = t.refund_order || '';
+    if (qs('refund_original_amount_display')) qs('refund_original_amount_display').value = t.refund_original_amount || '';
+    if (qs('refund_currency_display')) qs('refund_currency_display').value = t.refund_currency || '';
+    if (qs('refund_rrn_display')) qs('refund_rrn_display').value = t.refund_rrn || '';
+    if (qs('refund_int_ref_display')) qs('refund_int_ref_display').value = t.refund_int_ref || '';
+    if (qs('refund_merch_rn_id_display')) qs('refund_merch_rn_id_display').value = t.refund_merch_rn_id || '';
+    if (qs('refund_terminal_display')) qs('refund_terminal_display').value = t.refund_terminal || '';
     qs('refund_reason').value = '';
   }
 
@@ -448,8 +471,6 @@
       csrf_token: csrfToken,
       refund_amount: qs('refund_amount').value || '',
       refund_method: qs('refund_method').value || 'cash',
-      refund_provider: qs('refund_provider').value || '',
-      refund_transaction_id: qs('refund_transaction_id').value || '',
       reason: qs('refund_reason').value || ''
     };
 

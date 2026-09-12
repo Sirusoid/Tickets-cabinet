@@ -137,7 +137,7 @@ require __DIR__ . '/../includes/panel.php';
               <tr>
                 <th style="width:105px;">Дата заказа</th>
                 <th style="min-width:190px;">Сеанс</th>
-                <th style="min-width:190px;">Клиент</th>
+                <th style="width:150px; min-width:130px; max-width:150px;">Клиент</th>
                 <th>Ряд - Место</th>
                 <th>Тип</th>
                 <th style="width:130px;">Скидка</th>
@@ -188,6 +188,9 @@ require __DIR__ . '/../includes/panel.php';
       <div><strong>Дата - Время:</strong> <span id="refund_session_dt">—</span></div>
       <div><strong>Ряд / Место:</strong> <span id="refund_seat">—</span></div>
     </div>
+    <div id="refundBccNotice" class="alert alert--info" style="display:none; margin-bottom:12px;">
+      Онлайн-заказ будет возвращён через BCC. Банковские поля заполнены системой и недоступны для редактирования.
+    </div>
 
     <form id="refundForm" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
       <input type="hidden" id="refund_ticket_id" name="ticket_id" value="" />
@@ -198,7 +201,7 @@ require __DIR__ . '/../includes/panel.php';
         <input type="number" step="0.01" id="refund_amount" name="refund_amount" class="form-control" />
       </div>
 
-      <div>
+      <div id="refundMethodField">
         <label>Метод возврата</label>
         <select id="refund_method" name="refund_method" class="form-control">
           <option value="cash">Наличные</option>
@@ -207,17 +210,17 @@ require __DIR__ . '/../includes/panel.php';
         </select>
       </div>
 
-      <div>
-        <label>Провайдер / канал</label>
-        <input type="text" id="refund_provider" name="refund_provider" class="form-control" placeholder="Например: Kaspi, Счет банка" />
+      <div id="refundBccFields" style="display:none; grid-column:1 / -1; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px;">
+        <div><label>Номер заказа</label><input id="refund_order_display" class="form-control" readonly /></div>
+        <div><label>Исходная сумма</label><input id="refund_original_amount_display" class="form-control" readonly /></div>
+        <div><label>Валюта</label><input id="refund_currency_display" class="form-control" readonly /></div>
+        <div><label>RRN</label><input id="refund_rrn_display" class="form-control" readonly /></div>
+        <div><label>INT_REF</label><input id="refund_int_ref_display" class="form-control" readonly /></div>
+        <div><label>MERCH_RN_ID</label><input id="refund_merch_rn_id_display" class="form-control" readonly /></div>
+        <div><label>Терминал</label><input id="refund_terminal_display" class="form-control" readonly /></div>
       </div>
 
-      <div>
-        <label>ID транзакции</label>
-        <input type="text" id="refund_transaction_id" name="refund_transaction_id" class="form-control" placeholder="ID транзакции (если есть)" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
+      <div id="refundReasonField" style="grid-column: 1 / -1;">
         <label>Причина возврата</label>
         <textarea id="refund_reason" name="reason" class="form-control" rows="3" placeholder="Причина возврата (необязательно)"></textarea>
       </div>

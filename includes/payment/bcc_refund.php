@@ -268,6 +268,103 @@ if (!function_exists('bcc_mark_refund_result')) {
                     break;
                 }
             }
+
+            if (!function_exists('bcc_process_refund_request')) {
+                function bcc_process_refund_request(PDO $pdo, array $session, array $tickets, array $originalResponse, string $source = 'bcc_refund'): array
+                {
+                    $order = trim((string)($session['order_number'] ?? ''));
+                    if ($order === '' || empty($tickets)) {
+                        throw new RuntimeException('Данные заказа для возврата отсутствуют.');
+                    }
+                    if (trim((string)($originalResponse['RRN'] ?? '')) === '' || trim((string)($originalResponse['INT_REF'] ?? '')) === '') {
+                        throw new RuntimeException('В заказе отсутствуют данные банковской транзакции.');
+                    }
+
+                    $pdo->beginTransaction();
+                    try {
+                        $lockStmt = $pdo->prepare('SELECT id, status FROM payment_sessions WHERE id = :id LIMIT 1 FOR UPDATE');
+                        $lockStmt->execute([':id' => (int)$session['id']]);
+                        $lockedSession = $lockStmt->fetch(PDO::FETCH_ASSOC);
+                        if (!$lockedSession || (string)$lockedSession['status'] !== 'paid') {
+                            throw new RuntimeException('Оплата заказа не подтверждена.');
+                        }
+
+                        $ticketIds = array_map('intval', array_column($tickets, 'id'));
+                        $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
+                        $existingRefund = $pdo->prepare("SELECT refund_status FROM refunds WHERE ticket_id IN ($placeholders) AND refund_status IN ('requested', 'refunded') LIMIT 1");
+                        $existingRefund->execute($ticketIds);
+                        if ($existingRefund->fetchColumn()) {
+                            throw new RuntimeException('Запрос на возврат по этому заказу уже создан.');
+                        }
+
+                        $insertRefund = $pdo->prepare("INSERT INTO refunds
+                            (ticket_id, ticket_uid, schedule_id, refund_amount, refund_status, refund_method, refund_provider, reason, created_at)
+                            VALUES (:ticket_id, :ticket_uid, :schedule_id, :refund_amount, 'requested', 'bank', 'bcc', :reason, NOW())");
+                        foreach ($tickets as $ticket) {
+                            $insertRefund->execute([
+                                ':ticket_id' => (int)$ticket['id'],
+                                ':ticket_uid' => $ticket['ticket_uid'],
+                                ':schedule_id' => (int)$session['session_id'],
+                                ':refund_amount' => number_format((float)$ticket['price'], 2, '.', ''),
+                                ':reason' => 'Возврат кассиром через BCC',
+                            ]);
+                        }
+                        $pdo->commit();
+                    } catch (Throwable $e) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                        throw $e;
+                    }
+
+                    $cfg = bcc_config($pdo);
+                    $refundForm = bcc_build_refund_form($cfg, $session, $originalResponse, (int)$session['amount_cents']);
+                    $ch = curl_init($refundForm['action']);
+                    if ($ch === false) {
+                        throw new RuntimeException('Не удалось создать соединение с BCC.');
+                    }
+
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => http_build_query($refundForm['fields'], '', '&'),
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_CONNECTTIMEOUT => 5,
+                        CURLOPT_TIMEOUT => 20,
+                        CURLOPT_SSL_VERIFYPEER => true,
+                        CURLOPT_SSL_VERIFYHOST => 2,
+                    ]);
+                    $body = curl_exec($ch);
+                    $curlError = curl_error($ch);
+                    curl_close($ch);
+
+                    if ($body === false || $curlError !== '') {
+                        $data = [
+                            'ACTION' => '',
+                            'RC' => 'TRANSPORT_ERROR',
+                            'RC_TEXT' => $curlError !== '' ? $curlError : 'BCC gateway connection failed',
+                            'ORDER' => $order,
+                        ];
+                        bcc_mark_refund_result($pdo, $order, $data, false, $source . '_transport_error');
+                        return ['success' => false, 'state' => 'rejected', 'response' => $data, 'message' => 'Не удалось подключиться к банку.'];
+                    }
+
+                    $responseData = bcc_parse_gateway_response((string)$body);
+                    if (empty($responseData)) {
+                        return ['success' => true, 'state' => 'processing', 'response' => [], 'message' => 'Запрос на возврат принят и обрабатывается.'];
+                    }
+
+                    $success = bcc_refund_response_success($responseData);
+                    $result = bcc_mark_refund_result($pdo, $order, $responseData, $success, $source);
+                    return [
+                        'success' => $success,
+                        'state' => $result['status'],
+                        'response' => $responseData,
+                        'message' => $success
+                            ? 'Возврат подтверждён банком.'
+                            : 'Банк не подтвердил возврат. ' . trim((string)($responseData['RC_TEXT'] ?? '')),
+                    ];
+                }
+            }
             if ($allRefunded) {
                 $pdo->commit();
                 return ['status' => 'refunded', 'ticket_uids' => array_column($tickets, 'ticket_uid')];

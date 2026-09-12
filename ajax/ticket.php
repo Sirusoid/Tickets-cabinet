@@ -7,6 +7,7 @@
 // - Refund: update tickets.refund_status = 'refunded' and remove occupancy row (free seat). No inserts into refunds table.
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/payment/bcc_refund.php';
 require_login();
 
 header('Content-Type: application/json; charset=utf-8');
@@ -286,7 +287,10 @@ if ($action === 'get_ticket') {
         $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
                        t.seat_id, t.purchased_at, t.created_at, t.price, t.channel, t.payment_status, t.status, t.refund_status,
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
+                   t.payment_provider, t.payment_session_id,
                    tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
+                   ps.order_number, ps.amount_cents AS payment_amount_cents, ps.provider_response,
+                   ps.merch_rn_id,
                        COALESCE(c.full_name, '') AS customer_name,
                        COALESCE(e.title, '') AS event_title,
                        s.start_time AS session_start
@@ -294,12 +298,23 @@ if ($action === 'get_ticket') {
                 LEFT JOIN customers c ON c.id = t.customer_id
                 LEFT JOIN schedules s ON s.id = t.schedule_id
                 LEFT JOIN events e ON e.id = s.event_id
-            LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
                 WHERE t.id = :id LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $id]);
         $r = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$r) json_resp(['success' => false, 'message' => 'Билет не найден'], 404);
+        $providerResponse = [];
+        if (!empty($r['provider_response'])) {
+            $decodedProviderResponse = json_decode((string)$r['provider_response'], true);
+            if (is_array($decodedProviderResponse)) {
+                $providerResponse = $decodedProviderResponse;
+            }
+        }
+        $isOnlineBcc = (int)($r['payment_session_id'] ?? 0) > 0
+            && strtolower(trim((string)($r['payment_provider'] ?? ''))) === 'bcc';
+        $bccConfig = $isOnlineBcc ? bcc_config($pdo) : [];
         $out = [
             'id' => (string)$r['id'],
             'ticket_uid' => $r['ticket_uid'],
@@ -317,7 +332,18 @@ if ($action === 'get_ticket') {
             'customer_id' => $r['customer_id'],
             'event_title' => $r['event_title'],
             'session_start' => $r['session_start'],
-            'schedule_id' => $r['schedule_id']
+            'schedule_id' => $r['schedule_id'],
+            'is_online_bcc' => $isOnlineBcc,
+            'refund_mode' => $isOnlineBcc ? 'bcc' : 'local',
+            'refund_order' => $isOnlineBcc ? ($r['order_number'] ?? '') : '',
+            'refund_original_amount' => $isOnlineBcc
+                ? number_format(((int)($r['payment_amount_cents'] ?? 0)) / 100, 2, '.', '')
+                : number_format((float)($r['price'] ?? 0), 2, '.', ''),
+            'refund_currency' => $isOnlineBcc ? '398' : 'KZT',
+            'refund_rrn' => $isOnlineBcc ? ($providerResponse['RRN'] ?? '') : '',
+            'refund_int_ref' => $isOnlineBcc ? ($providerResponse['INT_REF'] ?? '') : '',
+            'refund_merch_rn_id' => $isOnlineBcc ? ($r['merch_rn_id'] ?? '') : '',
+            'refund_terminal' => $isOnlineBcc ? ($bccConfig['terminal'] ?? '') : '',
         ];
         json_resp(['success' => true, 'data' => $out]);
     } catch (Exception $e) {
@@ -736,7 +762,7 @@ if ($action === 'refund') {
         $pdo->beginTransaction();
 
         // lock ticket row and fetch info (include channel and customer_id for cash_transactions logic)
-        $q = $pdo->prepare("SELECT id, ticket_uid, price, refund_status, status, schedule_id, seat_identifier, channel, customer_id FROM tickets WHERE id = :id LIMIT 1 FOR UPDATE");
+        $q = $pdo->prepare("SELECT id, ticket_uid, price, refund_status, status, schedule_id, seat_identifier, channel, customer_id, payment_provider, payment_session_id FROM tickets WHERE id = :id LIMIT 1 FOR UPDATE");
         $q->execute(['id' => $ticket_id]);
         $t = $q->fetch(PDO::FETCH_ASSOC);
         if (!$t) {
@@ -746,6 +772,50 @@ if ($action === 'refund') {
         if (isset($t['refund_status']) && $t['refund_status'] === 'refunded') {
             $pdo->rollBack();
             json_resp(['success' => false, 'message' => 'Билет уже возвращён'], 400);
+        }
+
+        $isOnlineBcc = (int)($t['payment_session_id'] ?? 0) > 0
+            && strtolower(trim((string)($t['payment_provider'] ?? ''))) === 'bcc';
+        if ($isOnlineBcc) {
+            $pdo->rollBack();
+            try {
+                $sessionStmt = $pdo->prepare("SELECT ps.*, s.start_time AS schedule_start
+                    FROM payment_sessions ps
+                    LEFT JOIN schedules s ON s.id = ps.session_id
+                    WHERE ps.id = :id LIMIT 1");
+                $sessionStmt->execute([':id' => (int)$t['payment_session_id']]);
+                $paymentSession = $sessionStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$paymentSession) {
+                    json_resp(['success' => false, 'message' => 'Платёжная сессия онлайн-заказа не найдена'], 404);
+                }
+
+                $ticketStmt = $pdo->prepare("SELECT id, ticket_uid, price, refund_status
+                    FROM tickets WHERE payment_session_id = :payment_session_id ORDER BY id ASC");
+                $ticketStmt->execute([':payment_session_id' => (int)$paymentSession['id']]);
+                $orderTickets = $ticketStmt->fetchAll(PDO::FETCH_ASSOC);
+                $originalResponse = json_decode((string)($paymentSession['provider_response'] ?? ''), true);
+                if (!is_array($originalResponse)) {
+                    $originalResponse = [];
+                }
+
+                $refundResult = bcc_process_refund_request(
+                    $pdo,
+                    $paymentSession,
+                    $orderTickets,
+                    $originalResponse,
+                    'cashier_bcc_refund'
+                );
+                $bankResponse = is_array($refundResult['response'] ?? null) ? $refundResult['response'] : [];
+                json_resp([
+                    'success' => !empty($refundResult['success']),
+                    'state' => $refundResult['state'] ?? 'rejected',
+                    'message' => $refundResult['message'] ?? 'Возврат обработан.',
+                    'bank_response' => array_intersect_key($bankResponse, array_flip(['ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF'])),
+                ], !empty($refundResult['success']) ? 200 : 400);
+            } catch (Throwable $e) {
+                error_log('[BCC REFUND] Ошибка возврата кассиром: ' . $e->getMessage());
+                json_resp(['success' => false, 'message' => 'Не удалось выполнить возврат через BCC.'], 500);
+            }
         }
 
         // determine amount if not provided
