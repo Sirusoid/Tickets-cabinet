@@ -134,6 +134,14 @@ switch ($action) {
         $params = array_merge([$session_id], $seat_keys);
 
         try {
+            // Просроченные холды больше не блокируют место и могут мешать INSERT
+            // из-за уникального ключа до очередного запуска cron.
+            $expiredHoldStmt = $pdo->prepare("DELETE FROM cash_holds
+                WHERE session_id = ?
+                    AND seat_key IN ($placeholders)
+                    AND expires_at <= NOW()");
+            $expiredHoldStmt->execute($params);
+
             // Удаляем старые брони виджета для этих мест, чтобы пользователь мог повторить попытку
             if ($client_hold_token !== '') {
                 $delHoldStmt = $pdo->prepare("DELETE FROM cash_holds WHERE session_id = ? AND seat_key IN ($placeholders) AND meta LIKE ?");

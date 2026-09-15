@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 // /tools/cron_cleanup_holds.php
-// Удаляет просроченные записи из cash_holds
+// Удаляет только просроченные ручные резервы из cash_holds
 // Запуск: /usr/bin/php /tools/cron_cleanup_holds.php
 
 if (PHP_SAPI !== 'cli') {
@@ -30,54 +30,37 @@ try {
     // Подключение приложения: поправьте путь под ваш проект
     // Этот файл должен инициализировать $pdo (PDO instance)
     require_once __DIR__ . '/../init.php';
-    require_once __DIR__ . '/../includes/settings_manager.php';
 
     if (!isset($pdo) || !($pdo instanceof PDO)) {
         throw new Exception('PDO not initialized (check init.php path)');
     }
 
-    $autoCancelHours = function_exists('settings_get_value')
-        ? (int)settings_get_value($pdo, 'tickets.auto_cancel_hours', 0)
-        : 0;
-
-    // Выполняем очистку холдов и старых неоплаченных онлайн-сессий в одной транзакции.
+    // Cron очищает только ручные резервы кассира. Онлайн-холды управляются
+    // callback-ами BCC и сроком payment hold, а клиентские — своим TTL.
     $pdo->beginTransaction();
 
     if ($maxDeletePerRun && is_int($maxDeletePerRun) && $maxDeletePerRun > 0) {
         // Удаляем пачкой с LIMIT (MySQL поддерживает LIMIT в DELETE)
-        $stmt = $pdo->prepare("DELETE FROM cash_holds WHERE expires_at IS NOT NULL AND expires_at <= NOW() LIMIT :lim");
+        $stmt = $pdo->prepare("DELETE FROM cash_holds
+            WHERE expires_at IS NOT NULL
+                AND expires_at <= NOW()
+                AND (meta IS NULL OR meta = '')
+            LIMIT :lim");
         $stmt->bindValue(':lim', (int)$maxDeletePerRun, PDO::PARAM_INT);
         $stmt->execute();
         $deleted = $stmt->rowCount();
     } else {
-        $stmt = $pdo->prepare("DELETE FROM cash_holds WHERE expires_at IS NOT NULL AND expires_at <= NOW()");
+        $stmt = $pdo->prepare("DELETE FROM cash_holds
+            WHERE expires_at IS NOT NULL
+                AND expires_at <= NOW()
+                AND (meta IS NULL OR meta = '')");
         $stmt->execute();
         $deleted = $stmt->rowCount();
     }
 
-    $cancelledSessions = 0;
-    if ($autoCancelHours > 0) {
-        $cutoff = (new DateTimeImmutable('now'))->modify('-' . $autoCancelHours . ' hours')->format('Y-m-d H:i:s');
-        $sessionStmt = $pdo->prepare("SELECT id FROM payment_sessions
-            WHERE status = 'pending' AND provider = 'bcc' AND created_at <= :cutoff
-            LIMIT 1000 FOR UPDATE");
-        $sessionStmt->execute([':cutoff' => $cutoff]);
-        $sessionIds = $sessionStmt->fetchAll(PDO::FETCH_COLUMN, 0);
-        if (!empty($sessionIds)) {
-            $sessionPlaceholders = implode(',', array_fill(0, count($sessionIds), '?'));
-            $updateSessions = $pdo->prepare("UPDATE payment_sessions SET status = 'cancelled', updated_at = NOW() WHERE id IN ($sessionPlaceholders) AND status = 'pending'");
-            $updateSessions->execute($sessionIds);
-            $cancelledSessions = $updateSessions->rowCount();
-
-            // Удаляем только холды, созданные онлайн-платежом BCC.
-            $deleteOnlineHolds = $pdo->prepare("DELETE FROM cash_holds WHERE session_id IN ($sessionPlaceholders) AND meta LIKE '%widget_online_payment%'");
-            $deleteOnlineHolds->execute($sessionIds);
-        }
-    }
-
     $pdo->commit();
 
-    error_log('cron_cleanup_holds: OK deleted ' . (int)$deleted . ' expired holds, cancelled ' . (int)$cancelledSessions . ' unpaid online sessions');
+    error_log('cron_cleanup_holds: OK deleted ' . (int)$deleted . ' expired manual holds');
 
     // Освобождаем блокировку
     flock($fp, LOCK_UN);

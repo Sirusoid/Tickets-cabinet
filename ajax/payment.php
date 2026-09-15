@@ -125,6 +125,14 @@ switch ($action) {
         $params = array_merge([$session_id], $seat_keys);
 
         try {
+            // Удаляем только уже истёкшие холды: активные ручные и онлайн-резервы
+            // по-прежнему блокируют место.
+            $expiredHoldStmt = $pdo->prepare("DELETE FROM cash_holds
+                WHERE session_id = ?
+                    AND seat_key IN ($placeholders)
+                    AND expires_at <= NOW()");
+            $expiredHoldStmt->execute($params);
+
             $soldStmt = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status = 'issued'");
             $soldStmt->execute($params);
             $sold = $soldStmt->fetchAll(PDO::FETCH_COLUMN, 0);
