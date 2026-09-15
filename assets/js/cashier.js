@@ -246,7 +246,11 @@ var Cashier = (function () {
         cents = Math.floor((baseCents[i] * finalCents) / baseTotalCents);
         allocated += cents;
       }
-      distributed.push(Object.assign({}, seatsPayload[i], { price: cents / 100 }));
+      distributed.push(Object.assign({}, seatsPayload[i], {
+        price: cents / 100,
+        original_price: baseValues[i],
+        final_price: cents / 100
+      }));
     }
     return distributed;
   }

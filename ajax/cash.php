@@ -205,17 +205,37 @@ function normalize_seats($seats_raw) {
                 $identifier = str_replace(':', '-', $identifier);
             }
 
-            $price = null;
-            if (isset($s['price']) && $s['price'] !== '') $price = (float)$s['price'];
-            elseif (isset($s['final_price']) && $s['final_price'] !== '') $price = (float)$s['final_price'];
-            elseif (isset($s['final_price_cents']) && $s['final_price_cents'] !== '') $price = ((int)$s['final_price_cents']) / 100.0;
+            $originalPrice = null;
+            if (isset($s['original_price']) && $s['original_price'] !== '') {
+                $originalPrice = (float)$s['original_price'];
+            } elseif (isset($s['original_price_cents']) && $s['original_price_cents'] !== '') {
+                $originalPrice = ((int)$s['original_price_cents']) / 100.0;
+            }
+
+            $finalPrice = null;
+            if (isset($s['final_price']) && $s['final_price'] !== '') {
+                $finalPrice = (float)$s['final_price'];
+            } elseif (isset($s['final_price_cents']) && $s['final_price_cents'] !== '') {
+                $finalPrice = ((int)$s['final_price_cents']) / 100.0;
+            }
+
+            $price = $finalPrice;
+            if ($price === null && isset($s['price']) && $s['price'] !== '') {
+                $price = (float)$s['price'];
+            }
 
             $segment = null;
             if (isset($s['customer_segment'])) $segment = $s['customer_segment'];
             elseif (isset($s['segment'])) $segment = $s['segment'];
 
             if ($identifier !== null || $seatId !== null) {
-                $entry = ['id' => $seatId, 'identifier' => $identifier, 'price' => $price];
+                $entry = [
+                    'id' => $seatId,
+                    'identifier' => $identifier,
+                    'price' => $price,
+                    'original_price' => $originalPrice,
+                    'final_price' => $finalPrice ?? $price,
+                ];
                 if ($segment !== null) $entry['customer_segment'] = $segment;
                 $result[] = $entry;
             }
