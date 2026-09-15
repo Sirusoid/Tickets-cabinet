@@ -963,6 +963,23 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
             if (isset($ticket['discount']) && $ticket['discount'] !== '') {
                 $ticket_discount_db = is_numeric($ticket['discount']) ? (int)$ticket['discount'] : null;
             }
+            $ticket_discount_amount_db = is_numeric($ticket['discount_amount'] ?? null)
+                ? max(0.0, (float)$ticket['discount_amount'])
+                : 0.0;
+
+            // tickets.price хранит уже оплаченный итог. Восстанавливаем исходную цену
+            // по сохранённой денежной скидке, чтобы не применить процент повторно.
+            if ($ticket_discount_amount_db > 0) {
+                if (!isset($pdf_fields['payment_label']) && $ticket_price_db !== null) {
+                    $pdf_fields['payment_label'] = $ticket_price_db;
+                }
+                if (!isset($pdf_fields['price_label']) && $ticket_price_db !== null) {
+                    $pdf_fields['price_label'] = round($ticket_price_db + $ticket_discount_amount_db, 2);
+                }
+                if (!isset($pdf_fields['discount_label_amount'])) {
+                    $pdf_fields['discount_label_amount'] = $ticket_discount_amount_db;
+                }
+            }
 
             // If DB has discount percent, set it (overrides meta if present but meta should be preferred)
             if ($ticket_discount_db !== null && !isset($pdf_fields['discount_label_percent'])) {
