@@ -353,6 +353,176 @@ if ($action === 'get_ticket') {
     }
 }
 
+// --- CHECK-IN action (QR scanner / manual UID) ---
+if ($action === 'checkin') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        json_resp(['success' => false, 'message' => 'Неверный метод'], 405);
+    }
+    check_csrf();
+
+    $rawCode = trim((string)($_POST['code'] ?? $_POST['ticket_uid'] ?? ''));
+    if ($rawCode === '') {
+        json_resp(['success' => false, 'message' => 'Отсканируйте QR-код или введите UID билета'], 400);
+    }
+
+    // QR-код билета содержит UID. Также принимаем публичную ссылку, если QR
+    // будет изменён в будущем и UID окажется в её query-параметре.
+    $code = $rawCode;
+    if (filter_var($rawCode, FILTER_VALIDATE_URL)) {
+        $query = [];
+        parse_str((string)(parse_url($rawCode, PHP_URL_QUERY) ?? ''), $query);
+        if (!empty($query['uid'])) {
+            $code = trim((string)$query['uid']);
+        }
+    }
+    if (!preg_match('/^[A-Za-z0-9_-]{6,100}$/', $code)) {
+        json_resp(['success' => false, 'message' => 'QR-код не содержит корректный UID билета'], 422);
+    }
+
+    $deviceUid = substr(trim((string)($_POST['device_uid'] ?? '')), 0, 100);
+    $ticket = null;
+
+    try {
+        $pdo->beginTransaction();
+
+        $stmt = $pdo->prepare(
+            "SELECT t.id, t.ticket_uid, t.seat_identifier, t.status, t.payment_status,
+                    t.refund_status, t.is_checked_in, t.checked_in_at,
+                    COALESCE(e.title, '') AS event_title,
+                    s.start_time AS session_start,
+                    COALESCE(c.full_name, '') AS customer_name
+             FROM tickets t
+             LEFT JOIN events e ON e.id = t.event_id
+             LEFT JOIN schedules s ON s.id = t.schedule_id
+             LEFT JOIN customers c ON c.id = t.customer_id
+             WHERE t.ticket_uid = :uid
+             LIMIT 1
+             FOR UPDATE"
+        );
+        $stmt->execute([':uid' => $code]);
+        $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$ticket) {
+            $pdo->rollBack();
+            json_resp(['success' => false, 'message' => 'Билет с таким QR-кодом не найден'], 404);
+        }
+
+        $ticketId = (int)$ticket['id'];
+        $isAlreadyCheckedIn = (int)($ticket['is_checked_in'] ?? 0) === 1
+            || (string)($ticket['status'] ?? '') === 'used';
+
+        if ($isAlreadyCheckedIn) {
+            $duplicate = $pdo->prepare(
+                "INSERT INTO checkins
+                    (ticket_id, scanned_at, scanner_id, scan_source, device_uid, status, note)
+                 VALUES
+                    (:ticket_id, NOW(), NULL, 'mobile', :device_uid, 'duplicate', :note)"
+            );
+            $duplicate->execute([
+                ':ticket_id' => $ticketId,
+                ':device_uid' => $deviceUid !== '' ? $deviceUid : null,
+                ':note' => 'Повторное сканирование уже использованного билета',
+            ]);
+            $pdo->commit();
+            json_resp([
+                'success' => false,
+                'duplicate' => true,
+                'message' => 'Билет уже использован',
+                'data' => [
+                    'ticket_uid' => $ticket['ticket_uid'],
+                    'event_title' => $ticket['event_title'],
+                    'session_start' => $ticket['session_start'],
+                    'seat_identifier' => $ticket['seat_identifier'],
+                    'customer_name' => $ticket['customer_name'],
+                    'checked_in_at' => $ticket['checked_in_at'],
+                ],
+            ], 409);
+        }
+
+        $isValid = (string)($ticket['status'] ?? '') === 'issued'
+            && (string)($ticket['payment_status'] ?? '') === 'paid'
+            && (string)($ticket['refund_status'] ?? 'none') === 'none';
+
+        if (!$isValid) {
+            $invalid = $pdo->prepare(
+                "INSERT INTO checkins
+                    (ticket_id, scanned_at, scanner_id, scan_source, device_uid, status, note)
+                 VALUES
+                    (:ticket_id, NOW(), NULL, 'mobile', :device_uid, 'invalid', :note)"
+            );
+            $invalid->execute([
+                ':ticket_id' => $ticketId,
+                ':device_uid' => $deviceUid !== '' ? $deviceUid : null,
+                ':note' => 'Билет отменён, не оплачен или недействителен',
+            ]);
+            $pdo->commit();
+            json_resp([
+                'success' => false,
+                'message' => 'Билет недействителен: проверьте оплату, возврат и статус билета',
+                'data' => [
+                    'ticket_uid' => $ticket['ticket_uid'],
+                    'event_title' => $ticket['event_title'],
+                    'session_start' => $ticket['session_start'],
+                    'seat_identifier' => $ticket['seat_identifier'],
+                    'customer_name' => $ticket['customer_name'],
+                    'status' => $ticket['status'],
+                    'payment_status' => $ticket['payment_status'],
+                    'refund_status' => $ticket['refund_status'],
+                ],
+            ], 422);
+        }
+
+        $success = $pdo->prepare(
+            "INSERT INTO checkins
+                (ticket_id, scanned_at, scanner_id, scan_source, device_uid, status, note)
+             VALUES
+                (:ticket_id, NOW(), NULL, 'mobile', :device_uid, 'success', NULL)"
+        );
+        $success->execute([
+            ':ticket_id' => $ticketId,
+            ':device_uid' => $deviceUid !== '' ? $deviceUid : null,
+        ]);
+
+        $update = $pdo->prepare(
+            "UPDATE tickets
+             SET is_checked_in = 1, checked_in_at = NOW(), status = 'used'
+             WHERE id = :id AND is_checked_in = 0 AND status = 'issued'"
+        );
+        $update->execute([':id' => $ticketId]);
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('Не удалось зафиксировать проход по билету.');
+        }
+
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'ticket.checkin', 'ticket', $ticketId, $ticket['ticket_uid'], [], [
+                'event_title' => $ticket['event_title'],
+                'seat_identifier' => $ticket['seat_identifier'],
+                'device_uid' => $deviceUid,
+            ]);
+        }
+
+        $pdo->commit();
+        json_resp([
+            'success' => true,
+            'message' => 'Билет принят',
+            'data' => [
+                'ticket_uid' => $ticket['ticket_uid'],
+                'event_title' => $ticket['event_title'],
+                'session_start' => $ticket['session_start'],
+                'seat_identifier' => $ticket['seat_identifier'],
+                'customer_name' => $ticket['customer_name'],
+                'checked_in_at' => date('Y-m-d H:i:s'),
+            ],
+        ]);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('ajax/ticket.php checkin error: ' . $e->getMessage());
+        json_resp(['success' => false, 'message' => 'Не удалось проверить билет. Повторите попытку.'], 500);
+    }
+}
+
 // --- LIST action ---
 if ($action === 'list') {
     $date_from = trim((string)($_POST['date_from'] ?? $_GET['date_from'] ?? ''));

@@ -4,3 +4,5 @@ uploads/reports/*
 uploads/tickets/*
 !uploads/reports/.gitkeep
 !uploads/tickets/.gitkeep
+qr-ticket-scanner-android/keys/
+qr-ticket-scanner-android/keystore.properties

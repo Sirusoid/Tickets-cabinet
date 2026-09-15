@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="M:\Sites\Zhassahna\Tickets cabinet\qr-ticket-scanner-android\app"
+    name=":app"
+    type="APP"
+    maven="qr-ticket-scanner-android:app:unspecified"
+    agpVersion="8.7.3"
+    buildFolder="build"
+    bootClassPath="C:\Users\ch011\.copilot\session-state\2c1e9358-c89f-4100-928b-715b5975dd22\android-toolchain\android-sdk\platforms\android-35\android.jar;C:\Users\ch011\.copilot\session-state\2c1e9358-c89f-4100-928b-715b5975dd22\android-toolchain\android-sdk\build-tools\34.0.0\core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-35"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>
