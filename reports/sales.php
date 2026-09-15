@@ -48,6 +48,7 @@ try {
 		$sql = "SELECT
 								t.id,
 								t.schedule_id,
+								COALESCE(t.event_id, s.event_id) AS event_id,
 								t.original_price,
 								t.final_price,
 								t.discount,
@@ -135,7 +136,10 @@ foreach ($rows as $row) {
 		$bySegment[$segmentKey]['discount'] += $ticketDiscount;
 		$bySegment[$segmentKey]['net'] += $price;
 
-		$performanceKey = (string)($row['schedule_start'] ?? '') . '|' . (string)($row['event_title'] ?? '');
+		$performanceDateKey = $row['schedule_start'] !== ''
+			? date('Y-m-d H:i', strtotime((string)$row['schedule_start']))
+			: '';
+		$performanceKey = (int)($row['event_id'] ?? 0) . '|' . $performanceDateKey;
 		if (!isset($byPerformance[$performanceKey])) {
 				$byPerformance[$performanceKey] = [
 								'schedule_id' => (int)($row['schedule_id'] ?? 0),
@@ -178,7 +182,8 @@ try {
 			'amount' => (float)($refundRow['amount'] ?? 0),
 		];
 	$refundRows = db_fetch_all("SELECT
-		s.id AS schedule_id,
+		MIN(s.id) AS schedule_id,
+		COALESCE(t.event_id, s.event_id) AS event_id,
 		e.title AS event_title,
 			s.start_time AS schedule_start,
 			COUNT(*) AS tickets,
@@ -191,17 +196,25 @@ try {
 			AND t.refund_status = 'refunded'
 			$refundSegmentSql
 			$refundEventSql
-		GROUP BY e.title, s.start_time
+		GROUP BY COALESCE(t.event_id, s.event_id), e.title, s.start_time
 		ORDER BY s.start_time DESC", $refundParams);
 	foreach ($refundRows as $refundItem) {
-		$key = (string)($refundItem['schedule_start'] ?? '') . '|' . (string)($refundItem['event_title'] ?? '');
-		$refundByPerformance[$key] = [
-			'schedule_id' => (int)($refundItem['schedule_id'] ?? 0),
-			'event_title' => (string)($refundItem['event_title'] ?? 'Без названия'),
-			'schedule_start' => (string)($refundItem['schedule_start'] ?? ''),
-			'tickets' => (int)($refundItem['tickets'] ?? 0),
-			'amount' => (float)($refundItem['amount'] ?? 0),
-		];
+		$refundDateKey = !empty($refundItem['schedule_start'])
+			? date('Y-m-d H:i', strtotime((string)$refundItem['schedule_start']))
+			: '';
+		$key = (int)($refundItem['event_id'] ?? 0) . '|' . $refundDateKey;
+		if (!isset($refundByPerformance[$key])) {
+			$refundByPerformance[$key] = [
+				'schedule_id' => (int)($refundItem['schedule_id'] ?? 0),
+				'event_id' => (int)($refundItem['event_id'] ?? 0),
+				'event_title' => (string)($refundItem['event_title'] ?? 'Без названия'),
+				'schedule_start' => (string)($refundItem['schedule_start'] ?? ''),
+				'tickets' => 0,
+				'amount' => 0.0,
+			];
+		}
+		$refundByPerformance[$key]['tickets'] += (int)($refundItem['tickets'] ?? 0);
+		$refundByPerformance[$key]['amount'] += (float)($refundItem['amount'] ?? 0);
 	}
 } catch (Throwable $e) {
 		$errorText = $errorText !== '' ? $errorText : 'Ошибка загрузки возвратов: ' . $e->getMessage();
@@ -320,6 +333,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							$item = $byPerformance[$performanceKey] ?? [
 								'event_title' => $refundByPerformance[$performanceKey]['event_title'] ?? 'Без названия',
 								'schedule_id' => $refundByPerformance[$performanceKey]['schedule_id'] ?? 0,
+								'event_id' => $refundByPerformance[$performanceKey]['event_id'] ?? 0,
 								'schedule_start' => $refundByPerformance[$performanceKey]['schedule_start'] ?? '',
 								'tickets' => 0,
 								'original' => 0.0,
