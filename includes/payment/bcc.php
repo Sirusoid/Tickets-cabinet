@@ -227,7 +227,16 @@ if (!function_exists('bcc_generate_nonce')) {
 if (!function_exists('bcc_timestamp')) {
     function bcc_timestamp(): string
     {
-        return gmdate('YmdHis');
+        $timezone = defined('DEFAULT_TIMEZONE') ? (string)DEFAULT_TIMEZONE : 'Asia/Almaty';
+        return (new DateTimeImmutable('now', new DateTimeZone($timezone)))->format('YmdHis');
+    }
+}
+
+if (!function_exists('bcc_merchant_gmt')) {
+    function bcc_merchant_gmt(): string
+    {
+        $configured = getenv('ZHASSAHNA_BCC_MERCH_GMT');
+        return is_string($configured) && trim($configured) !== '' ? trim($configured) : '+5';
     }
 }
 
@@ -279,7 +288,7 @@ if (!function_exists('bcc_build_payment_form')) {
 
         $amount = number_format($amountCents / 100, 2, '.', '');
         $currency = '398';
-        $merchGmt = '0';
+        $merchGmt = bcc_merchant_gmt();
         $trtype = '1';
         $timestamp = bcc_timestamp();
         $nonce = bcc_generate_nonce();
