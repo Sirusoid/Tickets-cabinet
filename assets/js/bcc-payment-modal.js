@@ -192,14 +192,21 @@
     function updateTotal() {
         const total = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
         const count = selectedSeats.length;
+        const overLimit = count > maxTicketsPerUser;
         if (totalEl) totalEl.textContent = formatMoney(total) + ' ' + cfg.currencySymbol;
-        if (buyBtn) buyBtn.disabled = count === 0;
-        if (payBtn) payBtn.disabled = count === 0;
+        if (buyBtn) buyBtn.disabled = count === 0 || overLimit;
+        if (payBtn) payBtn.disabled = count === 0 || overLimit;
         if (reserveBtn) {
-            reserveBtn.disabled = count === 0 || clientReserved || !clientReservationEnabled;
+            reserveBtn.disabled = count === 0 || overLimit || clientReserved || !clientReservationEnabled;
             if (clientReserved) reserveBtn.textContent = 'Места зарезервированы';
         }
-            if (totalBar) totalBar.style.display = 'flex';
+        if (purchaseLimitNote) {
+            purchaseLimitNote.textContent = overLimit
+                ? 'В одном заказе можно выбрать не более ' + maxTicketsPerUser + ' билетов.'
+                : 'Лимит одного заказа: ' + maxTicketsPerUser + ' билетов.';
+            purchaseLimitNote.style.display = 'block';
+        }
+        if (totalBar) totalBar.style.display = 'flex';
     }
 
     function updateReservationUi() {
@@ -593,6 +600,10 @@
         }
         if (selectedSeats.length === 0) {
             showError('Выберите места');
+            return;
+        }
+        if (selectedSeats.length > maxTicketsPerUser) {
+            showError('В одном заказе можно оформить не более ' + maxTicketsPerUser + ' билетов.');
             return;
         }
 

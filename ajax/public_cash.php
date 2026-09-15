@@ -145,6 +145,11 @@ switch ($action) {
         $seatKeys = array_values(array_unique($seatKeys));
         if (empty($seatKeys)) json_response(['success' => false, 'message' => 'Места не выбраны'], 400);
 
+        $maxTickets = max(1, (int)public_ticket_setting($pdo, 'tickets.max_tickets_per_user', '6'));
+        if (count($seatKeys) > $maxTickets) {
+            json_response(['success' => false, 'message' => 'В одном заказе можно зарезервировать не более ' . $maxTickets . ' билетов.'], 400);
+        }
+
         $sessionStmt = $pdo->prepare("SELECT id FROM schedules WHERE id = :id AND status IN ('upcoming','active') AND start_time >= NOW() LIMIT 1");
         $sessionStmt->execute([':id' => $session_id]);
         if (!$sessionStmt->fetchColumn()) json_response(['success' => false, 'message' => 'Сеанс недоступен'], 404);

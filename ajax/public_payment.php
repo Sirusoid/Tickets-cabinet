@@ -117,11 +117,8 @@ switch ($action) {
         }
 
         $maxTickets = max(1, (int)public_payment_setting($pdo, 'tickets.max_tickets_per_user', '6'));
-        $existingTicketsStmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE schedule_id = :schedule_id AND (customer_phone = :phone OR customer_phone = :phone_digits) AND payment_status = 'paid' AND status <> 'cancelled' AND COALESCE(refund_status, 'none') <> 'refunded'");
-        $existingTicketsStmt->execute([':schedule_id' => $session_id, ':phone' => $normalizedPhone, ':phone_digits' => $phoneDigits]);
-        $existingTickets = (int)$existingTicketsStmt->fetchColumn();
-        if ($existingTickets + count($seats) > $maxTickets) {
-            json_response(['success' => false, 'message' => 'Превышен лимит билетов на одного пользователя: ' . $maxTickets]);
+        if (count($seats) > $maxTickets) {
+            json_response(['success' => false, 'message' => 'В одном заказе можно оформить не более ' . $maxTickets . ' билетов.']);
         }
 
         $placeholders = implode(',', array_fill(0, count($seat_keys), '?'));

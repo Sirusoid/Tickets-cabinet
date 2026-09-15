@@ -7,10 +7,10 @@ if (isset($pdo) && $pdo instanceof PDO) {
 	$ticketSettings = [
 		[
 			'key' => 'tickets.max_tickets_per_user',
-			'label' => 'Максимум билетов на пользователя',
+			'label' => 'Максимум билетов в одном заказе',
 			'value' => '6',
 			'type' => 'int',
-			'description' => 'Максимум оплаченных билетов на один сеанс для одного номера телефона.',
+			'description' => 'Максимум билетов, которые можно оплатить или зарезервировать в одном заказе.',
 			'sort' => 3,
 		],
 		[
@@ -43,6 +43,13 @@ if (isset($pdo) && $pdo instanceof PDO) {
 				':category' => 'tickets',
 				':description' => $setting['description'],
 				':sort_order' => $setting['sort'],
+			]);
+		} else {
+			$stmt = $pdo->prepare('UPDATE settings SET label = :label, description = :description WHERE id = :id');
+			$stmt->execute([
+				':label' => $setting['label'],
+				':description' => $setting['description'],
+				':id' => (int)$existing['id'],
 			]);
 		}
 	}
