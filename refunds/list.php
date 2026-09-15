@@ -347,6 +347,14 @@ $queryParams = [
         });
     }
 
+    function highlightMatch(value, query) {
+        var escapedValue = escapeHtml(value);
+        var escapedQuery = escapeHtml(query || '').trim();
+        if (!escapedQuery) return escapedValue;
+        var pattern = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return escapedValue.replace(new RegExp(pattern, 'ig'), '<strong>$&</strong>');
+    }
+
     function hideSuggestions() {
         Array.prototype.forEach.call(form.querySelectorAll('.refunds-typeahead'), function (element) {
             element.innerHTML = '';
@@ -365,7 +373,7 @@ $queryParams = [
         values.forEach(function (value) {
             var item = document.createElement('div');
             item.className = 'refunds-typeahead__item';
-            item.innerHTML = escapeHtml(value);
+            item.innerHTML = highlightMatch(value, input.value);
             item.addEventListener('mousedown', function (event) {
                 event.preventDefault();
                 input.value = value;
