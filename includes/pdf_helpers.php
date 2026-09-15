@@ -438,101 +438,6 @@ if (!function_exists('tickets_pdf_cleanup_for_schedule')) {
 }
 
 // -----------------------------
-// Вспомогательные тексты скидок
-// -----------------------------
-if (!function_exists('ticket_discount_summary_text')) {
-    function ticket_discount_summary_text(array $ticket) {
-        $payloadRaw = isset($ticket['tx_payload']) ? (string)$ticket['tx_payload'] : '';
-        if ($payloadRaw === '') {
-            return '';
-        }
-        $payload = json_decode($payloadRaw, true);
-        if (!is_array($payload)) {
-            return '';
-        }
-
-        // First, try to find per-seat discount in payload->seats_final
-        if (isset($payload['seats_final']) && is_array($payload['seats_final'])) {
-            $seatIdentifier = isset($ticket['seat_identifier']) ? (string)$ticket['seat_identifier'] : '';
-            $found = null;
-            foreach ($payload['seats_final'] as $s) {
-                if (!is_array($s)) continue;
-                // match by identifier if present
-                if ($seatIdentifier !== '' && isset($s['identifier']) && (string)$s['identifier'] === $seatIdentifier) {
-                    $found = $s;
-                    break;
-                }
-            }
-            // If not found by identifier, try to match by seat_id if available in ticket and payload
-            if ($found === null && isset($ticket['seat_id'])) {
-                foreach ($payload['seats_final'] as $s) {
-                    if (!is_array($s)) continue;
-                    if (isset($s['seat_id']) && (string)$s['seat_id'] === (string)$ticket['seat_id']) {
-                        $found = $s;
-                        break;
-                    }
-                }
-            }
-            if ($found !== null) {
-                $disc = 0.0;
-                if (isset($found['discount']) && is_numeric($found['discount'])) {
-                    $disc = (float)$found['discount'];
-                } elseif (isset($found['discount_cents']) && is_numeric($found['discount_cents'])) {
-                    $disc = ((int)$found['discount_cents']) / 100.0;
-                } else {
-                    // fallback compute from original and final if present
-                    if (isset($found['original_price']) && isset($found['final_price']) && is_numeric($found['original_price']) && is_numeric($found['final_price'])) {
-                        $disc = max(0.0, round((float)$found['original_price'] - (float)$found['final_price'], 2));
-                    }
-                }
-                if ($disc > 0) {
-                    $parts = [];
-                    if (isset($payload['discount']) && is_array($payload['discount']) && isset($payload['discount']['auto_percent']) && is_numeric($payload['discount']['auto_percent']) && (float)$payload['discount']['auto_percent'] > 0) {
-                        // only percent value (without "по типу билета")
-                        $parts[] = number_format((float)$payload['discount']['auto_percent'], 0, '.', '') . '%';
-                    }
-                    if (isset($payload['discount']) && is_array($payload['discount']) && !empty($payload['discount']['custom_type']) && $payload['discount']['custom_type'] !== 'none') {
-                        if ($payload['discount']['custom_type'] === 'percent' && isset($payload['discount']['custom_value']) && is_numeric($payload['discount']['custom_value'])) {
-                            $parts[] = 'ручная ' . number_format((float)$payload['discount']['custom_value'], 0, '.', '') . '%';
-                        } elseif ($payload['discount']['custom_type'] === 'fixed' && isset($payload['discount']['custom_value']) && is_numeric($payload['discount']['custom_value'])) {
-                            $parts[] = 'ручная ' . number_format((float)$payload['discount']['custom_value'], 0, '.', '') . ' тг';
-                        }
-                    }
-                    $tail = !empty($parts) ? (' (' . implode(', ', $parts) . ')') : '';
-                    return 'СКИДКА / ЖЕҢІЛДІК: ' . number_format($disc, 0, '.', '') . ' тг' . $tail;
-                }
-            }
-        }
-
-        // Fallback: use overall discount from payload->discount if present
-        if (!isset($payload['discount']) || !is_array($payload['discount'])) {
-            return '';
-        }
-        $discount = $payload['discount'];
-        $total = isset($discount['total_discount']) && is_numeric($discount['total_discount'])
-            ? (float)$discount['total_discount']
-            : 0.0;
-        if ($total <= 0) {
-            return '';
-        }
-        $parts = [];
-        if (isset($discount['auto_percent']) && is_numeric($discount['auto_percent']) && (float)$discount['auto_percent'] > 0) {
-            // only percent value (without "по типу билета")
-            $parts[] = number_format((float)$discount['auto_percent'], 0, '.', '') . '%';
-        }
-        if (!empty($discount['custom_type']) && $discount['custom_type'] !== 'none') {
-            if ($discount['custom_type'] === 'percent' && isset($discount['custom_value']) && is_numeric($discount['custom_value'])) {
-                $parts[] = 'ручная ' . number_format((float)$discount['custom_value'], 0, '.', '') . '%';
-            } elseif ($discount['custom_type'] === 'fixed' && isset($discount['custom_value']) && is_numeric($discount['custom_value'])) {
-                $parts[] = 'ручная ' . number_format((float)$discount['custom_value'], 0, '.', '') . ' тг';
-            }
-        }
-        $tail = !empty($parts) ? (' (' . implode(', ', $parts) . ')') : '';
-        return 'СКИДКА / ЖЕҢІЛДІК: ' . number_format($total, 0, '.', '') . ' тг' . $tail;
-    }
-}
-
-// -----------------------------
 // Хелпер для рендера: создаёт HTML для генерации билета, использует в приоритете полученные pdf_field, а потом только tx_payload, если pdf_fields не существует
 // -----------------------------
 if (!function_exists('ticket_pdf_render_html')) {
@@ -544,6 +449,8 @@ if (!function_exists('ticket_pdf_render_html')) {
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
+        // Цена PDF берётся только из канонических полей tickets.
+        unset($ticket['tx_payload']);
         $paid_price_value = is_numeric($ticket['final_price'] ?? null)
             ? (float)$ticket['final_price']
             : 0.0;

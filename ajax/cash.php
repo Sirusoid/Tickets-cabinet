@@ -479,12 +479,6 @@ case 'sell':
         $orig = isset($baseSeatPrices[$idx]) ? (float)$baseSeatPrices[$idx] : 0.0;
         $final = isset($finalSeatPrices[$idx]) ? (float)$finalSeatPrices[$idx] : 0.0;
 
-        // if client provided explicit final_price override it
-        if (is_array($seat)) {
-            if (isset($seat['final_price']) && $seat['final_price'] !== '') $final = (float)$seat['final_price'];
-            elseif (isset($seat['final_price_cents']) && $seat['final_price_cents'] !== '') $final = ((int)$seat['final_price_cents']) / 100.0;
-        }
-
         // discount amount in currency (orig - final)
         $discount_amount = round(max(0.0, $orig - $final), 2);
         $discount_cents = (int) round($discount_amount * 100);
