@@ -30,11 +30,12 @@ $status = $parsed['success'] ? 'paid' : 'failed';
 $message = $parsed['success'] ? 'Оплата прошла успешно!' : 'Оплата не была завершена. Пожалуйста, попробуйте снова.';
 
 if ($order !== '' && $pdo instanceof PDO) {
-    $stmt = $pdo->prepare("SELECT id, status, ticket_uids, amount_cents, session_id FROM payment_sessions WHERE order_number = :order LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, status, ticket_uids, amount_cents, session_id, seats_payload FROM payment_sessions WHERE order_number = :order LIMIT 1");
     $stmt->execute([':order' => $order]);
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($session) {
+        $wasPending = (string)($session['status'] ?? '') === 'pending';
         $newStatus = $parsed['success'] ? $session['status'] : 'failed';
         $upd = $pdo->prepare("UPDATE payment_sessions SET return_visited_at = NOW(), provider_response = :response, status = CASE WHEN status = 'paid' THEN status ELSE :new_status END, updated_at = NOW() WHERE id = :id");
         $upd->execute([
@@ -42,6 +43,10 @@ if ($order !== '' && $pdo instanceof PDO) {
             ':new_status' => $newStatus,
             ':id' => $session['id'],
         ]);
+
+        if (!$parsed['success'] && $wasPending) {
+            bcc_release_payment_holds($pdo, $session);
+        }
 
         $stmt2 = $pdo->prepare("SELECT status, ticket_uids, amount_cents FROM payment_sessions WHERE id = :id LIMIT 1");
         $stmt2->execute([':id' => $session['id']]);

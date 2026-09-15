@@ -39,6 +39,7 @@ if ($order !== '' && $pdo instanceof PDO) {
 
     if ($session) {
         $paymentSessionId = (int)($session['id'] ?? 0);
+        $wasPending = (string)($session['status'] ?? '') === 'pending';
         // В return.php НЕ меняем статус на paid — это делает только notify.
         // Фиксируем факт возврата клиента и неудачный статус, если банк явно сообщил об отказе.
         $newStatus = $parsed['success'] ? $session['status'] : 'failed';
@@ -48,6 +49,10 @@ if ($order !== '' && $pdo instanceof PDO) {
             ':new_status' => $newStatus,
             ':id' => $paymentSessionId,
         ]);
+
+        if (!$parsed['success'] && $wasPending) {
+            bcc_release_payment_holds($pdo, $session);
+        }
 
         // BACKREF и NOTIFY приходят независимо друг от друга. Страница заказа
         // сама дождётся NOTIFY и обновит данные внутри текущего iframe.

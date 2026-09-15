@@ -131,6 +131,13 @@ if (!function_exists('bcc_endpoint')) {
     }
 }
 
+if (!function_exists('bcc_payment_hold_minutes')) {
+    function bcc_payment_hold_minutes(): int
+    {
+        return 15;
+    }
+}
+
 if (!function_exists('bcc_base_url')) {
     function bcc_base_url(): string
     {
@@ -417,5 +424,42 @@ if (!function_exists('bcc_parse_response')) {
             'approval_code' => $approval,
             'raw' => $data,
         ];
+    }
+}
+
+if (!function_exists('bcc_release_payment_holds')) {
+    function bcc_release_payment_holds(PDO $pdo, array $paymentSession): int
+    {
+        $scheduleId = (int)($paymentSession['session_id'] ?? 0);
+        $seats = json_decode((string)($paymentSession['seats_payload'] ?? ''), true);
+        if ($scheduleId <= 0 || !is_array($seats)) {
+            throw new RuntimeException('Cannot release BCC holds: payment session data is incomplete.');
+        }
+
+        $seatKeys = [];
+        foreach ($seats as $seat) {
+            if (!is_array($seat)) {
+                continue;
+            }
+            $seatKey = str_replace(':', '-', trim((string)($seat['identifier'] ?? '')));
+            if ($seatKey !== '') {
+                $seatKeys[] = $seatKey;
+            }
+        }
+        $seatKeys = array_values(array_unique($seatKeys));
+        if (empty($seatKeys)) {
+            throw new RuntimeException('Cannot release BCC holds: seat identifiers are missing.');
+        }
+
+        $placeholders = implode(',', array_fill(0, count($seatKeys), '?'));
+        $stmt = $pdo->prepare("DELETE FROM cash_holds
+            WHERE session_id = ?
+                AND seat_key IN ($placeholders)
+                AND (
+                    meta LIKE '%widget_online_payment%'
+                    OR meta LIKE '%bcc_online_payment%'
+                )");
+        $stmt->execute(array_merge([$scheduleId], $seatKeys));
+        return $stmt->rowCount();
     }
 }

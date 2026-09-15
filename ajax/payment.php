@@ -148,8 +148,8 @@ switch ($action) {
             json_response(['success' => false, 'message' => 'Amount must be greater than 0']);
         }
 
-        // Создаём резерв мест на 20 минут (чтобы никто не купил, пока клиент платит)
-        $reserveMinutes = 20;
+        // Ждём подтверждение банка не более 15 минут, пока места заблокированы.
+        $reserveMinutes = bcc_payment_hold_minutes();
         $now = (new DateTime())->format('Y-m-d H:i:s');
         $expires_at = (new DateTime("+{$reserveMinutes} minutes"))->format('Y-m-d H:i:s');
         $user_id = current_user_id();

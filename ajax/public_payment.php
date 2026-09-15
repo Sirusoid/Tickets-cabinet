@@ -165,7 +165,7 @@ switch ($action) {
             json_response(['success' => false, 'message' => 'Сумма заказа должна быть больше 0']);
         }
 
-        $reserveMinutes = 20;
+        $reserveMinutes = bcc_payment_hold_minutes();
         $expires_at = (new DateTime("+{$reserveMinutes} minutes"))->format('Y-m-d H:i:s');
 
         $pdo->beginTransaction();

@@ -129,11 +129,20 @@ if ((string)$data['MERCHANT'] !== trim((string)($cfg['merchant'] ?? ''))
 }
 
 if (!$parsed['success']) {
-    $upd = $pdo->prepare("UPDATE payment_sessions SET status = 'failed', provider_response = :response, notify_received_at = NOW(), updated_at = NOW() WHERE id = :id");
+    $wasPending = (string)($session['status'] ?? '') === 'pending';
+    $upd = $pdo->prepare("UPDATE payment_sessions
+        SET status = CASE WHEN status = 'paid' THEN status ELSE 'failed' END,
+            provider_response = :response,
+            notify_received_at = NOW(),
+            updated_at = NOW()
+        WHERE id = :id");
     $upd->execute([
         ':response' => json_encode($data, JSON_UNESCAPED_UNICODE),
         ':id' => $session['id'],
     ]);
+    if ($wasPending) {
+        bcc_release_payment_holds($pdo, $session);
+    }
     json_response(['success' => true, 'message' => 'Received failed payment']);
 }
 
