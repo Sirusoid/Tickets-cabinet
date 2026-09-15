@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: localhost:3306
--- Время создания: Сен 15 2026 г., 17:11
+-- Время создания: Сен 15 2026 г., 17:35
 -- Версия сервера: 10.6.27-MariaDB-cll-lve
 -- Версия PHP: 8.4.24
 
@@ -30,7 +30,6 @@ SET time_zone = "+00:00";
 CREATE TABLE `audit_logs` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED DEFAULT NULL,
-  `staff_id` int(10) UNSIGNED DEFAULT NULL,
   `performed_by_type` enum('admin','staff','system','api') NOT NULL DEFAULT 'admin',
   `action` varchar(100) NOT NULL,
   `entity_type` varchar(100) NOT NULL,
@@ -42,6 +41,14 @@ CREATE TABLE `audit_logs` (
   `user_agent` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Дамп данных таблицы `audit_logs`
+--
+
+INSERT INTO `audit_logs` (`id`, `user_id`, `performed_by_type`, `action`, `entity_type`, `entity_name`, `entity_id`, `before_data`, `after_data`, `ip_address`, `user_agent`, `created_at`) VALUES
+(52, 1, 'admin', 'sale:create', 'session', NULL, 67, NULL, '{\"seats\":[\"16-10\",\"16-20\"],\"tx_id\":\"253\",\"amount\":15000,\"uids\":[\"48f7b115e69a2872\",\"01bc5aeb27d7239f\"],\"customer_id\":37,\"discount\":{\"final_total\":15000,\"applied\":{\"segment\":\"adult\",\"auto_percent\":0,\"auto_amount\":0,\"custom_type\":\"none\",\"custom_value\":0,\"custom_amount\":0,\"total_discount\":0}}}', '91.198.101.184', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 YaBrowser/26.8.0.0 Safari/537.36', '2026-09-15 12:26:35'),
+(53, 1, 'admin', 'sale:create', 'session', NULL, 67, NULL, '{\"seats\":[\"16-22\",\"16-23\"],\"tx_id\":\"254\",\"amount\":8000,\"uids\":[\"e7550c7cee5e4222\",\"5929db1d69f61c40\"],\"customer_id\":37,\"discount\":{\"final_total\":8000,\"applied\":{\"segment\":\"student\",\"auto_percent\":0,\"auto_amount\":0,\"custom_type\":\"none\",\"custom_value\":0,\"custom_amount\":0,\"total_discount\":0}}}', '91.198.101.184', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 YaBrowser/26.8.0.0 Safari/537.36', '2026-09-15 12:26:49');
 
 -- --------------------------------------------------------
 
@@ -94,6 +101,14 @@ CREATE TABLE `cash_transactions` (
   `ticket_uids` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`ticket_uids`)),
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+--
+-- Дамп данных таблицы `cash_transactions`
+--
+
+INSERT INTO `cash_transactions` (`id`, `type`, `session_id`, `user_id`, `customer_id`, `amount_cents`, `currency`, `payment_method`, `payload`, `ticket_uids`, `created_at`) VALUES
+(253, 'sale', 67, 1, 37, 15000, 'KZT', 'cash', '{\"schema_version\":2,\"action\":\"sale\",\"source\":\"cashier\",\"payment_method\":\"cash\",\"customer_segment\":\"adult\"}', '[\"48f7b115e69a2872\",\"01bc5aeb27d7239f\"]', '2026-09-15 17:26:34'),
+(254, 'sale', 67, 1, 37, 8000, 'KZT', 'cash', '{\"schema_version\":2,\"action\":\"sale\",\"source\":\"cashier\",\"payment_method\":\"cash\",\"customer_segment\":\"student\"}', '[\"e7550c7cee5e4222\",\"5929db1d69f61c40\"]', '2026-09-15 17:26:48');
 
 -- --------------------------------------------------------
 
@@ -468,26 +483,6 @@ INSERT INTO `schedules` (`id`, `event_id`, `hall_id`, `start_time`, `end_time`, 
 -- --------------------------------------------------------
 
 --
--- Структура таблицы `schedule_prices`
---
-
-CREATE TABLE `schedule_prices` (
-  `id` int(10) UNSIGNED NOT NULL,
-  `schedule_id` int(10) UNSIGNED NOT NULL,
-  `row_start` int(10) UNSIGNED NOT NULL,
-  `row_end` int(10) UNSIGNED NOT NULL,
-  `zone_name` varchar(100) DEFAULT NULL,
-  `seat_type` varchar(100) DEFAULT NULL,
-  `price` decimal(10,2) NOT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `comment` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
 -- Структура таблицы `seats`
 --
 
@@ -527,6 +522,16 @@ CREATE TABLE `seat_occupancy` (
   `reserved_at` datetime NOT NULL DEFAULT current_timestamp(),
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Дамп данных таблицы `seat_occupancy`
+--
+
+INSERT INTO `seat_occupancy` (`id`, `schedule_id`, `seat_identifier`, `ticket_id`, `reserved_by`, `reserved_until`, `reserved_at`, `created_at`) VALUES
+(144, 67, '16-10', 332, NULL, NULL, '2026-09-15 17:26:34', '2026-09-15 12:26:34'),
+(145, 67, '16-20', 333, NULL, NULL, '2026-09-15 17:26:34', '2026-09-15 12:26:34'),
+(146, 67, '16-22', 334, NULL, NULL, '2026-09-15 17:26:48', '2026-09-15 12:26:48'),
+(147, 67, '16-23', 335, NULL, NULL, '2026-09-15 17:26:48', '2026-09-15 12:26:48');
 
 -- --------------------------------------------------------
 
@@ -623,22 +628,22 @@ INSERT INTO `settings` (`id`, `key`, `label`, `value`, `type`, `options`, `categ
 -- --------------------------------------------------------
 
 --
--- Структура таблицы `staff`
+-- Структура таблицы `staff_backup_before_users_migration`
 --
 
-CREATE TABLE `staff` (
-  `id` int(10) UNSIGNED NOT NULL,
-  `staff_uid` varchar(100) DEFAULT NULL,
-  `full_name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `phone` varchar(50) DEFAULT NULL,
-  `role` enum('admin','manager','cashier','scanner') NOT NULL DEFAULT 'manager',
-  `password_hash` varchar(255) NOT NULL,
+CREATE TABLE `staff_backup_before_users_migration` (
+  `id` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `staff_uid` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `full_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` enum('admin','manager','cashier','scanner') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'manager',
+  `password_hash` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `last_login_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- --------------------------------------------------------
 
@@ -683,6 +688,16 @@ CREATE TABLE `tickets` (
   `sold_by_staff_id` int(10) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Дамп данных таблицы `tickets`
+--
+
+INSERT INTO `tickets` (`id`, `schedule_id`, `event_id`, `hall_id`, `seat_id`, `seat_identifier`, `customer_id`, `customer_name`, `customer_phone`, `customer_email`, `customer_segment`, `channel`, `source_ref`, `ticket_uid`, `barcode`, `qr_code`, `price`, `original_price`, `final_price`, `discount`, `discount_amount`, `status`, `payment_status`, `payment_provider`, `payment_transaction_id`, `payment_session_id`, `is_checked_in`, `checked_in_at`, `refund_status`, `refund_at`, `purchased_at`, `created_at`, `updated_at`, `sold_by_staff_id`) VALUES
+(332, 67, 24, 8, NULL, '16-10', 37, 'Дядя Вас', '+77773000000', 'pochta@pochta.com', 'adult', 'kassa', NULL, '48f7b115e69a2872', NULL, NULL, 10000.00, 10000.00, 10000.00, 0, 0.00, 'issued', 'paid', NULL, '253', NULL, 0, NULL, 'none', NULL, '2026-09-15 17:26:34', '2026-09-15 12:26:34', '2026-09-15 12:26:34', NULL),
+(333, 67, 24, 8, NULL, '16-20', 37, 'Дядя Вас', '+77773000000', 'pochta@pochta.com', 'adult', 'kassa', NULL, '01bc5aeb27d7239f', NULL, NULL, 5000.00, 5000.00, 5000.00, 0, 0.00, 'issued', 'paid', NULL, '253', NULL, 0, NULL, 'none', NULL, '2026-09-15 17:26:34', '2026-09-15 12:26:34', '2026-09-15 12:26:34', NULL),
+(334, 67, 24, 8, NULL, '16-22', 37, 'Дядя Вас', '+77773000000', 'pochta@pochta.com', 'student', 'kassa', NULL, 'e7550c7cee5e4222', NULL, NULL, 4000.00, 4000.00, 4000.00, 20, 0.00, 'issued', 'paid', NULL, '254', NULL, 0, NULL, 'none', NULL, '2026-09-15 17:26:48', '2026-09-15 12:26:48', '2026-09-15 12:26:48', NULL),
+(335, 67, 24, 8, NULL, '16-23', 37, 'Дядя Вас', '+77773000000', 'pochta@pochta.com', 'student', 'kassa', NULL, '5929db1d69f61c40', NULL, NULL, 4000.00, 4000.00, 4000.00, 20, 0.00, 'issued', 'paid', NULL, '254', NULL, 0, NULL, 'none', NULL, '2026-09-15 17:26:48', '2026-09-15 12:26:48', '2026-09-15 12:26:48', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -694,7 +709,7 @@ CREATE TABLE `users` (
   `username` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(150) NOT NULL,
-  `role` enum('admin','manager','cashier') NOT NULL DEFAULT 'admin',
+  `role` enum('admin','manager','cashier','scanner') NOT NULL DEFAULT 'manager',
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `email` varchar(255) DEFAULT NULL,
   `last_login_at` datetime DEFAULT NULL,
@@ -724,7 +739,6 @@ INSERT INTO `users` (`id`, `username`, `password_hash`, `full_name`, `role`, `is
 ALTER TABLE `audit_logs`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_user_id` (`user_id`),
-  ADD KEY `idx_staff_id` (`staff_id`),
   ADD KEY `idx_entity` (`entity_type`,`entity_id`),
   ADD KEY `idx_audit_logs_created` (`created_at`);
 
@@ -852,13 +866,6 @@ ALTER TABLE `schedules`
   ADD KEY `idx_schedules_hall` (`hall_id`);
 
 --
--- Индексы таблицы `schedule_prices`
---
-ALTER TABLE `schedule_prices`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `fk_schedule_prices_schedule_clean` (`schedule_id`);
-
---
 -- Индексы таблицы `seats`
 --
 ALTER TABLE `seats`
@@ -884,13 +891,6 @@ ALTER TABLE `settings`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uniq_settings_key` (`key`),
   ADD KEY `idx_settings_category` (`category`);
-
---
--- Индексы таблицы `staff`
---
-ALTER TABLE `staff`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uniq_email` (`email`);
 
 --
 -- Индексы таблицы `tickets`
@@ -922,7 +922,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT для таблицы `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=52;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=54;
 
 --
 -- AUTO_INCREMENT для таблицы `cash_audit_log`
@@ -940,7 +940,7 @@ ALTER TABLE `cash_holds`
 -- AUTO_INCREMENT для таблицы `cash_transactions`
 --
 ALTER TABLE `cash_transactions`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=253;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=255;
 
 --
 -- AUTO_INCREMENT для таблицы `checkins`
@@ -1015,12 +1015,6 @@ ALTER TABLE `schedules`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
 
 --
--- AUTO_INCREMENT для таблицы `schedule_prices`
---
-ALTER TABLE `schedule_prices`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
 -- AUTO_INCREMENT для таблицы `seats`
 --
 ALTER TABLE `seats`
@@ -1030,7 +1024,7 @@ ALTER TABLE `seats`
 -- AUTO_INCREMENT для таблицы `seat_occupancy`
 --
 ALTER TABLE `seat_occupancy`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=144;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=148;
 
 --
 -- AUTO_INCREMENT для таблицы `settings`
@@ -1039,16 +1033,10 @@ ALTER TABLE `settings`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=72;
 
 --
--- AUTO_INCREMENT для таблицы `staff`
---
-ALTER TABLE `staff`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT для таблицы `tickets`
 --
 ALTER TABLE `tickets`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=332;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=336;
 
 --
 -- AUTO_INCREMENT для таблицы `users`
@@ -1064,7 +1052,6 @@ ALTER TABLE `users`
 -- Ограничения внешнего ключа таблицы `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  ADD CONSTRAINT `fk_audit_logs_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_audit_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
@@ -1077,7 +1064,7 @@ ALTER TABLE `cash_transactions`
 -- Ограничения внешнего ключа таблицы `checkins`
 --
 ALTER TABLE `checkins`
-  ADD CONSTRAINT `fk_checkins_scanner` FOREIGN KEY (`scanner_id`) REFERENCES `staff` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_checkins_scanner_user` FOREIGN KEY (`scanner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_checkins_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
@@ -1099,7 +1086,7 @@ ALTER TABLE `event_actors`
 -- Ограничения внешнего ключа таблицы `refunds`
 --
 ALTER TABLE `refunds`
-  ADD CONSTRAINT `fk_refunds_processed_by` FOREIGN KEY (`processed_by`) REFERENCES `staff` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_refunds_processed_by_user` FOREIGN KEY (`processed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_refunds_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
@@ -1108,12 +1095,6 @@ ALTER TABLE `refunds`
 ALTER TABLE `schedules`
   ADD CONSTRAINT `fk_schedules_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_schedules_hall` FOREIGN KEY (`hall_id`) REFERENCES `halls` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Ограничения внешнего ключа таблицы `schedule_prices`
---
-ALTER TABLE `schedule_prices`
-  ADD CONSTRAINT `fk_schedule_prices_schedule_clean` FOREIGN KEY (`schedule_id`) REFERENCES `schedules` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Ограничения внешнего ключа таблицы `seats`
@@ -1137,7 +1118,7 @@ ALTER TABLE `tickets`
   ADD CONSTRAINT `fk_tickets_hall` FOREIGN KEY (`hall_id`) REFERENCES `halls` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_tickets_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `schedules` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_tickets_seat` FOREIGN KEY (`seat_id`) REFERENCES `seats` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_tickets_sold_by` FOREIGN KEY (`sold_by_staff_id`) REFERENCES `staff` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `fk_tickets_sold_by_user` FOREIGN KEY (`sold_by_staff_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
