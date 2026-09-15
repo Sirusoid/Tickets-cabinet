@@ -227,8 +227,7 @@ if (!function_exists('bcc_generate_nonce')) {
 if (!function_exists('bcc_timestamp')) {
     function bcc_timestamp(): string
     {
-        $timezone = defined('DEFAULT_TIMEZONE') ? (string)DEFAULT_TIMEZONE : 'Asia/Almaty';
-        return (new DateTimeImmutable('now', new DateTimeZone($timezone)))->format('YmdHis');
+        return gmdate('YmdHis');
     }
 }
 
@@ -236,7 +235,7 @@ if (!function_exists('bcc_merchant_gmt')) {
     function bcc_merchant_gmt(): string
     {
         $configured = getenv('ZHASSAHNA_BCC_MERCH_GMT');
-        return is_string($configured) && trim($configured) !== '' ? trim($configured) : '+5';
+        return is_string($configured) && trim($configured) !== '' ? trim($configured) : '0';
     }
 }
 
