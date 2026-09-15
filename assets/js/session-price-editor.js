@@ -569,7 +569,10 @@
       renderOverlay();
 
       var api = {
-        setTool: function (t) { internal.tool = (t === 'rect') ? 'rect' : 'select'; },
+        setTool: function (t) {
+          internal.tool = (t === 'rect') ? 'rect' : 'select';
+          internal.canvas.style.cursor = internal.tool === 'rect' ? 'crosshair' : 'default';
+        },
         clearSelection: clearSelection,
         getSelectedSeatsCount: getSelectedSeatsCount,
         assignPriceToSelection: function (opts) { return assignPriceToSelection(opts); },

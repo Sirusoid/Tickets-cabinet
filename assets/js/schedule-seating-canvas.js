@@ -80,6 +80,7 @@
         gapY: Number(opts.gapY) || 12,
         showGrid: !!opts.showGrid,
         disableWheelZoom: !!opts.disableWheelZoom,
+        disablePan: !!opts.disablePan,
         plainUnavailableSeats: !!opts.plainUnavailableSeats,
         scale: 1,
         _visual: Object.assign({
@@ -710,6 +711,7 @@
       }
 
       canvas.addEventListener('mousedown', function (e) {
+        if (internal.disablePan) return;
         if (e.button !== 0) return;
         var hit = getSeatAt(e.clientX, e.clientY);
         if (hit) return; // let click handler work
@@ -735,6 +737,10 @@
           canvas.style.cursor = 'grab';
         }
       });
+
+      if (internal.disablePan) {
+        canvas.style.cursor = 'default';
+      }
 
       canvas.addEventListener('wheel', function (e) {
         if (internal.disableWheelZoom) return;

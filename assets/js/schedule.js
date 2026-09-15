@@ -735,7 +735,8 @@
           gapY: 12,
           showGrid: true,
           fitToCanvas: true,
-          disableWheelZoom: true
+          disableWheelZoom: true,
+          disablePan: true
         });
       }
     } catch (e) {}
@@ -743,7 +744,7 @@
       if (window.SessionPriceEditor && typeof window.SessionPriceEditor.init === 'function') {
         window.SessionPriceEditor.init({
           canvasId: 'editor-canvas',
-          seatingOptions: { seatSize: 28, gapX: 8, gapY: 12, showGrid: true },
+          seatingOptions: { seatSize: 28, gapX: 8, gapY: 12, showGrid: true, disablePan: true },
           selectedCountId: 'selectedCount'
         });
       }
