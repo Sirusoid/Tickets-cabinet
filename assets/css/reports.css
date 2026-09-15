@@ -127,6 +127,8 @@
 .reports-kpi--accent strong { color: #2563eb; }
 .reports-kpi--success { border-top-color: #16a34a; }
 .reports-kpi--success strong { color: #15803d; }
+.reports-kpi--discount { border-top-color: #d97706; }
+.reports-kpi--discount strong { color: #b45309; }
 .reports-kpi--dark { border-top-color: #334155; }
 .reports-kpi--dark strong { color: #1e293b; }
 

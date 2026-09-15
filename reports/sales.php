@@ -279,8 +279,9 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 		<div class="reports-kpi-grid">
 			<div class="card reports-kpi reports-kpi--accent"><span>Продано билетов</span><strong><?= number_format((float)$totals['tickets'], 0, '.', ' ') ?></strong><small>за выбранный период</small></div>
 			<div class="card reports-kpi"><span>Выручка до скидок</span><strong><?= number_format((float)$totals['gross'], 2, '.', ' ') ?> <em>тг</em></strong><small>номинальная стоимость</small></div>
-			<div class="card reports-kpi reports-kpi--success"><span>Чистая выручка</span><strong><?= number_format((float)$totals['net'], 2, '.', ' ') ?> <em>тг</em></strong><small>после скидок</small></div>
-			<div class="card reports-kpi reports-kpi--dark"><span>После возвратов</span><strong><?= number_format((float)$netAfterRefunds, 2, '.', ' ') ?> <em>тг</em></strong><small><?= number_format((float)$refundTotals['tickets'], 0, '.', ' ') ?> возвращённых билетов</small></div>
+		<div class="card reports-kpi reports-kpi--discount"><span>Скидки</span><strong>-<?= number_format((float)$totals['discount'], 2, '.', ' ') ?> <em>тг</em></strong><small>за выбранный период</small></div>
+		<div class="card reports-kpi reports-kpi--success"><span>Чистая выручка</span><strong><?= number_format((float)$totals['net'], 2, '.', ' ') ?> <em>тг</em></strong><small>после скидок</small></div>
+		<div class="card reports-kpi reports-kpi--dark"><span>После возвратов</span><strong><?= number_format((float)$netAfterRefunds, 2, '.', ' ') ?> <em>тг</em></strong><small><?= number_format((float)$refundTotals['tickets'], 0, '.', ' ') ?> возвращённых билетов</small></div>
 		</div>
 
 		<div class="reports-meta-row">
