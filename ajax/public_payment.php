@@ -103,7 +103,16 @@ switch ($action) {
             $identifier = is_array($s) && isset($s['identifier']) ? (string)$s['identifier'] : (is_string($s) ? $s : '');
             $identifier = str_replace(':', '-', trim($identifier));
             if ($identifier === '') continue;
-            $price = is_array($s) && isset($s['original_price']) ? (float)$s['original_price'] : 0.0;
+            $price = 0.0;
+            if (is_array($s) && isset($s['original_price'])) {
+                $price = (float)$s['original_price'];
+            } elseif (is_array($s) && isset($s['price'])) {
+                // Переходная совместимость со старым JS; в БД сохраняется только original_price/final_price.
+                $price = (float)$s['price'];
+            }
+            if ($price <= 0) {
+                continue;
+            }
             $seats[] = [
                 'identifier' => $identifier,
                 'original_price' => $price,
