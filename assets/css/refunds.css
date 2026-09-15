@@ -3,6 +3,31 @@
 .refunds-filters__form { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)) auto; gap: 10px; align-items: end; }
 .refunds-filters label { display: block; margin-bottom: 5px; color: #52647e; font-size: 12px; font-weight: 600; }
 .refunds-filters__actions { display: flex; gap: 8px; }
+.refunds-filter-field { position: relative; }
+.refunds-typeahead {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 3px);
+    z-index: 1500;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #d9e1ec;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, .14);
+}
+.refunds-typeahead.is-visible { display: block; }
+.refunds-typeahead__item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eef2f7;
+    color: #263b55;
+    cursor: pointer;
+    font-size: 13px;
+}
+.refunds-typeahead__item:last-child { border-bottom: 0; }
+.refunds-typeahead__item:hover { background: #f2f7ff; }
 .refunds-summary { margin: 0 0 8px; color: #64748b; font-size: 13px; }
 .refunds-table-wrap { overflow-x: auto; padding: 0; }
 .refunds-table { width: 100%; min-width: 1250px; }

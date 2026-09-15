@@ -25,6 +25,70 @@ $perPage = 50;
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
 
+$suggestType = trim((string)($_GET['suggest'] ?? ''));
+if ($suggestType !== '') {
+    header('Content-Type: application/json; charset=utf-8');
+    $query = trim((string)($_GET['q'] ?? ''));
+    if ($query === '') {
+        echo json_encode(['success' => true, 'data' => []], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $like = '%' . $query . '%';
+    $suggestParams = [
+        ':date_from' => $dateFrom . ' 00:00:00',
+        ':date_to' => $dateTo . ' 23:59:59',
+        ':like' => $like,
+    ];
+    try {
+        if ($suggestType === 'customer') {
+            $suggestSql = "SELECT DISTINCT c.full_name AS value
+                FROM refunds r
+                LEFT JOIN tickets t ON t.id = r.ticket_id
+                LEFT JOIN customers c ON c.id = t.customer_id
+                WHERE r.created_at BETWEEN :date_from AND :date_to
+                    AND c.full_name LIKE :like
+                ORDER BY c.full_name
+                LIMIT 20";
+        } elseif ($suggestType === 'ticket') {
+            $suggestSql = "SELECT DISTINCT r.ticket_uid AS value
+                FROM refunds r
+                WHERE r.created_at BETWEEN :date_from AND :date_to
+                    AND r.ticket_uid LIKE :like
+                ORDER BY r.ticket_uid
+                LIMIT 20";
+        } elseif ($suggestType === 'transaction') {
+            $suggestSql = "SELECT DISTINCT r.refund_transaction_id AS value
+                FROM refunds r
+                WHERE r.created_at BETWEEN :date_from AND :date_to
+                    AND r.refund_transaction_id LIKE :like
+                ORDER BY r.refund_transaction_id
+                LIMIT 20";
+        } elseif ($suggestType === 'order') {
+            $suggestSql = "SELECT DISTINCT ps.order_number AS value
+                FROM refunds r
+                LEFT JOIN tickets t ON t.id = r.ticket_id
+                LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                WHERE r.created_at BETWEEN :date_from AND :date_to
+                    AND ps.order_number LIKE :like
+                ORDER BY ps.order_number
+                LIMIT 20";
+        } else {
+            echo json_encode(['success' => true, 'data' => []], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $suggestStmt = $pdo->prepare($suggestSql);
+        $suggestStmt->execute($suggestParams);
+        echo json_encode(['success' => true, 'data' => $suggestStmt->fetchAll(PDO::FETCH_COLUMN)], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        error_log('[REFUNDS] Ошибка подсказок: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'data' => []], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 $originSql = "CASE
     WHEN r.processed_by IS NOT NULL THEN 'cashier'
     WHEN r.reason LIKE '%кассир%' OR r.reason LIKE '%cashier%' THEN 'cashier'
@@ -121,53 +185,6 @@ $methodLabels = [
     'noncash' => 'Безналичные',
     'bank' => 'Эквайринг',
 ];
-$refundHints = [
-    'customer' => [],
-    'ticket' => [],
-    'transaction' => [],
-    'order' => [],
-];
-try {
-    $hintParams = [
-        ':hint_date_from' => $dateFrom . ' 00:00:00',
-        ':hint_date_to' => $dateTo . ' 23:59:59',
-    ];
-    $hintWhere = 'r.created_at BETWEEN :hint_date_from AND :hint_date_to';
-    $refundHints['customer'] = array_column(db_fetch_all(
-        "SELECT DISTINCT c.full_name AS value
-         FROM refunds r
-         LEFT JOIN tickets t ON t.id = r.ticket_id
-         LEFT JOIN customers c ON c.id = t.customer_id
-         WHERE {$hintWhere} AND c.full_name IS NOT NULL AND c.full_name <> ''
-         ORDER BY c.full_name LIMIT 50",
-        $hintParams
-    ), 'value');
-    $refundHints['ticket'] = array_column(db_fetch_all(
-        "SELECT DISTINCT r.ticket_uid AS value
-         FROM refunds r
-         WHERE {$hintWhere} AND r.ticket_uid IS NOT NULL AND r.ticket_uid <> ''
-         ORDER BY r.ticket_uid LIMIT 50",
-        $hintParams
-    ), 'value');
-    $refundHints['transaction'] = array_column(db_fetch_all(
-        "SELECT DISTINCT r.refund_transaction_id AS value
-         FROM refunds r
-         WHERE {$hintWhere} AND r.refund_transaction_id IS NOT NULL AND r.refund_transaction_id <> ''
-         ORDER BY r.refund_transaction_id LIMIT 50",
-        $hintParams
-    ), 'value');
-    $refundHints['order'] = array_column(db_fetch_all(
-        "SELECT DISTINCT ps.order_number AS value
-         FROM refunds r
-         LEFT JOIN tickets t ON t.id = r.ticket_id
-         LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
-         WHERE {$hintWhere} AND ps.order_number IS NOT NULL AND ps.order_number <> ''
-         ORDER BY ps.order_number LIMIT 50",
-        $hintParams
-    ), 'value');
-} catch (Throwable $e) {
-    error_log('[REFUNDS] Не удалось загрузить подсказки фильтров: ' . $e->getMessage());
-}
 $totalPages = max(1, (int)ceil($total / $perPage));
 $queryParams = [
     'date_from' => $dateFrom,
@@ -224,31 +241,31 @@ $queryParams = [
             </div>
             <div>
                 <label for="refunds-customer">Клиент</label>
-                <input id="refunds-customer" class="form-control" type="search" name="customer" list="refunds-customer-hints" value="<?= h($customerSearch) ?>" placeholder="ФИО клиента">
-                <datalist id="refunds-customer-hints">
-                    <?php foreach ($refundHints['customer'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
-                </datalist>
+                <div class="refunds-filter-field">
+                    <input id="refunds-customer" class="form-control" type="search" name="customer" value="<?= h($customerSearch) ?>" placeholder="ФИО клиента" data-refund-suggest="customer">
+                    <div id="refunds-customer-suggestions" class="refunds-typeahead"></div>
+                </div>
             </div>
             <div>
                 <label for="refunds-ticket">Билет</label>
-                <input id="refunds-ticket" class="form-control" type="search" name="ticket" list="refunds-ticket-hints" value="<?= h($ticketSearch) ?>" placeholder="UID билета">
-                <datalist id="refunds-ticket-hints">
-                    <?php foreach ($refundHints['ticket'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
-                </datalist>
+                <div class="refunds-filter-field">
+                    <input id="refunds-ticket" class="form-control" type="search" name="ticket" value="<?= h($ticketSearch) ?>" placeholder="UID билета" data-refund-suggest="ticket">
+                    <div id="refunds-ticket-suggestions" class="refunds-typeahead"></div>
+                </div>
             </div>
             <div>
                 <label for="refunds-transaction">Транзакция</label>
-                <input id="refunds-transaction" class="form-control" type="search" name="transaction" list="refunds-transaction-hints" value="<?= h($transactionSearch) ?>" placeholder="ID транзакции">
-                <datalist id="refunds-transaction-hints">
-                    <?php foreach ($refundHints['transaction'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
-                </datalist>
+                <div class="refunds-filter-field">
+                    <input id="refunds-transaction" class="form-control" type="search" name="transaction" value="<?= h($transactionSearch) ?>" placeholder="ID транзакции" data-refund-suggest="transaction">
+                    <div id="refunds-transaction-suggestions" class="refunds-typeahead"></div>
+                </div>
             </div>
             <div>
                 <label for="refunds-order">Заказ</label>
-                <input id="refunds-order" class="form-control" type="search" name="order" list="refunds-order-hints" value="<?= h($orderSearch) ?>" placeholder="Номер заказа">
-                <datalist id="refunds-order-hints">
-                    <?php foreach ($refundHints['order'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
-                </datalist>
+                <div class="refunds-filter-field">
+                    <input id="refunds-order" class="form-control" type="search" name="order" value="<?= h($orderSearch) ?>" placeholder="Номер заказа" data-refund-suggest="order">
+                    <div id="refunds-order-suggestions" class="refunds-typeahead"></div>
+                </div>
             </div>
             <div class="refunds-filters__actions">
                 <a class="btn btn-ghost" href="/refunds/list.php">Сбросить</a>
@@ -323,17 +340,132 @@ $queryParams = [
 (function () {
     var form = document.getElementById('refundsFiltersForm');
     if (!form) return;
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, function (char) {
+            return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char];
+        });
+    }
+
+    function hideSuggestions() {
+        Array.prototype.forEach.call(form.querySelectorAll('.refunds-typeahead'), function (element) {
+            element.innerHTML = '';
+            element.classList.remove('is-visible');
+        });
+    }
+
+    function showSuggestions(type, values, input) {
+        var box = document.getElementById('refunds-' + type + '-suggestions');
+        if (!box) return;
+        box.innerHTML = '';
+        if (!values || !values.length) {
+            box.classList.remove('is-visible');
+            return;
+        }
+        values.forEach(function (value) {
+            var item = document.createElement('div');
+            item.className = 'refunds-typeahead__item';
+            item.innerHTML = escapeHtml(value);
+            item.addEventListener('mousedown', function (event) {
+                event.preventDefault();
+                input.value = value;
+                hideSuggestions();
+                refreshTable();
+            });
+            box.appendChild(item);
+        });
+        box.classList.add('is-visible');
+    }
+
+    function loadSuggestions(input) {
+        var type = input.getAttribute('data-refund-suggest');
+        var query = input.value.trim();
+        if (!type || query === '') {
+            hideSuggestions();
+            return;
+        }
+
+        var params = new URLSearchParams();
+        params.set('suggest', type);
+        params.set('q', query);
+        var dateFrom = form.querySelector('[name="date_from"]');
+        var dateTo = form.querySelector('[name="date_to"]');
+        if (dateFrom) params.set('date_from', dateFrom.value);
+        if (dateTo) params.set('date_to', dateTo.value);
+
+        fetch('/refunds/list.php?' + params.toString(), {credentials: 'same-origin'})
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                showSuggestions(type, data && data.success ? data.data : [], input);
+            })
+            .catch(function () { hideSuggestions(); });
+    }
+
+    function refreshTable() {
+        var params = new URLSearchParams(new FormData(form));
+        params.set('page', '1');
+        var focused = document.activeElement;
+        var focusedName = focused && focused.name ? focused.name : '';
+        var focusedValue = focused && typeof focused.selectionStart === 'number' ? focused.selectionStart : null;
+
+        fetch('/refunds/list.php?' + params.toString(), {credentials: 'same-origin'})
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+                var parsed = new DOMParser().parseFromString(html, 'text/html');
+                var currentSummary = document.querySelector('.refunds-summary');
+                var nextSummary = parsed.querySelector('.refunds-summary');
+                var currentTable = document.querySelector('.refunds-table-wrap');
+                var nextTable = parsed.querySelector('.refunds-table-wrap');
+                var currentPagination = document.querySelector('.refunds-pagination');
+                var nextPagination = parsed.querySelector('.refunds-pagination');
+                if (currentSummary && nextSummary) currentSummary.replaceWith(nextSummary);
+                if (currentTable && nextTable) currentTable.replaceWith(nextTable);
+                if (currentPagination && nextPagination) currentPagination.replaceWith(nextPagination);
+                if (currentPagination && !nextPagination) currentPagination.remove();
+                window.history.replaceState({}, '', '/refunds/list.php?' + params.toString());
+                if (focusedName) {
+                    var restored = form.querySelector('[name="' + focusedName + '"]');
+                    if (restored) {
+                        restored.focus();
+                        if (focusedValue !== null && typeof restored.setSelectionRange === 'function') {
+                            restored.setSelectionRange(focusedValue, focusedValue);
+                        }
+                    }
+                }
+            })
+            .catch(function () {});
+    }
+
     var controls = form.querySelectorAll('input, select');
     Array.prototype.forEach.call(controls, function (control) {
         if (control.type === 'search' || control.type === 'text') {
             control.addEventListener('input', function () {
-                form.submit();
+                loadSuggestions(control);
+                refreshTable();
+            });
+            control.addEventListener('focus', function () {
+                loadSuggestions(control);
+            });
+            control.addEventListener('blur', function () {
+                window.setTimeout(hideSuggestions, 150);
+            });
+            control.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    hideSuggestions();
+                    refreshTable();
+                }
             });
             return;
         }
         control.addEventListener('change', function () {
-            form.submit();
+            hideSuggestions();
+            refreshTable();
         });
+    });
+
+    document.addEventListener('mousedown', function (event) {
+        if (!form.contains(event.target)) hideSuggestions();
     });
 })();
 </script>
