@@ -15,7 +15,10 @@ $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $origin = trim((string)($_GET['origin'] ?? ''));
 $status = trim((string)($_GET['status'] ?? ''));
 $method = trim((string)($_GET['method'] ?? ''));
-$search = trim((string)($_GET['search'] ?? ''));
+$customerSearch = trim((string)($_GET['customer'] ?? ''));
+$ticketSearch = trim((string)($_GET['ticket'] ?? ''));
+$transactionSearch = trim((string)($_GET['transaction'] ?? ''));
+$orderSearch = trim((string)($_GET['order'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 50;
 
@@ -44,9 +47,21 @@ if ($method !== '') {
     $where[] = 'r.refund_method = :method';
     $params[':method'] = $method;
 }
-if ($search !== '') {
-    $where[] = '(r.ticket_uid LIKE :search OR c.full_name LIKE :search OR e.title LIKE :search OR ps.order_number LIKE :search OR r.refund_transaction_id LIKE :search)';
-    $params[':search'] = '%' . $search . '%';
+if ($customerSearch !== '') {
+    $where[] = 'c.full_name LIKE :customer_search';
+    $params[':customer_search'] = '%' . $customerSearch . '%';
+}
+if ($ticketSearch !== '') {
+    $where[] = 'r.ticket_uid LIKE :ticket_search';
+    $params[':ticket_search'] = '%' . $ticketSearch . '%';
+}
+if ($transactionSearch !== '') {
+    $where[] = 'r.refund_transaction_id LIKE :transaction_search';
+    $params[':transaction_search'] = '%' . $transactionSearch . '%';
+}
+if ($orderSearch !== '') {
+    $where[] = 'ps.order_number LIKE :order_search';
+    $params[':order_search'] = '%' . $orderSearch . '%';
 }
 $whereSql = implode(' AND ', $where);
 
@@ -113,7 +128,10 @@ $queryParams = [
     'origin' => $origin,
     'status' => $status,
     'method' => $method,
-    'search' => $search,
+    'customer' => $customerSearch,
+    'ticket' => $ticketSearch,
+    'transaction' => $transactionSearch,
+    'order' => $orderSearch,
 ];
 ?>
 
@@ -158,8 +176,20 @@ $queryParams = [
                 </select>
             </div>
             <div>
-                <label for="refunds-search">Поиск</label>
-                <input id="refunds-search" class="form-control" type="search" name="search" value="<?= h($search) ?>" placeholder="Клиент, билет, заказ">
+                <label for="refunds-customer">Клиент</label>
+                <input id="refunds-customer" class="form-control" type="search" name="customer" value="<?= h($customerSearch) ?>" placeholder="ФИО клиента">
+            </div>
+            <div>
+                <label for="refunds-ticket">Билет</label>
+                <input id="refunds-ticket" class="form-control" type="search" name="ticket" value="<?= h($ticketSearch) ?>" placeholder="UID билета">
+            </div>
+            <div>
+                <label for="refunds-transaction">Транзакция</label>
+                <input id="refunds-transaction" class="form-control" type="search" name="transaction" value="<?= h($transactionSearch) ?>" placeholder="ID транзакции">
+            </div>
+            <div>
+                <label for="refunds-order">Заказ</label>
+                <input id="refunds-order" class="form-control" type="search" name="order" value="<?= h($orderSearch) ?>" placeholder="Номер заказа">
             </div>
             <div class="refunds-filters__actions">
                 <a class="btn btn-ghost" href="/refunds/list.php">Сбросить</a>
