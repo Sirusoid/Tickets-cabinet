@@ -234,16 +234,13 @@ require __DIR__ . '/../includes/panel.php';
 							<td><?= (int)$userRow['id'] ?></td>
 							<td><?= h($userRow['username']) ?></td>
 							<td>
-								<form method="post" class="settings-inline-form">
-									<input type="hidden" name="action" value="update_user">
-									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
-									<input type="text" name="full_name" value="<?= h($userRow['full_name']) ?>" required>
+									<input form="update_user_<?= (int)$userRow['id'] ?>" type="text" name="full_name" value="<?= h($userRow['full_name']) ?>" required>
 							</td>
 							<td>
-									<input type="email" name="email" value="<?= h((string)$userRow['email']) ?>">
+									<input form="update_user_<?= (int)$userRow['id'] ?>" type="email" name="email" value="<?= h((string)$userRow['email']) ?>">
 							</td>
 							<td>
-									<select name="role">
+									<select form="update_user_<?= (int)$userRow['id'] ?>" name="role">
 										<?php foreach ($roles as $roleCode => $roleLabel): ?>
 											<option value="<?= h($roleCode) ?>" <?= $roleCode === $userRow['role'] ? 'selected' : '' ?>><?= h($roleLabel) ?></option>
 										<?php endforeach; ?>
@@ -251,7 +248,7 @@ require __DIR__ . '/../includes/panel.php';
 							</td>
 							<td>
 									<label class="settings-bool settings-bool--compact">
-										<input type="checkbox" name="is_active" value="1" <?= (int)$userRow['is_active'] === 1 ? 'checked' : '' ?>>
+											<input form="update_user_<?= (int)$userRow['id'] ?>" type="checkbox" name="is_active" value="1" <?= (int)$userRow['is_active'] === 1 ? 'checked' : '' ?>>
 										<span><?= (int)$userRow['is_active'] === 1 ? 'Да' : 'Нет' ?></span>
 									</label>
 							</td>
@@ -259,6 +256,9 @@ require __DIR__ . '/../includes/panel.php';
 								<?= h((string)($userRow['last_login_at'] ?? '')) !== '' ? h((string)$userRow['last_login_at']) : '—' ?>
 							</td>
 							<td>
+								<form id="update_user_<?= (int)$userRow['id'] ?>" method="post" class="settings-inline-form">
+									<input type="hidden" name="action" value="update_user">
+									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
 									<div class="settings-inline-actions">
 										<button type="submit" class="btn btn-secondary btn-sm">Сохранить</button>
 									</div>
