@@ -448,6 +448,41 @@ case 'sell':
     }
 
     $discountSettings = cash_get_discount_settings($pdo);
+    $hasOriginalSeatPrices = false;
+    foreach ($seats as $seat) {
+        if (is_array($seat) && isset($seat['original_price']) && is_numeric($seat['original_price'])) {
+            $hasOriginalSeatPrices = true;
+            break;
+        }
+    }
+    if (!$hasOriginalSeatPrices && $amount_cents > 0) {
+        $clientFinalTotal = round($amount_cents / 100, 2);
+        $clientSeatTotal = round(array_sum($baseSeatPrices), 2);
+        $segmentPercent = 0.0;
+        if (
+            $customer_segment !== 'manual'
+            && isset($discountSettings['segment_percent'][$customer_segment])
+            && is_numeric($discountSettings['segment_percent'][$customer_segment])
+        ) {
+            $segmentPercent = max(0.0, min(100.0, (float)$discountSettings['segment_percent'][$customer_segment]));
+        }
+        $manualAmount = isset($discount_input['manual_amount']) && is_numeric($discount_input['manual_amount'])
+            ? max(0.0, (float)$discount_input['manual_amount'])
+            : 0.0;
+        $inferredBaseTotal = $clientFinalTotal;
+        if ($segmentPercent > 0 && $segmentPercent < 100) {
+            $inferredBaseTotal = $clientFinalTotal / (1 - ($segmentPercent / 100));
+        } elseif ($customer_segment === 'manual' && $manualAmount > 0) {
+            $inferredBaseTotal = $clientFinalTotal + $manualAmount;
+        }
+        if ($clientSeatTotal > 0 && abs($clientSeatTotal - $clientFinalTotal) < 0.01 && $inferredBaseTotal > $clientFinalTotal) {
+            $scale = $inferredBaseTotal / $clientSeatTotal;
+            foreach ($baseSeatPrices as $index => $basePrice) {
+                $baseSeatPrices[$index] = round($basePrice * $scale, 2);
+            }
+            $baseTotal = round(array_sum($baseSeatPrices), 2);
+        }
+    }
     $discountApplied = cash_apply_sale_discounts($baseTotal, $customer_segment, $discount_input, $discountSettings);
     $finalSeatPrices = cash_distribute_prices($baseSeatPrices, $discountApplied['final_total']);
 

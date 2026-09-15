@@ -122,6 +122,15 @@ if (!function_exists('reporting_ticket_financials')) {
                 'paid' => round($paid, 2),
             ];
         }
+        $storedDiscount = is_numeric($row['discount'] ?? null) ? (float)$row['discount'] : 0.0;
+        if ($storedDiscount > 0 && $storedDiscount < 100) {
+            $original = $paid / (1 - ($storedDiscount / 100));
+            return [
+                'original' => round($original, 2),
+                'discount' => round($original - $paid, 2),
+                'paid' => round($paid, 2),
+            ];
+        }
         $payload = reporting_decode_payload($row['tx_payload'] ?? null);
         $seatIdentifier = str_replace(':', '-', trim((string)($row['seat_identifier'] ?? '')));
 
@@ -154,16 +163,6 @@ if (!function_exists('reporting_ticket_financials')) {
                 'original' => round($original, 2),
                 'discount' => round($discount, 2),
                 'paid' => round($final, 2),
-            ];
-        }
-
-        $storedDiscount = is_numeric($row['discount'] ?? null) ? (float)$row['discount'] : 0.0;
-        if ($storedDiscount > 0 && $storedDiscount < 100) {
-            $original = $paid / (1 - ($storedDiscount / 100));
-            return [
-                'original' => round($original, 2),
-                'discount' => round($original - $paid, 2),
-                'paid' => round($paid, 2),
             ];
         }
 
