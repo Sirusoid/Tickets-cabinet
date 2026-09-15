@@ -67,7 +67,13 @@ try {
     }
 
     $pdfPath = ticket_pdf_file_path($ticket_uid);
-    if ($force || !is_file($pdfPath) || filesize($pdfPath) === 0) {
+    $pdfGeneratorPath = __DIR__ . '/../includes/pdf_helpers.php';
+    $pdfGeneratorUpdatedAt = is_file($pdfGeneratorPath) ? (int)filemtime($pdfGeneratorPath) : 0;
+    $ticketUpdatedAt = !empty($ticket['updated_at']) ? (int)strtotime((string)$ticket['updated_at']) : 0;
+    $pdfUpdatedAt = is_file($pdfPath) ? (int)filemtime($pdfPath) : 0;
+    $needsCanonicalRebuild = $pdfUpdatedAt < max($pdfGeneratorUpdatedAt, $ticketUpdatedAt);
+
+    if ($force || !is_file($pdfPath) || filesize($pdfPath) === 0 || $needsCanonicalRebuild) {
         $error = null;
         if (!ticket_pdf_generate_from_ticket($ticket, $force, $error)) {
             header('Content-Type: text/html; charset=utf-8');
