@@ -137,7 +137,7 @@ function get_dashboard_metrics()
         'events' => db_fetch_one('SELECT COUNT(*) AS total FROM events')['total'] ?? 0,
         'schedules' => db_fetch_one('SELECT COUNT(*) AS total FROM schedules')['total'] ?? 0,
         'tickets' => db_fetch_one('SELECT COUNT(*) AS total FROM tickets')['total'] ?? 0,
-        'sales' => db_fetch_one('SELECT IFNULL(SUM(price), 0) AS total FROM tickets WHERE payment_status = ?', ['paid'])['total'] ?? 0,
+        'sales' => db_fetch_one('SELECT IFNULL(SUM(final_price), 0) AS total FROM tickets WHERE payment_status = ?', ['paid'])['total'] ?? 0,
     ];
 }
 
@@ -302,4 +302,3 @@ function schedule_refresh_statuses(PDO $pdo, ?int $scheduleId = null)
 
     return $updated;
 }
-

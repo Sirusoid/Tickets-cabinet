@@ -39,7 +39,7 @@ if (!$error && $session && $pdo instanceof PDO) {
         $uids = json_decode($session['ticket_uids'] ?? '[]', true);
         if (is_array($uids) && !empty($uids)) {
             $placeholders = implode(',', array_fill(0, count($uids), '?'));
-            $stmt = $pdo->prepare("            SELECT t.id, t.ticket_uid, t.seat_identifier, t.price, t.final_price, t.customer_segment, t.channel,
+            $stmt = $pdo->prepare("                        SELECT t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.customer_segment, t.channel,
                         t.status, t.payment_status, t.refund_status, t.refund_at, t.purchased_at,
                         COALESCE(c.full_name, '') AS customer_name,
                         COALESCE(e.title, '') AS event_title,
@@ -237,7 +237,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <?php if ($publicSeat['row'] !== ''): ?><strong>Ряд: <?= h($publicSeat['row']) ?></strong><br><?php endif; ?>
                                         <strong>Место: <?= h($publicSeat['seat']) ?></strong>
                                     </div>
-                                    <div style="color:#4b5563;">Цена / Бағасы: <?= number_format((float)($ticket['final_price'] ?? $ticket['price']), 2, '.', ' ') ?> ₸</div>
+                                    <div style="color:#4b5563;">Цена / Бағасы: <?= number_format((float)$ticket['final_price'], 2, '.', ' ') ?> ₸</div>
                                     <?php if (($ticket['refund_status'] ?? 'none') === 'refunded'): ?>
                                         <div style="color:#b91c1c; font-weight:600;">Билет возвращён / Билет қайтарылды</div>
                                     <?php endif; ?>
@@ -310,7 +310,7 @@ require_once __DIR__ . '/../includes/header.php';
                 return [
                     'uid' => $t['ticket_uid'],
                     'seat' => $t['seat_identifier'],
-                    'price' => number_format((float)$t['price'], 2, '.', ' ')
+                    'price' => number_format((float)$t['final_price'], 2, '.', ' ')
                 ];
             }, $tickets)) ?>;
             if (window.parent && window.parent !== window) {

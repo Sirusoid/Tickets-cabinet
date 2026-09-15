@@ -63,7 +63,7 @@ if (!$session) {
     public_refund_response(['success' => false, 'message' => 'Заказ не найден.'], 404);
 }
 
-$ticketStmt = $pdo->prepare("SELECT id, ticket_uid, price, refund_status, status
+$ticketStmt = $pdo->prepare("SELECT id, ticket_uid, final_price, refund_status, status
     FROM tickets WHERE payment_session_id = :payment_session_id ORDER BY id ASC");
 $ticketStmt->execute([':payment_session_id' => (int)$session['id']]);
 $tickets = $ticketStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -126,7 +126,7 @@ try {
             ':ticket_id' => (int)$ticket['id'],
             ':ticket_uid' => $ticket['ticket_uid'],
             ':schedule_id' => (int)$session['session_id'],
-            ':refund_amount' => number_format((float)$ticket['price'], 2, '.', ''),
+            ':refund_amount' => number_format((float)$ticket['final_price'], 2, '.', ''),
             ':reason' => 'Самостоятельный возврат клиента',
         ]);
     }

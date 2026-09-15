@@ -48,7 +48,6 @@ try {
 		$sql = "SELECT
 								t.id,
 								t.schedule_id,
-								t.price,
 								t.original_price,
 								t.final_price,
 								t.discount,
@@ -61,7 +60,6 @@ try {
 								t.refund_status,
 								t.payment_transaction_id,
 								COALESCE(tx.payment_method, CASE WHEN t.channel IN ('web', 'mobile') THEN 'card' ELSE 'cash' END) AS payment_method,
-								tx.payload AS tx_payload,
 								e.title AS event_title,
 								s.start_time AS schedule_start
 						FROM tickets t
@@ -167,7 +165,7 @@ try {
 			$refundEventSql = ' AND COALESCE(t.event_id, s.event_id) = :refund_event_id ';
 			$refundParams[':refund_event_id'] = $eventFilter;
 		}
-		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.price), 0) AS amount
+		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.final_price), 0) AS amount
 			FROM tickets t
 			LEFT JOIN schedules s ON s.id = t.schedule_id
 			WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
@@ -184,7 +182,7 @@ try {
 		e.title AS event_title,
 			s.start_time AS schedule_start,
 			COUNT(*) AS tickets,
-			COALESCE(SUM(t.price), 0) AS amount
+			COALESCE(SUM(t.final_price), 0) AS amount
 		FROM tickets t
 		LEFT JOIN schedules s ON s.id = t.schedule_id
 		LEFT JOIN events e ON e.id = COALESCE(t.event_id, s.event_id)

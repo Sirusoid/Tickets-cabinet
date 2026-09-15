@@ -190,7 +190,7 @@
     }
 
     function updateTotal() {
-        const total = selectedSeats.reduce(function (sum, s) { return sum + s.price; }, 0);
+        const total = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
         const count = selectedSeats.length;
         if (totalEl) totalEl.textContent = formatMoney(total) + ' ' + cfg.currencySymbol;
         if (buyBtn) buyBtn.disabled = count === 0;
@@ -491,7 +491,7 @@
         if (idx !== -1) {
             selectedSeats.splice(idx, 1);
         } else {
-            selectedSeats.push({ identifier: key, price: price, row: row, col: col });
+            selectedSeats.push({ identifier: key, original_price: price, row: row, col: col });
         }
         renderer.selectSeats(selectedSeats.map(function (s) { return s.identifier; }));
         updateCart();
@@ -531,7 +531,7 @@
         right.style.alignItems = 'center';
         const price = document.createElement('span');
         price.className = 'bcc-seat-card-price';
-        price.textContent = formatMoney(s.price) + ' ' + cfg.currencySymbol;
+        price.textContent = formatMoney(s.original_price) + ' ' + cfg.currencySymbol;
         const remove = document.createElement('button');
         remove.className = 'bcc-seat-card-remove';
         remove.setAttribute('aria-label', 'Убрать билет');
@@ -573,7 +573,7 @@
             info.appendChild(meta);
             const price = document.createElement('span');
             price.className = 'bcc-seat-card-price';
-            price.textContent = formatMoney(s.price) + ' ' + cfg.currencySymbol;
+            price.textContent = formatMoney(s.original_price) + ' ' + cfg.currencySymbol;
             card.appendChild(info);
             card.appendChild(price);
             customerCartList.appendChild(card);
@@ -611,7 +611,7 @@
         const payload = {
                 action: 'create_bcc_session',
                 session_id: currentSession.id || currentSession.session_id,
-                seats: selectedSeats.map(function (s) { return { identifier: s.identifier, price: s.price }; }),
+                seats: selectedSeats.map(function (s) { return { identifier: s.identifier, original_price: s.original_price }; }),
                 customer_name: name,
                 customer_phone: phone,
                 customer_email: email,

@@ -218,43 +218,6 @@ var Cashier = (function () {
     };
   }
 
-  function distributeSeatPrices(seatsPayload, finalTotal) {
-    if (!Array.isArray(seatsPayload) || !seatsPayload.length) return seatsPayload || [];
-    var baseValues = seatsPayload.map(function (s) {
-      var p = Number(s.price);
-      return isFinite(p) && p > 0 ? p : 0;
-    });
-    var baseSum = baseValues.reduce(function (sum, v) { return sum + v; }, 0);
-    if (baseSum <= 0) {
-      return seatsPayload.map(function (s) { return Object.assign({}, s, { price: 0 }); });
-    }
-
-    var finalCents = Math.max(0, Math.round(Number(finalTotal || 0) * 100));
-    var baseCents = baseValues.map(function (v) { return Math.round(v * 100); });
-    var baseTotalCents = baseCents.reduce(function (sum, c) { return sum + c; }, 0);
-    if (baseTotalCents <= 0) {
-      return seatsPayload.map(function (s) { return Object.assign({}, s, { price: 0 }); });
-    }
-
-    var distributed = [];
-    var allocated = 0;
-    for (var i = 0; i < seatsPayload.length; i++) {
-      var cents;
-      if (i === seatsPayload.length - 1) {
-        cents = Math.max(0, finalCents - allocated);
-      } else {
-        cents = Math.floor((baseCents[i] * finalCents) / baseTotalCents);
-        allocated += cents;
-      }
-      distributed.push(Object.assign({}, seatsPayload[i], {
-        price: cents / 100,
-        original_price: baseValues[i],
-        final_price: cents / 100
-      }));
-    }
-    return distributed;
-  }
-
   function getManualDiscountInputValue() {
     var el = manualDiscountAmountEl || document.getElementById('manualDiscountAmount');
     if (!el) return 0;
@@ -393,7 +356,7 @@ var Cashier = (function () {
           seats.push({
             id: seatId,
             identifier: (row && seat) ? (row + ':' + seat) : String(k),
-            price: price
+            original_price: price
           });
         } catch (inner) {
         }
@@ -1074,30 +1037,13 @@ var Cashier = (function () {
 
           // Build payload safely: structured seats + legacy keys
           var seatsPayload = buildSeatsPayload();
-          var discountInfo = calculateDiscounts(seatsPayload.reduce(function(sum, s){ return sum + (Number(s.price) || 0); }, 0));
-          var discountedSeats = distributeSeatPrices(seatsPayload, discountInfo.final_total);
-          var totalAmount = Math.round(discountInfo.final_total);
-
           var payload = {
             session_id: sessionId,
-            seats: discountedSeats,         // structured payload (id, identifier, discounted price)
-            seats_keys: cart.slice(),       // legacy: array of "row:seat" strings
+            seats: seatsPayload,
             payment_method: pm,
-            amount_cents: totalAmount,
             customer: customer,
             customer_segment: customer_segment,
-            discount: {
-              segment: discountInfo.segment,
-              auto_percent: discountInfo.auto_percent,
-              auto_amount: discountInfo.auto_amount,
-              custom_type: discountInfo.custom_type,
-              custom_value: discountInfo.custom_value,
-              custom_amount: discountInfo.custom_amount,
-              manual_amount: manualDiscountAmount,
-              total_discount: discountInfo.total_discount,
-              final_total: discountInfo.final_total,
-              base_total: discountInfo.base_total
-            }
+            discount: { manual_amount: manualDiscountAmount }
           };
 
           // debug (temporary)

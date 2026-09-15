@@ -544,11 +544,9 @@ if (!function_exists('ticket_pdf_render_html')) {
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        // paid price (final) — stored in ticket.price (decimal)
-        $paid_price_value = null;
-        if (isset($ticket['price']) && is_numeric($ticket['price'])) {
-            $paid_price_value = (float)$ticket['price'];
-        }
+        $paid_price_value = is_numeric($ticket['final_price'] ?? null)
+            ? (float)$ticket['final_price']
+            : 0.0;
 
         // tx_payload raw (may be present)
         $tx_payload_raw = isset($ticket['tx_payload']) ? (string)$ticket['tx_payload'] : '';
@@ -592,7 +590,7 @@ if (!function_exists('ticket_pdf_render_html')) {
             $pdf_payment_label = is_numeric($tx_payload['final_total']) ? (float)$tx_payload['final_total'] : null;
         }
 
-        // Final fallbacks to ticket.price and ticket.discount
+        // Финальные значения берутся из канонических полей билета.
         if ($pdf_price_label === null) $pdf_price_label = $paid_price_value !== null ? (float)$paid_price_value : 0.0;
         if ($pdf_payment_label === null) $pdf_payment_label = $paid_price_value !== null ? (float)$paid_price_value : 0.0;
         if ($pdf_discount_percent === null) $pdf_discount_percent = isset($ticket['discount']) && is_numeric($ticket['discount']) ? (int)$ticket['discount'] : 0;
@@ -650,12 +648,19 @@ if (!function_exists('ticket_pdf_render_html')) {
             }
         }
 
-        // Format displays
-        $orig_price_display = $orig_price_value !== null ? number_format((float)$orig_price_value, 0, '.', '') . ' тг' : '—';
-        $paid_price_display = $paid_price_value !== null ? number_format((float)$paid_price_value, 0, '.', '') . ' тг' : '—';
+        // Канонические поля билета — единственный источник цены PDF.
+        $orig_price_value = (float)($ticket['original_price'] ?? 0);
+        $paid_price_value = (float)($ticket['final_price'] ?? 0);
+        $pdf_price_label = $orig_price_value;
+        $pdf_payment_label = $paid_price_value;
+        $pdf_discount_percent = (int)($ticket['discount'] ?? 0);
+        $discount_amount_display = (float)($ticket['discount_amount'] ?? max(0.0, $orig_price_value - $paid_price_value));
 
-        // Discount summary text (uses tx_payload)
-        $discountLine = ticket_discount_summary_text(['tx_payload' => $tx_payload_raw, 'seat_identifier' => $ticket['seat_identifier'] ?? null, 'seat_id' => $ticket['seat_id'] ?? null]);
+        $orig_price_display = number_format($orig_price_value, 0, '.', '') . ' тг';
+        $paid_price_display = number_format($paid_price_value, 0, '.', '') . ' тг';
+        $discountLine = $discount_amount_display > 0
+            ? 'СКИДКА / ЖЕҢІЛДІК: ' . number_format($discount_amount_display, 0, '.', '') . ' тг'
+            : '';
 
         $channel_raw = trim((string)($ticket['channel'] ?? ''));
         $segment_raw = trim((string)($ticket['customer_segment'] ?? ''));
@@ -919,12 +924,11 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
         }
 
         try {
-            $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, e.title AS event_title, c.full_name AS customer_name, tx.payload AS tx_payload
+            $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, e.title AS event_title, c.full_name AS customer_name
                 FROM tickets t
                 LEFT JOIN schedules s ON s.id = t.schedule_id
                 LEFT JOIN events e ON e.id = t.event_id
                 LEFT JOIN customers c ON c.id = t.customer_id
-                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
                 WHERE t.ticket_uid = :uid LIMIT 1");
             $stmt->execute([':uid' => $ticket_uid]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -932,6 +936,16 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
                 $error = 'Билет не найден';
                 return false;
             }
+
+            // Канонический PDF строится только по полям билета.
+            $ticket['pdf_fields'] = [
+                'price_label' => round((float)($ticket['original_price'] ?? 0), 2),
+                'payment_label' => round((float)($ticket['final_price'] ?? 0), 2),
+                'discount_label_percent' => (int)($ticket['discount'] ?? 0),
+                'discount_label_amount' => round((float)($ticket['discount_amount'] ?? 0), 2),
+                'payment_type' => (string)($ticket['payment_provider'] ?? $ticket['channel'] ?? ''),
+            ];
+            return ticket_pdf_generate_from_ticket($ticket, $force, $error);
 
             // --- START: normalize meta and/or build per-ticket pdf_fields using ticket row ---
             $pdf_fields = [];
@@ -956,9 +970,8 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
             }
 
             // 2) Prefer authoritative per-ticket DB values when present
-            // ticket.price in DB may be transaction-level or original_price depending on your flow,
-            // but we still use it as a reliable fallback for payment_label if nothing else provided.
-            $ticket_price_db = isset($ticket['price']) ? (float)$ticket['price'] : null;
+            // Канонические поля билета используются без пересчёта.
+            $ticket_price_db = isset($ticket['final_price']) ? (float)$ticket['final_price'] : null;
             $ticket_discount_db = null;
             if (isset($ticket['discount']) && $ticket['discount'] !== '') {
                 $ticket_discount_db = is_numeric($ticket['discount']) ? (int)$ticket['discount'] : null;
@@ -1067,17 +1080,17 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
                             }
                         }
                     }
-                    // fallback: if tx payload has base_total/final_total and we still lack values, try to use ticket.price as payment
+                    // Старый transaction payload больше не является источником цены.
                     if ((!isset($pdf_fields['price_label']) || !isset($pdf_fields['payment_label'])) && isset($txp['base_total']) && isset($txp['final_total'])) {
-                        if (!isset($pdf_fields['payment_label']) && isset($ticket['price'])) $pdf_fields['payment_label'] = (float)$ticket['price'];
+                        if (!isset($pdf_fields['payment_label']) && isset($ticket['final_price'])) $pdf_fields['payment_label'] = (float)$ticket['final_price'];
                         if (!isset($pdf_fields['price_label']) && isset($txp['base_total'])) $pdf_fields['price_label'] = (float)$txp['base_total'];
                     }
                 }
             }
 
             // 7) Final safety defaults: ensure payment_label exists and price_label exists
-            if (!isset($pdf_fields['payment_label']) && isset($ticket['price'])) {
-                $pdf_fields['payment_label'] = (float)$ticket['price'];
+            if (!isset($pdf_fields['payment_label']) && isset($ticket['final_price'])) {
+                $pdf_fields['payment_label'] = (float)$ticket['final_price'];
             }
             if (!isset($pdf_fields['price_label'])) {
                 // fallback: set price_label = payment_label

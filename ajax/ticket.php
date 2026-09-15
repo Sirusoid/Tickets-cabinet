@@ -60,64 +60,6 @@ function ticket_debug_log($msg) {
     @file_put_contents('/tmp/ticket_debug.log', date('[Y-m-d H:i:s] ') . $msg . PHP_EOL, FILE_APPEND);
 }
 
-function extract_discount_from_transaction_payload($payloadRaw) {
-    $out = [
-        'total_discount' => 0.0,
-        'base_total' => null,
-        'final_total' => null,
-        'auto_percent' => null,
-        'custom_type' => null,
-    ];
-
-    if (!is_string($payloadRaw) || trim($payloadRaw) === '') {
-        return $out;
-    }
-
-    $payload = json_decode($payloadRaw, true);
-    if (!is_array($payload)) {
-        return $out;
-    }
-    $discount = isset($payload['discount']) && is_array($payload['discount']) ? $payload['discount'] : [];
-    if (empty($discount)) {
-        return $out;
-    }
-
-    $out['total_discount'] = isset($discount['total_discount']) && is_numeric($discount['total_discount'])
-        ? max(0.0, (float)$discount['total_discount'])
-        : 0.0;
-    $out['base_total'] = isset($discount['base_total']) && is_numeric($discount['base_total'])
-        ? (float)$discount['base_total']
-        : null;
-    $out['final_total'] = isset($discount['final_total']) && is_numeric($discount['final_total'])
-        ? (float)$discount['final_total']
-        : null;
-    $out['auto_percent'] = isset($discount['auto_percent']) && is_numeric($discount['auto_percent'])
-        ? (float)$discount['auto_percent']
-        : null;
-    $out['custom_type'] = isset($discount['custom_type']) ? (string)$discount['custom_type'] : null;
-
-    return $out;
-}
-
-function allocate_ticket_discount($ticketPrice, array $discountInfo, $txTicketCount = 1) {
-    $ticketPrice = is_numeric($ticketPrice) ? max(0.0, (float)$ticketPrice) : 0.0;
-    $txTicketCount = max(1, (int)$txTicketCount);
-    $totalDiscount = isset($discountInfo['total_discount']) ? (float)$discountInfo['total_discount'] : 0.0;
-    $finalTotal = isset($discountInfo['final_total']) && is_numeric($discountInfo['final_total'])
-        ? max(0.0, (float)$discountInfo['final_total'])
-        : 0.0;
-
-    if ($totalDiscount <= 0.0) {
-        return 0.0;
-    }
-
-    if ($finalTotal > 0.0 && $ticketPrice > 0.0) {
-        return round($totalDiscount * ($ticketPrice / $finalTotal), 2);
-    }
-
-    return round($totalDiscount / $txTicketCount, 2);
-}
-
 /**
  * Map channel and/or cash_transactions.payment_method to payment type display string.
  * Priority:
@@ -286,10 +228,10 @@ if ($action === 'get_ticket') {
     if (!$id) json_resp(['success' => false, 'message' => 'Неверный id'], 400);
     try {
         $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                       t.seat_id, t.purchased_at, t.created_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                       t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
                    t.payment_provider, t.payment_session_id,
-                   tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
+                   tx.payment_method AS tx_payment_method,
                    ps.order_number, ps.amount_cents AS payment_amount_cents, ps.provider_response,
                    ps.merch_rn_id,
                        COALESCE(c.full_name, '') AS customer_name,
@@ -322,13 +264,15 @@ if ($action === 'get_ticket') {
             'seat_identifier' => $r['seat_identifier'],
             'seat_label' => $r['seat_label'],
             'seat' => $r['seat_label'] ?: $r['seat_identifier'],
-            'price' => $r['price'],
+            'original_price' => $r['original_price'],
+            'final_price' => $r['final_price'],
             'channel' => $r['channel'],
             'payment_status' => $r['payment_status'],
             'payment_type' => map_payment_type_display($r['channel'] ?? '', $r['tx_payment_method'] ?? null),
             'status' => $r['status'],
             'refund_status' => $r['refund_status'] ?? 'none',
-            'discount' => extract_discount_from_transaction_payload($r['tx_payload'] ?? null),
+            'discount_percent' => (int)($r['discount'] ?? 0),
+            'discount_amount' => (float)($r['discount_amount'] ?? 0),
             'customer_name' => $r['customer_name'],
             'customer_id' => $r['customer_id'],
             'event_title' => $r['event_title'],
@@ -339,7 +283,7 @@ if ($action === 'get_ticket') {
             'refund_order' => $isOnlineBcc ? ($r['order_number'] ?? '') : '',
             'refund_original_amount' => $isOnlineBcc
                 ? number_format(((int)($r['payment_amount_cents'] ?? 0)) / 100, 2, '.', '')
-                : number_format((float)($r['price'] ?? 0), 2, '.', ''),
+                : number_format((float)($r['final_price'] ?? 0), 2, '.', ''),
             'refund_currency' => $isOnlineBcc ? '398' : 'KZT',
             'refund_rrn' => $isOnlineBcc ? ($providerResponse['RRN'] ?? '') : '',
             'refund_int_ref' => $isOnlineBcc ? ($providerResponse['INT_REF'] ?? '') : '',
@@ -617,11 +561,10 @@ if ($action === 'list') {
     try {
         $sql = "SELECT
                     t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                    t.seat_id, t.purchased_at, t.created_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                    t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                     t.customer_segment, t.payment_transaction_id,
-                    tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
+                    tx.payment_method AS tx_payment_method,
                     ps.order_number,
-                    (SELECT COUNT(*) FROM tickets t2 WHERE t2.payment_transaction_id = t.payment_transaction_id) AS tx_ticket_count,
                     COALESCE(c.full_name, '') AS customer_name,
                     COALESCE(e.title, '') AS event_title,
                     s.start_time AS session_start
@@ -651,11 +594,10 @@ if ($action === 'list') {
         try {
             $csvSql = "SELECT
                         t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                        t.purchased_at, t.created_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                        t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                         t.customer_segment, t.payment_transaction_id,
-                        tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
+                        tx.payment_method AS tx_payment_method,
                         ps.order_number,
-                        (SELECT COUNT(*) FROM tickets t2 WHERE t2.payment_transaction_id = t.payment_transaction_id) AS tx_ticket_count,
                         COALESCE(c.full_name, '') AS customer_name,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS session_start
@@ -726,9 +668,9 @@ if ($action === 'list') {
             'session_start_raw' => $r['session_start'] ?? null,
             'customer_name' => $r['customer_name'] ?? null,
             'customer_segment' => $r['customer_segment'] ?? null,
-            'base_price' => $priceOut,
+            'original_price' => $ticketFinancials['original'],
             'discount_amount' => $ticketDiscount,
-            'price' => $priceOut,
+            'final_price' => $priceOut,
             'channel' => $r['channel'],
             'payment_type' => map_payment_type_display($r['channel'] ?? '', $r['tx_payment_method'] ?? null),
             'tx_payment_method' => $r['tx_payment_method'] ?? null,
@@ -755,7 +697,7 @@ if ($action === 'create_ticket') {
     $schedule_id = isset($_POST['schedule_id']) ? intval($_POST['schedule_id']) : 0;
     $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : 0;
     $seat_identifier = trim((string)($_POST['seat_identifier'] ?? ''));
-    $price = isset($_POST['price']) ? (float)$_POST['price'] : 0.0;
+    $finalPrice = isset($_POST['final_price']) ? (float)$_POST['final_price'] : 0.0;
     $channel = trim((string)($_POST['channel'] ?? 'kassa'));
     $payment_status = trim((string)($_POST['payment_status'] ?? 'paid'));
     $customer_segment = trim((string)($_POST['customer_segment'] ?? ''));
@@ -764,7 +706,7 @@ if ($action === 'create_ticket') {
         json_resp(['success' => false, 'message' => 'Не указаны schedule_id или seat_identifier'], 400);
     }
 
-    ticket_debug_log("create_ticket called schedule={$schedule_id} seat='{$seat_identifier}' customer={$customer_id} price={$price}");
+    ticket_debug_log("create_ticket called schedule={$schedule_id} seat='{$seat_identifier}' customer={$customer_id} final_price={$finalPrice}");
 
     // Внутри create_ticket, сразу перед попыткой INSERT в seat_occupancy
 ticket_debug_log("DEBUG: about to insert into seat_occupancy schedule={$schedule_id} seat='{$seat_identifier}' user=" . ($_SESSION['user_id'] ?? 'null'));
@@ -830,19 +772,18 @@ try {
 
         // 3) Insert new ticket row (always INSERT)
         $ins = $pdo->prepare("INSERT INTO tickets
-            (ticket_uid, schedule_id, customer_id, seat_identifier, price, original_price, final_price, discount, discount_amount,
+            (ticket_uid, schedule_id, customer_id, seat_identifier, original_price, final_price, discount, discount_amount,
              channel, payment_status, status, refund_status, customer_segment, purchased_at, created_at, updated_at)
             VALUES
-            (:ticket_uid, :schedule_id, :customer_id, :seat_identifier, :price, :original_price, :final_price, 0, 0,
+            (:ticket_uid, :schedule_id, :customer_id, :seat_identifier, :original_price, :final_price, 0, 0,
              :channel, :payment_status, 'issued', 'none', :customer_segment, NOW(), NOW(), NOW())");
         $ins->execute([
             ':ticket_uid' => $ticket_uid,
             ':schedule_id' => $schedule_id,
             ':customer_id' => $customer_id ?: null,
             ':seat_identifier' => $seat_identifier,
-            ':price' => $price,
-            ':original_price' => $price,
-            ':final_price' => $price,
+            ':original_price' => $finalPrice,
+            ':final_price' => $finalPrice,
             ':channel' => $channel,
             ':payment_status' => $payment_status,
             ':customer_segment' => $customer_segment
@@ -892,7 +833,7 @@ if ($action === 'refund') {
         $refund_method = 'cash';
     }
 
-    // validate amount (allow empty -> set to ticket price later)
+    // validate amount (allow empty -> use the canonical final_price later)
     if ($refund_amount_raw !== '') {
         if (!is_numeric($refund_amount_raw)) json_resp(['success' => false, 'message' => 'Неверная сумма возврата'], 400);
         $refund_amount = number_format((float)$refund_amount_raw, 2, '.', '');
@@ -906,7 +847,7 @@ if ($action === 'refund') {
         $pdo->beginTransaction();
 
         // lock ticket row and fetch info (include channel and customer_id for cash_transactions logic)
-        $q = $pdo->prepare("SELECT id, ticket_uid, price, refund_status, status, schedule_id, seat_identifier, channel, customer_id, payment_provider, payment_session_id FROM tickets WHERE id = :id LIMIT 1 FOR UPDATE");
+        $q = $pdo->prepare("SELECT id, ticket_uid, final_price, refund_status, status, schedule_id, seat_identifier, channel, customer_id, payment_provider, payment_session_id FROM tickets WHERE id = :id LIMIT 1 FOR UPDATE");
         $q->execute(['id' => $ticket_id]);
         $t = $q->fetch(PDO::FETCH_ASSOC);
         if (!$t) {
@@ -937,7 +878,7 @@ if ($action === 'refund') {
                     json_resp(['success' => false, 'message' => 'Платёжная сессия онлайн-заказа не найдена'], 404);
                 }
 
-                $ticketStmt = $pdo->prepare("SELECT id, ticket_uid, price, refund_status
+                $ticketStmt = $pdo->prepare("SELECT id, ticket_uid, final_price, refund_status
                     FROM tickets WHERE payment_session_id = :payment_session_id ORDER BY id ASC");
                 $ticketStmt->execute([':payment_session_id' => (int)$paymentSession['id']]);
                 $orderTickets = $ticketStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -968,7 +909,7 @@ if ($action === 'refund') {
 
         // determine amount if not provided
         if ($refund_amount === null) {
-            $refund_amount = isset($t['price']) ? number_format((float)$t['price'], 2, '.', '') : '0.00';
+            $refund_amount = isset($t['final_price']) ? number_format((float)$t['final_price'], 2, '.', '') : '0.00';
         }
 
         // update tickets table: set refund_status to refunded, keep the ticket row

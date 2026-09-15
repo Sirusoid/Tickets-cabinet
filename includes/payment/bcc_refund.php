@@ -253,7 +253,7 @@ if (!function_exists('bcc_process_refund_request')) {
                     ':ticket_id' => (int)$ticket['id'],
                     ':ticket_uid' => $ticket['ticket_uid'],
                     ':schedule_id' => (int)$session['session_id'],
-                    ':refund_amount' => number_format((float)$ticket['price'], 2, '.', ''),
+                    ':refund_amount' => number_format((float)$ticket['final_price'], 2, '.', ''),
                     ':reason' => 'Возврат кассиром через BCC',
                     ':processed_by' => !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null,
                 ]);
@@ -324,7 +324,7 @@ if (!function_exists('bcc_mark_refund_result')) {
             throw new RuntimeException('Заказ не найден.');
         }
 
-        $ticketStmt = $pdo->prepare("SELECT id, ticket_uid, price, refund_status FROM tickets WHERE payment_session_id = :payment_session_id ORDER BY id ASC");
+        $ticketStmt = $pdo->prepare("SELECT id, ticket_uid, final_price, refund_status FROM tickets WHERE payment_session_id = :payment_session_id ORDER BY id ASC");
         $ticketStmt->execute([':payment_session_id' => (int)$session['id']]);
         $tickets = $ticketStmt->fetchAll(PDO::FETCH_ASSOC);
         if (empty($tickets)) {

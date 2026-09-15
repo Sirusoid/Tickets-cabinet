@@ -95,9 +95,9 @@ $paymentNames = ['paid' => 'Оплачен', 'pending' => 'Ожидает', 'fai
 $channelNames = ['web' => 'Web', 'mobile' => 'Mobile', 'kassa' => 'Касса', 'agent' => 'Agent', 'qr' => 'QR', 'admin' => 'Admin'];
 
 $sql = "SELECT
-		t.id, t.ticket_uid, t.seat_identifier, t.purchased_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount,
+		t.id, t.ticket_uid, t.seat_identifier, t.purchased_at, t.original_price, t.final_price, t.discount, t.discount_amount,
 		t.channel, t.payment_status, t.status, t.refund_status, t.customer_segment,
-		tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
+		tx.payment_method AS tx_payment_method,
 		ps.order_number, COALESCE(c.full_name, '') AS customer_name,
 		COALESCE(e.title, '') AS event_title, s.start_time AS session_start
 	FROM tickets t

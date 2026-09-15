@@ -103,8 +103,12 @@ switch ($action) {
             $identifier = is_array($s) && isset($s['identifier']) ? (string)$s['identifier'] : (is_string($s) ? $s : '');
             $identifier = str_replace(':', '-', trim($identifier));
             if ($identifier === '') continue;
-            $price = is_array($s) && isset($s['price']) ? (float)$s['price'] : 0.0;
-            $seats[] = ['identifier' => $identifier, 'price' => $price];
+            $price = is_array($s) && isset($s['original_price']) ? (float)$s['original_price'] : 0.0;
+            $seats[] = [
+                'identifier' => $identifier,
+                'original_price' => $price,
+                'final_price' => $price,
+            ];
             $seat_keys[] = $identifier;
         }
 
@@ -150,7 +154,7 @@ switch ($action) {
             json_response(['success' => false, 'message' => 'Ошибка проверки мест']);
         }
 
-        $amountCents = (int) round(array_sum(array_column($seats, 'price')) * 100);
+        $amountCents = (int) round(array_sum(array_column($seats, 'original_price')) * 100);
         if ($amountCents <= 0) {
             json_response(['success' => false, 'message' => 'Сумма заказа должна быть больше 0']);
         }

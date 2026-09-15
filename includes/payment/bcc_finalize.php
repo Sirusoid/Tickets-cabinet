@@ -67,40 +67,24 @@ if (!function_exists('bcc_finalize_payment_session')) {
             $deleteHolds = $pdo->prepare("DELETE FROM cash_holds WHERE session_id = ? AND seat_key IN ($placeholders)");
             $deleteHolds->execute(array_merge([(int)$lockedSession['session_id']], $seatKeys));
 
-            $transactionSeats = [];
+            $transactionOriginalTotal = 0.0;
             $transactionTotal = 0.0;
             foreach ($seats as $seat) {
-                $identifier = str_replace(':', '-', (string)($seat['identifier'] ?? ''));
-                $price = isset($seat['price']) ? (float)$seat['price'] : 0.0;
-                $transactionTotal += $price;
-                $transactionSeats[] = [
-                    'identifier' => $identifier,
-                    'original_price' => round($price, 2),
-                    'final_price' => round($price, 2),
-                    'discount_amount' => 0,
-                    'discount_percent' => 0,
-                    'custom_discount' => 0,
-                ];
+                $originalPrice = isset($seat['original_price']) ? (float)$seat['original_price'] : 0.0;
+                $finalPrice = isset($seat['final_price']) ? (float)$seat['final_price'] : $originalPrice;
+                $transactionOriginalTotal += $originalPrice;
+                $transactionTotal += $finalPrice;
             }
             $transactionPayload = [
+                'schema_version' => 2,
                 'action' => 'sale',
                 'source' => $source,
                 'provider' => 'bcc',
                 'order' => $data['ORDER'] ?? '',
                 'rrn' => $data['RRN'] ?? null,
                 'int_ref' => $data['INT_REF'] ?? null,
-                'seats_final' => $transactionSeats,
-                'customer' => [
-                    'full_name' => $lockedSession['customer_name'] ?: '',
-                    'phone' => $lockedSession['customer_phone'] ?: '',
-                    'email' => $lockedSession['customer_email'] ?: '',
-                ],
-                'customer_segment' => 'adult',
-                'discount' => [
-                    'total_discount' => 0,
-                    'final_total' => round($transactionTotal, 2),
-                ],
-                'base_total' => round($transactionTotal, 2),
+                'original_total' => round($transactionOriginalTotal, 2),
+                'discount_total' => round(max(0.0, $transactionOriginalTotal - $transactionTotal), 2),
                 'final_total' => round($transactionTotal, 2),
             ];
             $transactionStmt = $pdo->prepare("INSERT INTO cash_transactions (type, session_id, user_id, customer_id, amount_cents, currency, payment_method, payload, created_at)
@@ -146,23 +130,27 @@ if (!function_exists('bcc_finalize_payment_session')) {
             $ticketUids = [];
             foreach ($seats as $seat) {
                 $identifier = str_replace(':', '-', (string)($seat['identifier'] ?? ''));
-                $price = isset($seat['price']) ? (float)$seat['price'] : 0.0;
+                $originalPrice = isset($seat['original_price']) ? (float)$seat['original_price'] : 0.0;
+                $finalPrice = isset($seat['final_price']) ? (float)$seat['final_price'] : $originalPrice;
+                $discountAmount = max(0.0, $originalPrice - $finalPrice);
+                $discountPercent = $originalPrice > 0 ? (int)round(($discountAmount / $originalPrice) * 100) : 0;
                 $ticketUid = bin2hex(random_bytes(8));
 
                 $insertTicket = $pdo->prepare("INSERT INTO tickets
-                    (schedule_id, event_id, hall_id, seat_identifier, price, original_price, final_price, discount, discount_amount,
+                    (schedule_id, event_id, hall_id, seat_identifier, original_price, final_price, discount, discount_amount,
                      status, payment_status, payment_provider, payment_transaction_id, payment_session_id, customer_id, customer_name, customer_phone, customer_email, ticket_uid, channel, purchased_at, created_at, updated_at)
                     VALUES
-                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :price, :original_price, :final_price, 0, 0,
+                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :original_price, :final_price, :discount, :discount_amount,
                      'issued', 'paid', 'bcc', :txid, :payment_session_id, :customer_id, :customer_name, :customer_phone, :customer_email, :ticket_uid, 'web', NOW(), NOW(), NOW())");
                 $insertTicket->execute([
                     ':schedule_id' => (int)$lockedSession['session_id'],
                     ':event_id' => (int)$lockedSession['event_id'],
                     ':hall_id' => (int)$lockedSession['hall_id'],
                     ':seat_identifier' => $identifier,
-                    ':price' => number_format($price, 2, '.', ''),
-                    ':original_price' => number_format($price, 2, '.', ''),
-                    ':final_price' => number_format($price, 2, '.', ''),
+                    ':original_price' => number_format($originalPrice, 2, '.', ''),
+                    ':final_price' => number_format($finalPrice, 2, '.', ''),
+                    ':discount' => $discountPercent,
+                    ':discount_amount' => number_format($discountAmount, 2, '.', ''),
                     ':txid' => $transactionId,
                     ':payment_session_id' => $paymentSessionId,
                     ':customer_id' => $customerId,

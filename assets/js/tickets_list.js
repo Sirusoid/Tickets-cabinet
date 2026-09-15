@@ -231,7 +231,7 @@
     var discountTd = document.createElement('td');
     var discountValue = Number(t.discount_amount || 0);
     if (discountValue > 0) {
-      var baseValue = Number(t.base_price || 0);
+      var baseValue = Number(t.original_price || 0);
       discountTd.innerHTML = '<div style="font-weight:600; color:#185d2f;">-' + discountValue.toLocaleString() + ' тг</div>' +
         '<div style="font-size:11px; color:#6a7b90;">из ' + baseValue.toLocaleString() + ' тг</div>';
     } else {
@@ -240,7 +240,7 @@
     tr.appendChild(discountTd);
 
     var priceTd = document.createElement('td');
-    priceTd.textContent = (t.price !== null && t.price !== undefined) ? (Number(t.price).toLocaleString() + ' тг') : '—';
+    priceTd.textContent = (t.final_price !== null && t.final_price !== undefined) ? (Number(t.final_price).toLocaleString() + ' тг') : '—';
     tr.appendChild(priceTd);
 
     var channelTd = document.createElement('td');
@@ -421,8 +421,8 @@
     qs('refund_seat').textContent = seat;
     var amtEl = qs('refund_amount');
     if (amtEl) {
-      if (t.price !== null && t.price !== undefined && t.price !== '') {
-        amtEl.value = Number(t.price);
+      if (t.final_price !== null && t.final_price !== undefined && t.final_price !== '') {
+        amtEl.value = Number(t.final_price);
       } else {
         amtEl.value = '';
       }

@@ -189,7 +189,7 @@ function normalize_seats($seats_raw) {
             if ($s !== '') {
                 // normalize colon -> hyphen
                 $s = str_replace(':', '-', $s);
-                $result[] = ['id' => null, 'identifier' => $s, 'price' => null];
+                $result[] = ['id' => null, 'identifier' => $s, 'original_price' => null];
             }
         } elseif (is_array($s)) {
             $seatId = null;
@@ -212,18 +212,6 @@ function normalize_seats($seats_raw) {
                 $originalPrice = ((int)$s['original_price_cents']) / 100.0;
             }
 
-            $finalPrice = null;
-            if (isset($s['final_price']) && $s['final_price'] !== '') {
-                $finalPrice = (float)$s['final_price'];
-            } elseif (isset($s['final_price_cents']) && $s['final_price_cents'] !== '') {
-                $finalPrice = ((int)$s['final_price_cents']) / 100.0;
-            }
-
-            $price = $finalPrice;
-            if ($price === null && isset($s['price']) && $s['price'] !== '') {
-                $price = (float)$s['price'];
-            }
-
             $segment = null;
             if (isset($s['customer_segment'])) $segment = $s['customer_segment'];
             elseif (isset($s['segment'])) $segment = $s['segment'];
@@ -232,9 +220,7 @@ function normalize_seats($seats_raw) {
                 $entry = [
                     'id' => $seatId,
                     'identifier' => $identifier,
-                    'price' => $price,
                     'original_price' => $originalPrice,
-                    'final_price' => $finalPrice ?? $price,
                 ];
                 if ($segment !== null) $entry['customer_segment'] = $segment;
                 $result[] = $entry;
@@ -316,16 +302,12 @@ case 'sell':
     $allowed_segments = ['adult','child','student','senior','manual'];
     if (!in_array($customer_segment, $allowed_segments, true)) $customer_segment = 'adult';
 
-    $discount_input = isset($input['discount']) ? $input['discount'] : [];
-    if (is_string($discount_input)) {
-        $decodedDiscount = json_decode($discount_input, true);
-        if (is_array($decodedDiscount)) {
-            $discount_input = $decodedDiscount;
-        }
-    }
-    if (!is_array($discount_input)) {
-        $discount_input = [];
-    }
+    $discountPayload = isset($input['discount']) && is_array($input['discount']) ? $input['discount'] : [];
+    $discount_input = [
+        'manual_amount' => isset($discountPayload['manual_amount']) && is_numeric($discountPayload['manual_amount'])
+            ? max(0.0, (float)$discountPayload['manual_amount'])
+            : 0.0,
+    ];
 
     // Additional flags for customer handling
     $provided_customer_id = isset($input['customer_id']) ? (int)$input['customer_id'] : null;
@@ -371,13 +353,18 @@ case 'sell':
         json_response(['success' => false, 'message' => 'Сеанс не содержит event_id или hall_id. Невозможно завершить продажу.']);
     }
 
-    // Build base seat prices from seats[].original_price (we will store original_price into tickets.price)
+    // Канонический источник цены места — только original_price из payload.
     $baseSeatPrices = [];
     foreach ($seats as $seat) {
-        $p = (isset($seat['original_price']) && is_numeric($seat['original_price'])) ? (float)$seat['original_price'] : (isset($seat['price']) && is_numeric($seat['price']) ? (float)$seat['price'] : 0.0);
+        $p = isset($seat['original_price']) && is_numeric($seat['original_price'])
+            ? (float)$seat['original_price']
+            : 0.0;
         $baseSeatPrices[] = max(0.0, $p);
     }
     $baseTotal = array_sum($baseSeatPrices);
+    if ($baseTotal <= 0) {
+        json_response(['success' => false, 'message' => 'У выбранных мест отсутствует исходная цена']);
+    }
 
     // discount functions expected to exist in project; fallback if not
     if (!function_exists('cash_get_discount_settings')) {
@@ -394,28 +381,14 @@ case 'sell':
             $autoAmount = round($base * $segmentPercent / 100, 2);
             $afterAuto = max(0.0, $base - $autoAmount);
 
-            $customType = isset($discount_input['custom_type']) ? (string)$discount_input['custom_type'] : 'none';
-            $customValue = isset($discount_input['custom_value']) && is_numeric($discount_input['custom_value']) ? max(0.0, (float)$discount_input['custom_value']) : 0.0;
-            if ($segment === 'manual' && isset($discount_input['manual_amount']) && is_numeric($discount_input['manual_amount'])) {
-                $customType = 'fixed';
-                $customValue = max(0.0, (float)$discount_input['manual_amount']);
+            $customValue = $segment === 'manual' ? max(0.0, (float)$discount_input['manual_amount']) : 0.0;
+            $maxAmount = isset($discountSettings['custom_max_amount']) && is_numeric($discountSettings['custom_max_amount'])
+                ? max(0.0, (float)$discountSettings['custom_max_amount'])
+                : 0.0;
+            if ($maxAmount > 0) {
+                $customValue = min($customValue, $maxAmount);
             }
-
-            $customAmount = 0.0;
-            if ($customType === 'percent') {
-                $maxPercent = isset($discountSettings['custom_max_percent']) && is_numeric($discountSettings['custom_max_percent']) ? max(0.0, (float)$discountSettings['custom_max_percent']) : 0.0;
-                if ($maxPercent > 0) {
-                    $customValue = min($customValue, $maxPercent);
-                }
-                $customValue = min($customValue, 100.0);
-                $customAmount = round($afterAuto * $customValue / 100, 2);
-            } elseif ($customType === 'fixed') {
-                $maxAmount = isset($discountSettings['custom_max_amount']) && is_numeric($discountSettings['custom_max_amount']) ? max(0.0, (float)$discountSettings['custom_max_amount']) : 0.0;
-                if ($maxAmount > 0) {
-                    $customValue = min($customValue, $maxAmount);
-                }
-                $customAmount = min($afterAuto, round($customValue, 2));
-            }
+            $customAmount = $segment === 'manual' ? min($afterAuto, round($customValue, 2)) : 0.0;
 
             $finalTotal = max(0.0, round($afterAuto - $customAmount, 2));
             return [
@@ -424,7 +397,7 @@ case 'sell':
                     'segment' => $segment,
                     'auto_percent' => $segmentPercent,
                     'auto_amount' => $autoAmount,
-                    'custom_type' => $customType,
+                    'custom_type' => $segment === 'manual' ? 'fixed' : 'none',
                     'custom_value' => $customValue,
                     'custom_amount' => $customAmount,
                     'total_discount' => max(0.0, round($base - $finalTotal, 2)),
@@ -448,59 +421,11 @@ case 'sell':
     }
 
     $discountSettings = cash_get_discount_settings($pdo);
-    $hasOriginalSeatPrices = false;
-    foreach ($seats as $seat) {
-        if (is_array($seat) && isset($seat['original_price']) && is_numeric($seat['original_price'])) {
-            $hasOriginalSeatPrices = true;
-            break;
-        }
-    }
-    if (!$hasOriginalSeatPrices && $amount_cents > 0) {
-        $clientFinalTotal = round($amount_cents / 100, 2);
-        $clientSeatTotal = round(array_sum($baseSeatPrices), 2);
-        $segmentPercent = 0.0;
-        if (
-            $customer_segment !== 'manual'
-            && isset($discountSettings['segment_percent'][$customer_segment])
-            && is_numeric($discountSettings['segment_percent'][$customer_segment])
-        ) {
-            $segmentPercent = max(0.0, min(100.0, (float)$discountSettings['segment_percent'][$customer_segment]));
-        }
-        $manualAmount = isset($discount_input['manual_amount']) && is_numeric($discount_input['manual_amount'])
-            ? max(0.0, (float)$discount_input['manual_amount'])
-            : 0.0;
-        $inferredBaseTotal = $clientFinalTotal;
-        if ($segmentPercent > 0 && $segmentPercent < 100) {
-            $inferredBaseTotal = $clientFinalTotal / (1 - ($segmentPercent / 100));
-        } elseif ($customer_segment === 'manual' && $manualAmount > 0) {
-            $inferredBaseTotal = $clientFinalTotal + $manualAmount;
-        }
-        if ($clientSeatTotal > 0 && abs($clientSeatTotal - $clientFinalTotal) < 0.01 && $inferredBaseTotal > $clientFinalTotal) {
-            $scale = $inferredBaseTotal / $clientSeatTotal;
-            foreach ($baseSeatPrices as $index => $basePrice) {
-                $baseSeatPrices[$index] = round($basePrice * $scale, 2);
-            }
-            $baseTotal = round(array_sum($baseSeatPrices), 2);
-        }
-    }
     $discountApplied = cash_apply_sale_discounts($baseTotal, $customer_segment, $discount_input, $discountSettings);
     $finalSeatPrices = cash_distribute_prices($baseSeatPrices, $discountApplied['final_total']);
 
-    // If client provided final prices per-seat in input, prefer them (override server distribution)
-    foreach ($seats as $idx => $sraw) {
-        if (is_array($sraw)) {
-            if (isset($sraw['final_price']) && $sraw['final_price'] !== '') {
-                $finalSeatPrices[$idx] = (float)$sraw['final_price'];
-            } elseif (isset($sraw['final_price_cents']) && $sraw['final_price_cents'] !== '') {
-                $finalSeatPrices[$idx] = ((int)$sraw['final_price_cents']) / 100.0;
-            }
-        }
-    }
-
-    // amount_cents is final total in cents (integer)
-    if ($amount_cents <= 0) {
-        $amount_cents = (int)round($discountApplied['final_total'] * 100);
-    }
+    // Сумма всегда вычисляется сервером; значение клиента не используется.
+    $amount_cents = (int)round($discountApplied['final_total'] * 100);
 
     // --- формирование per-seat итогов (seats_final) ---
     $seats_final = [];
@@ -553,7 +478,7 @@ case 'sell':
         ];
     }
 
-    $customer_segment_store = ($customer_segment === 'manual') ? 'adult' : $customer_segment;
+    $customer_segment_store = $customer_segment;
 
     // helper: generate ticket uid (robust)
     $generate_ticket_uid = function($bytes = 8) {
@@ -624,6 +549,9 @@ case 'sell':
             'source' => 'cashier',
             'payment_method' => $payment_method,
             'customer_segment' => $customer_segment_store,
+            'original_total' => round($baseTotal, 2),
+            'discount_total' => round($discountApplied['applied']['total_discount'] ?? 0, 2),
+            'final_total' => round($discountApplied['final_total'], 2),
         ], JSON_UNESCAPED_UNICODE);
         $currency = 'KZT';
         $txStmt->execute([
@@ -755,8 +683,8 @@ case 'sell':
         $ticket_has_discount_amount = column_exists($pdo, 'tickets', 'discount_amount');
 
         // Extend baseCols to include any existing extra columns (we will not add new DB columns)
-        $baseCols = "schedule_id, event_id, hall_id, seat_identifier, seat_id, price, status, payment_status, payment_transaction_id, ticket_uid, channel, customer_id, customer_segment, purchased_at, created_at, updated_at";
-        $baseVals = ":sid, :event_id, :hall_id, :sk, :seat_id, :price, 'issued', 'paid', :txid, :ticket_uid, 'kassa', :customer_id, :customer_segment, NOW(), NOW(), NOW()";
+        $baseCols = "schedule_id, event_id, hall_id, seat_identifier, seat_id, status, payment_status, payment_transaction_id, ticket_uid, channel, customer_id, customer_segment, purchased_at, created_at, updated_at";
+        $baseVals = ":sid, :event_id, :hall_id, :sk, :seat_id, 'issued', 'paid', :txid, :ticket_uid, 'kassa', :customer_id, :customer_segment, NOW(), NOW(), NOW()";
 
         $extraCols = [];
         $extraVals = [];
@@ -778,36 +706,6 @@ case 'sell':
         $insSql = "INSERT INTO tickets ({$baseCols}) VALUES ({$baseVals})";
         $insStmt = $pdo->prepare($insSql);
 
-        // Prepare transaction-level meta for PDF generation (map by uid later)
-        $meta_base_total = null;
-        $meta_final_total = null;
-        $meta_auto_percent = null;
-
-        if (isset($discount_input['base_total']) && is_numeric($discount_input['base_total'])) {
-            $meta_base_total = (float)$discount_input['base_total'];
-        } else {
-            $meta_base_total = (float)round($baseTotal, 2);
-        }
-
-        if (isset($discount_input['final_total']) && is_numeric($discount_input['final_total'])) {
-            $meta_final_total = (float)$discount_input['final_total'];
-        } elseif ($amount_cents > 0) {
-            $meta_final_total = (float)($amount_cents / 100.0);
-        } else {
-            $meta_final_total = isset($discountApplied['final_total']) ? (float)round($discountApplied['final_total'], 2) : (float)$meta_base_total;
-        }
-
-        if (isset($discount_input['auto_percent']) && is_numeric($discount_input['auto_percent'])) {
-            $meta_auto_percent = (int)$discount_input['auto_percent'];
-        } elseif (isset($discountApplied['applied']) && isset($discountApplied['applied']['auto_percent'])) {
-            $meta_auto_percent = (int)$discountApplied['applied']['auto_percent'];
-        } else {
-            $meta_auto_percent = isset($discount_input['auto_percent']) ? (int)$discount_input['auto_percent'] : 0;
-        }
-
-        // Build ticket_meta_map for PDF generation (map by uid later)
-        $ticket_meta_map = [];
-
         foreach ($seats as $idx => $seat) {
             // generate unique ticket_uid (with DB check)
             $ticket_uid = null;
@@ -826,67 +724,17 @@ case 'sell':
             // seat fields
             $seatId = null;
             $seatIdentifier = null;
-            $seatPrice = null;
             if (is_array($seat)) {
                 if (!empty($seat['id'])) $seatId = (int)$seat['id'];
                 if (!empty($seat['identifier'])) $seatIdentifier = (string)$seat['identifier'];
-                if (isset($seat['price']) && $seat['price'] !== null && $seat['price'] !== '') $seatPrice = (float)$seat['price'];
             }
             if (is_string($seatIdentifier)) $seatIdentifier = str_replace(':','-',$seatIdentifier);
 
-            // Determine values from seats_final (we built seats_final earlier)
-            $sf = isset($seats_final[$idx]) ? $seats_final[$idx] : null;
-            $orig_price = $sf ? (float)$sf['original_price'] : ($seatPrice !== null ? (float)$seatPrice : 0.0);
-            $final_price = $sf ? (float)$sf['final_price'] : ($seatPrice !== null ? (float)$seatPrice : 0.0);
-
-            // Store the amount actually paid for this ticket row.
-            $ticket_price_to_store = number_format((float)$final_price, 2, '.', '');
-
-            // Determine discount percent to store in tickets.discount: use transaction-level auto_percent if present
-            $discount_percent_to_store = null;
-            if (isset($discount_input['auto_percent']) && is_numeric($discount_input['auto_percent'])) {
-                $discount_percent_to_store = (int)$discount_input['auto_percent'];
-            } elseif (isset($discount['auto_percent']) && is_numeric($discount['auto_percent'])) {
-                $discount_percent_to_store = (int)$discount['auto_percent'];
-            } elseif ($meta_auto_percent !== null) {
-                $discount_percent_to_store = (int)$meta_auto_percent;
-            } else {
-                // fallback: compute per-seat percent from seats_final if available
-                if ($orig_price > 0.000001) {
-                    $discount_amount_local = round(max(0.0, $orig_price - $final_price), 2);
-                    $discount_percent_to_store = (int) round(($discount_amount_local / $orig_price) * 100);
-                } else {
-                    $discount_percent_to_store = 0;
-                }
-            }
-            if ($discount_percent_to_store < 0) $discount_percent_to_store = 0;
-            if ($discount_percent_to_store > 100) $discount_percent_to_store = 100;
-
-            // auto_discount and custom_discount amounts per seat (if present in input)
-            $auto_discount_amount = null;
-            $custom_discount_amount = null;
-            if (is_array($seat)) {
-                if (isset($seat['auto_discount'])) $auto_discount_amount = (float)$seat['auto_discount'];
-                elseif (isset($seat['auto_discount_cents'])) $auto_discount_amount = ((int)$seat['auto_discount_cents']) / 100.0;
-                if (isset($seat['custom_discount'])) $custom_discount_amount = (float)$seat['custom_discount'];
-                elseif (isset($seat['custom_discount_cents'])) $custom_discount_amount = ((int)$seat['custom_discount_cents']) / 100.0;
-            }
-            // ensure numeric
-            $auto_discount_amount = $auto_discount_amount !== null ? round($auto_discount_amount, 2) : 0.0;
-            $custom_discount_amount = $custom_discount_amount !== null ? round($custom_discount_amount, 2) : 0.0;
-            $ticket_discount_amount = round(max(0.0, $orig_price - $final_price), 2);
-
-            // Build pdf_fields for this ticket (PRICE = original_price, PAYMENT = final_price)
-            $pdf_fields_arr = [
-                'price_label' => round((float)$orig_price, 2),                      // ЦЕНА (original_price)
-                'discount_label_percent' => $discount_percent_to_store,            // процент скидки (from discount.auto_percent)
-                'discount_label_amount' => $ticket_discount_amount, // сумма скидки по билету
-                'payment_label' => round((float)$final_price, 2),                  // ОПЛАТА (final_price)
-                'payment_type' => (function_exists('map_payment_type_display') ? map_payment_type_display($payment_method ?? '', $payment_method ?? null) : ($payment_method ?: 'kassa')),
-                // keep some legacy keys for compatibility
-                'price_per_seat' => (float)number_format((float)$final_price, 2, '.', '')
-            ];
-            $pdf_fields_json = json_encode($pdf_fields_arr, JSON_UNESCAPED_UNICODE);
+            $sf = $seats_final[$idx];
+            $orig_price = (float)$sf['original_price'];
+            $final_price = (float)$sf['final_price'];
+            $ticket_discount_amount = (float)$sf['discount_amount'];
+            $discount_percent_to_store = (int)$sf['discount_percent'];
 
             // Bind values for insert
             $bind = [
@@ -895,8 +743,6 @@ case 'sell':
                 ':hall_id' => $hall_id,
                 ':sk' => $seatIdentifier,
                 ':seat_id' => $seatId,
-                // Per instruction: tickets.price = original_price
-                ':price' => $ticket_price_to_store,
                 ':txid' => $transaction_id,
                 ':ticket_uid' => $ticket_uid,
                 ':customer_id' => $customer_id,
@@ -909,7 +755,6 @@ case 'sell':
             if ($ticket_has_customer_city) $bind[':customer_city'] = is_array($customer_snapshot) && isset($customer_snapshot['city']) ? $customer_snapshot['city'] : $customer_city;
             if ($ticket_has_customer_gender) $bind[':customer_gender'] = is_array($customer_snapshot) && isset($customer_snapshot['gender']) ? $customer_snapshot['gender'] : $customer_gender;
             if ($ticket_has_discount) {
-                // store discount percent (from discount.auto_percent if present)
                 $bind[':discount'] = $discount_percent_to_store;
             }
             if ($ticket_has_discount_amount) {
@@ -925,22 +770,6 @@ case 'sell':
             $insStmt->execute($bind);
 
             $generated_ticket_uids[] = $ticket_uid;
-
-            // prepare ticket_meta_map entry for this uid (for PDF generation)
-            $ticket_meta_map[$ticket_uid] = [
-                // per-ticket pdf fields (preferred)
-                'pdf_price' => $pdf_fields_arr['price_label'],
-                'pdf_discount_percent' => $pdf_fields_arr['discount_label_percent'],
-                'pdf_discount_amount' => $pdf_fields_arr['discount_label_amount'],
-                'pdf_payment' => $pdf_fields_arr['payment_label'],
-                'pdf_payment_type' => $pdf_fields_arr['payment_type'],
-
-                // legacy / fallback keys
-                'price' => $ticket_price_to_store,
-                'discount_percent' => $discount_percent_to_store,
-                'seat_identifier' => $seatIdentifier,
-                'price_per_seat' => (float)$pdf_fields_arr['price_per_seat']
-            ];
         }
 
         // 5) Удаляем холды для этих мест (используем $seat_keys)
@@ -994,25 +823,24 @@ case 'sell':
 
         $pdo->commit();
 
-        // Generate ticket PDFs immediately after successful sale (pass per-ticket meta)
+        // Generate ticket PDFs from canonical ticket fields.
         $pdf_generation_errors = [];
         if (!empty($generated_ticket_uids)) {
             foreach ($generated_ticket_uids as $ticket_uid) {
                 $error = null;
-                $meta = isset($ticket_meta_map[$ticket_uid]) ? $ticket_meta_map[$ticket_uid] : null;
-                if (!function_exists('ticket_pdf_generate_by_ticket_uid') || !ticket_pdf_generate_by_ticket_uid($ticket_uid, false, $error, $meta)) {
+                if (!function_exists('ticket_pdf_generate_by_ticket_uid') || !ticket_pdf_generate_by_ticket_uid($ticket_uid, false, $error)) {
                     $pdf_generation_errors[$ticket_uid] = $error ?: 'Не удалось сгенерировать PDF';
                     error_log('ajax/cash.php PDF generation failed for ticket_uid=' . $ticket_uid . ': ' . ($error ?: 'unknown error'));
                 }
             }
         }
 
-        // Build detailed tickets array for response (use $ticket_meta_map to enrich)
+        // Build detailed tickets array from canonical ticket fields.
         $sold_tickets = [];
         if (!empty($generated_ticket_uids)) {
             $in = implode(',', array_fill(0, count($generated_ticket_uids), '?'));
             try {
-                $stmtT = $pdo->prepare("SELECT id, ticket_uid, seat_identifier, price, discount, purchased_at FROM tickets WHERE ticket_uid IN ($in)");
+                $stmtT = $pdo->prepare("SELECT id, ticket_uid, seat_identifier, original_price, final_price, discount, discount_amount, purchased_at FROM tickets WHERE ticket_uid IN ($in)");
                 $stmtT->execute($generated_ticket_uids);
                 while ($tr = $stmtT->fetch(PDO::FETCH_ASSOC)) {
                     $pdfPath = null;
@@ -1024,36 +852,14 @@ case 'sell':
                         }
                     }
 
-                    // enrich from ticket_meta_map if available
-                    $meta = isset($ticket_meta_map[$tr['ticket_uid']]) ? $ticket_meta_map[$tr['ticket_uid']] : null;
-                    $discountPercent = null;
-                    $discountAmount = null;
-                    if ($meta) {
-                        $discountPercent = isset($meta['pdf_discount_percent']) ? (int)$meta['pdf_discount_percent'] : (isset($meta['discount_percent']) ? (int)$meta['discount_percent'] : null);
-
-                        if (isset($meta['pdf_discount_amount'])) {
-                            $discountAmount = (float)$meta['pdf_discount_amount'];
-                        } elseif (isset($meta['pdf_price']) && isset($meta['price_per_seat'])) {
-                            $discountAmount = round((float)$meta['pdf_price'] - (float)$meta['price_per_seat'], 2);
-                        } elseif (isset($meta['discount_amount'])) {
-                            $discountAmount = (float)$meta['discount_amount'];
-                        }
-                    } else {
-                        // fallback to DB discount (int) and compute amount from price and percent if possible
-                        if (isset($tr['discount'])) $discountPercent = (int)$tr['discount'];
-                        if ($discountPercent !== null && is_numeric($tr['price'])) {
-                            $discountAmount = number_format(((float)$tr['price'] * $discountPercent) / (100 - $discountPercent), 2, '.', '');
-                        }
-                    }
-
                     $sold_tickets[] = [
                         'id' => isset($tr['id']) ? (int)$tr['id'] : null,
                         'ticket_uid' => $tr['ticket_uid'],
                         'seat_identifier' => $tr['seat_identifier'],
-                        'price' => is_numeric($tr['price']) ? (float)$tr['price'] : null,
-                        'discount' => $discountPercent !== null ? ((int)$discountPercent) . '%' : null,
-                        'discount_percent' => $discountPercent,
-                        'discount_amount' => $discountAmount !== null ? (float)$discountAmount : null,
+                        'original_price' => (float)$tr['original_price'],
+                        'final_price' => (float)$tr['final_price'],
+                        'discount_percent' => (int)$tr['discount'],
+                        'discount_amount' => (float)$tr['discount_amount'],
                         'purchased_at' => isset($tr['purchased_at']) ? $tr['purchased_at'] : null,
                         'pdf_url' => $pdfUrl
                     ];

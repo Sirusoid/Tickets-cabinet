@@ -1,20 +1,6 @@
 <?php
 // Единые расчёты отчётности по билетам и транзакциям.
 
-if (!function_exists('reporting_decode_payload')) {
-    function reporting_decode_payload($payload): array
-    {
-        if (is_array($payload)) {
-            return $payload;
-        }
-        if (!is_string($payload) || trim($payload) === '') {
-            return [];
-        }
-        $decoded = json_decode($payload, true);
-        return is_array($decoded) ? $decoded : [];
-    }
-}
-
 if (!function_exists('reporting_segment_label')) {
     function reporting_segment_label($segment): string
     {
@@ -93,29 +79,16 @@ if (!function_exists('reporting_discount_label')) {
     {
         $discountAmount = is_numeric($row['discount_amount'] ?? null) ? (float)$row['discount_amount'] : 0.0;
         $segment = (string)($row['customer_segment'] ?? '');
+        if ($discountAmount <= 0) {
+            return 'Без скидки';
+        }
         if ($discountAmount > 0 && $segment === 'manual') {
             return 'Ручная, фиксированная';
         }
         if ($discountAmount > 0 && $segment !== '') {
             return 'По типу: ' . reporting_segment_label($segment);
         }
-
-        $payload = reporting_decode_payload($row['tx_payload'] ?? null);
-        $discount = is_array($payload['discount'] ?? null) ? $payload['discount'] : [];
-        $applied = is_array($discount['applied'] ?? null) ? $discount['applied'] : [];
-        $totalDiscount = is_numeric($discount['total_discount'] ?? null) ? (float)$discount['total_discount'] : 0.0;
-        if ($totalDiscount <= 0) {
-            return 'Без скидки';
-        }
-        $customType = (string)($applied['custom_type'] ?? 'none');
-        if ($customType === 'percent') {
-            return 'Ручная, процентная';
-        }
-        if ($customType === 'fixed') {
-            return 'Ручная, фиксированная';
-        }
-        $segment = (string)($applied['segment'] ?? $row['customer_segment'] ?? '');
-        return $segment !== '' ? 'По типу: ' . reporting_segment_label($segment) : 'Скидка';
+        return 'Скидка';
     }
 }
 
@@ -126,7 +99,7 @@ if (!function_exists('reporting_ticket_financials')) {
         $canonicalFinal = is_numeric($row['final_price'] ?? null) ? (float)$row['final_price'] : 0.0;
         $canonicalDiscount = is_numeric($row['discount_amount'] ?? null) ? (float)$row['discount_amount'] : 0.0;
         if ($canonicalOriginal > 0 || $canonicalFinal > 0 || $canonicalDiscount > 0) {
-            $paid = max(0.0, $canonicalFinal > 0 ? $canonicalFinal : (float)($row['price'] ?? 0));
+            $paid = max(0.0, $canonicalFinal);
             $original = max($paid, $canonicalOriginal > 0 ? $canonicalOriginal : $paid + $canonicalDiscount);
             $discount = max(0.0, $canonicalDiscount > 0 ? $canonicalDiscount : $original - $paid);
             return [
@@ -136,79 +109,10 @@ if (!function_exists('reporting_ticket_financials')) {
             ];
         }
 
-        $paid = max(0.0, (float)($row['price'] ?? 0));
-        if (is_numeric($row['discount_amount'] ?? null) && (float)$row['discount_amount'] > 0) {
-            $discount = max(0.0, (float)$row['discount_amount']);
-            return [
-                'original' => round($paid + $discount, 2),
-                'discount' => round($discount, 2),
-                'paid' => round($paid, 2),
-            ];
-        }
-        $storedDiscount = is_numeric($row['discount'] ?? null) ? (float)$row['discount'] : 0.0;
-        if ($storedDiscount > 0 && $storedDiscount < 100) {
-            $original = $paid / (1 - ($storedDiscount / 100));
-            return [
-                'original' => round($original, 2),
-                'discount' => round($original - $paid, 2),
-                'paid' => round($paid, 2),
-            ];
-        }
-        $payload = reporting_decode_payload($row['tx_payload'] ?? null);
-        $seatIdentifier = str_replace(':', '-', trim((string)($row['seat_identifier'] ?? '')));
-
-        $seatData = null;
-        $seatsFinal = $payload['seats_final'] ?? null;
-        if (is_array($seatsFinal)) {
-            foreach ($seatsFinal as $seat) {
-                if (!is_array($seat)) {
-                    continue;
-                }
-                $candidate = str_replace(':', '-', trim((string)($seat['identifier'] ?? $seat['seat_identifier'] ?? '')));
-                if ($seatIdentifier !== '' && $candidate === $seatIdentifier) {
-                    $seatData = $seat;
-                    break;
-                }
-            }
-        }
-
-        if (is_array($seatData)) {
-            $final = isset($seatData['final_price']) && is_numeric($seatData['final_price'])
-                ? max(0.0, (float)$seatData['final_price'])
-                : $paid;
-            $original = isset($seatData['original_price']) && is_numeric($seatData['original_price'])
-                ? max($final, (float)$seatData['original_price'])
-                : $final;
-            $discount = isset($seatData['discount_amount']) && is_numeric($seatData['discount_amount'])
-                ? max(0.0, (float)$seatData['discount_amount'])
-                : max(0.0, $original - $final);
-            return [
-                'original' => round($original, 2),
-                'discount' => round($discount, 2),
-                'paid' => round($final, 2),
-            ];
-        }
-
-        $discount = is_array($payload['discount'] ?? null) ? $payload['discount'] : [];
-        $totalDiscount = is_numeric($discount['total_discount'] ?? null)
-            ? max(0.0, (float)$discount['total_discount'])
-            : 0.0;
-        $finalTotal = is_numeric($discount['final_total'] ?? null)
-            ? max(0.0, (float)$discount['final_total'])
-            : 0.0;
-        if ($totalDiscount > 0 && $finalTotal > 0) {
-            $allocatedDiscount = $totalDiscount * ($paid / $finalTotal);
-            return [
-                'original' => round($paid + $allocatedDiscount, 2),
-                'discount' => round($allocatedDiscount, 2),
-                'paid' => round($paid, 2),
-            ];
-        }
-
         return [
-            'original' => round($paid, 2),
-            'discount' => 0.0,
-            'paid' => round($paid, 2),
+            'original' => round($canonicalOriginal, 2),
+            'discount' => round($canonicalDiscount, 2),
+            'paid' => round($canonicalFinal, 2),
         ];
     }
 }
