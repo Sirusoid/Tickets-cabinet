@@ -30,6 +30,7 @@ $roles = [
 		'admin' => 'Администратор',
 		'manager' => 'Менеджер',
 		'cashier' => 'Кассир',
+		'scanner' => 'Сканер',
 ];
 
 $saveSuccess = null;

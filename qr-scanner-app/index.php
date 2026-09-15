@@ -3,7 +3,21 @@
 // Мобильная страница проверки QR-билетов для контролёра.
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/settings_manager.php';
 require_login();
+
+$scannerAllowed = (string)($_SESSION['user']['role'] ?? '') === 'admin';
+if (!$scannerAllowed && isset($pdo) && $pdo instanceof PDO && function_exists('settings_get_value')) {
+    $rawPermissions = (string)settings_get_value($pdo, 'security.role_permissions', '');
+    $permissions = function_exists('settings_decode_json_value')
+        ? settings_decode_json_value($rawPermissions, [])
+        : [];
+    $scannerAllowed = !empty($permissions[$_SESSION['user']['role'] ?? '']['scanner']);
+}
+if (!$scannerAllowed) {
+    http_response_code(403);
+    exit('Доступ к сканеру запрещён.');
+}
 
 $use_sidebar = true;
 $active_menu = 'scanner';
