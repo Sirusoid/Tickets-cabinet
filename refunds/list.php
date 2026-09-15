@@ -122,7 +122,7 @@ $queryParams = [
 
 <div class="page container-full refunds-page">
     <div class="card refunds-filters">
-        <form method="get" class="refunds-filters__form">
+        <form id="refundsFiltersForm" method="get" class="refunds-filters__form">
             <div>
                 <label for="refunds-date-from">Дата от</label>
                 <input id="refunds-date-from" class="form-control" type="date" name="date_from" value="<?= h($dateFrom) ?>">
@@ -163,7 +163,6 @@ $queryParams = [
             </div>
             <div class="refunds-filters__actions">
                 <a class="btn btn-ghost" href="/refunds/list.php">Сбросить</a>
-                <button class="btn btn-primary" type="submit">Показать</button>
             </div>
         </form>
     </div>
@@ -230,3 +229,26 @@ $queryParams = [
 </div>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
+
+<script>
+(function () {
+    var form = document.getElementById('refundsFiltersForm');
+    if (!form) return;
+    var searchTimer = null;
+    var controls = form.querySelectorAll('input, select');
+    Array.prototype.forEach.call(controls, function (control) {
+        if (control.type === 'search' || control.type === 'text') {
+            control.addEventListener('input', function () {
+                window.clearTimeout(searchTimer);
+                searchTimer = window.setTimeout(function () {
+                    form.submit();
+                }, 350);
+            });
+            return;
+        }
+        control.addEventListener('change', function () {
+            form.submit();
+        });
+    });
+})();
+</script>
