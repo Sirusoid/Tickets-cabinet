@@ -114,6 +114,14 @@ if (!function_exists('reporting_ticket_financials')) {
     function reporting_ticket_financials(array $row): array
     {
         $paid = max(0.0, (float)($row['price'] ?? 0));
+        if (is_numeric($row['discount_amount'] ?? null) && (float)$row['discount_amount'] > 0) {
+            $discount = max(0.0, (float)$row['discount_amount']);
+            return [
+                'original' => round($paid + $discount, 2),
+                'discount' => round($discount, 2),
+                'paid' => round($paid, 2),
+            ];
+        }
         $payload = reporting_decode_payload($row['tx_payload'] ?? null);
         $seatIdentifier = str_replace(':', '-', trim((string)($row['seat_identifier'] ?? '')));
 

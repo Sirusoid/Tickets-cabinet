@@ -286,7 +286,7 @@ if ($action === 'get_ticket') {
     if (!$id) json_resp(['success' => false, 'message' => 'Неверный id'], 400);
     try {
         $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                       t.seat_id, t.purchased_at, t.created_at, t.price, t.channel, t.payment_status, t.status, t.refund_status,
+                       t.seat_id, t.purchased_at, t.created_at, t.price, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
                    t.payment_provider, t.payment_session_id,
                    tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
@@ -617,7 +617,7 @@ if ($action === 'list') {
     try {
         $sql = "SELECT
                     t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                    t.seat_id, t.purchased_at, t.created_at, t.price, t.discount, t.channel, t.payment_status, t.status, t.refund_status,
+                    t.seat_id, t.purchased_at, t.created_at, t.price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                     t.customer_segment, t.payment_transaction_id,
                     tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
                     ps.order_number,
@@ -651,7 +651,7 @@ if ($action === 'list') {
         try {
             $csvSql = "SELECT
                         t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                        t.purchased_at, t.created_at, t.price, t.discount, t.channel, t.payment_status, t.status, t.refund_status,
+                        t.purchased_at, t.created_at, t.price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                         t.customer_segment, t.payment_transaction_id,
                         tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
                         ps.order_number,

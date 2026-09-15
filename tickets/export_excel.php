@@ -95,7 +95,7 @@ $paymentNames = ['paid' => 'Оплачен', 'pending' => 'Ожидает', 'fai
 $channelNames = ['web' => 'Web', 'mobile' => 'Mobile', 'kassa' => 'Касса', 'agent' => 'Agent', 'qr' => 'QR', 'admin' => 'Admin'];
 
 $sql = "SELECT
-		t.id, t.ticket_uid, t.seat_identifier, t.purchased_at, t.price, t.discount,
+		t.id, t.ticket_uid, t.seat_identifier, t.purchased_at, t.price, t.discount, t.discount_amount,
 		t.channel, t.payment_status, t.status, t.refund_status, t.customer_segment,
 		tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
 		ps.order_number, COALESCE(c.full_name, '') AS customer_name,

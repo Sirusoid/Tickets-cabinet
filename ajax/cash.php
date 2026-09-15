@@ -697,6 +697,7 @@ case 'sell':
         $ticket_has_customer_city = column_exists($pdo, 'tickets', 'customer_city');
         $ticket_has_customer_gender = column_exists($pdo, 'tickets', 'customer_gender');
         $ticket_has_discount = column_exists($pdo, 'tickets', 'discount') || column_exists($pdo, 'tickets', 'discount_cents');
+        $ticket_has_discount_amount = column_exists($pdo, 'tickets', 'discount_amount');
 
         // Extend baseCols to include any existing extra columns (we will not add new DB columns)
         $baseCols = "schedule_id, event_id, hall_id, seat_identifier, seat_id, price, status, payment_status, payment_transaction_id, ticket_uid, channel, customer_id, customer_segment, purchased_at, created_at, updated_at";
@@ -710,6 +711,7 @@ case 'sell':
         if ($ticket_has_customer_city) { $extraCols[] = 'customer_city'; $extraVals[] = ':customer_city'; }
         if ($ticket_has_customer_gender) { $extraCols[] = 'customer_gender'; $extraVals[] = ':customer_gender'; }
         if ($ticket_has_discount) { $extraCols[] = 'discount'; $extraVals[] = ':discount'; }
+        if ($ticket_has_discount_amount) { $extraCols[] = 'discount_amount'; $extraVals[] = ':discount_amount'; }
 
         if (!empty($extraCols)) {
             $baseCols .= ', ' . implode(', ', $extraCols);
@@ -852,6 +854,9 @@ case 'sell':
             if ($ticket_has_discount) {
                 // store discount percent (from discount.auto_percent if present)
                 $bind[':discount'] = $discount_percent_to_store;
+            }
+            if ($ticket_has_discount_amount) {
+                $bind[':discount_amount'] = number_format($ticket_discount_amount, 2, '.', '');
             }
 
             $insStmt->execute($bind);

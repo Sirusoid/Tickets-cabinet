@@ -42,7 +42,7 @@ if ($eventId > 0) {
 
 try {
     $rows = db_fetch_all("SELECT
-            t.id, t.ticket_uid, t.seat_identifier, t.price, t.discount, t.schedule_id,
+            t.id, t.ticket_uid, t.seat_identifier, t.price, t.discount, t.discount_amount, t.schedule_id,
             t.customer_segment, t.channel, t.payment_status, t.status,
             t.refund_status, t.refund_at, t.payment_provider, t.purchased_at,
             tx.payload AS tx_payload,

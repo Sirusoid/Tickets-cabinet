@@ -50,6 +50,7 @@ try {
 								t.schedule_id,
 								t.price,
 								t.discount,
+								t.discount_amount,
 								t.seat_identifier,
 								t.customer_segment,
 								t.purchased_at,
