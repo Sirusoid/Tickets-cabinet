@@ -903,7 +903,13 @@ if ($action === 'refund') {
                 ], !empty($refundResult['success']) ? 200 : 400);
             } catch (Throwable $e) {
                 error_log('[BCC REFUND] Ошибка возврата кассиром: ' . $e->getMessage());
-                json_resp(['success' => false, 'message' => 'Не удалось выполнить возврат через BCC.'], 500);
+                $isExpectedError = $e instanceof RuntimeException;
+                json_resp([
+                    'success' => false,
+                    'message' => $isExpectedError
+                        ? $e->getMessage()
+                        : 'Не удалось выполнить возврат через BCC.',
+                ], $isExpectedError ? 409 : 500);
             }
         }
 

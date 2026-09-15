@@ -177,6 +177,11 @@ if ($body === false || $curlError !== '') {
         'state' => 'rejected',
         'code' => 'transport_error',
         'message' => 'Не удалось подключиться к банку. Возврат не отправлен, повторите попытку позже.',
+        'bank_response' => [
+            'ACTION' => '',
+            'RC' => 'TRANSPORT_ERROR',
+            'RC_TEXT' => $curlError !== '' ? $curlError : 'BCC gateway connection failed',
+        ],
     ], 502);
 }
 
@@ -203,6 +208,7 @@ if (!$success) {
         'success' => false,
         'state' => 'rejected',
         'message' => 'Банк не подтвердил возврат. ' . trim((string)($responseData['RC_TEXT'] ?? '')),
+        'bank_response' => array_intersect_key($responseData, array_flip(['ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF'])),
     ], 400);
 }
 
@@ -210,4 +216,5 @@ public_refund_response([
     'success' => true,
     'state' => $result['status'],
     'message' => 'Запрос на возврат принят банком. Зачисление обычно выполняется после клиринга.',
+    'bank_response' => array_intersect_key($responseData, array_flip(['ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF'])),
 ]);

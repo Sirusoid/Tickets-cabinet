@@ -342,8 +342,13 @@ require_once __DIR__ . '/../includes/header.php';
             })
                 .then(function (response) { return response.json(); })
                 .then(function (data) {
+                    if (typeof window.showBccToast === 'function') {
+                        window.showBccToast(data, 'refund');
+                    }
                     if (!data.success && data.state !== 'processing') {
-                        throw new Error((data.message || 'Не удалось отправить запрос на возврат.') + ' / Қайтару сұрауын жіберу мүмкін болмады.');
+                        var refundError = new Error((data.message || 'Не удалось отправить запрос на возврат.') + ' / Қайтару сұрауы жіберу мүмкін болмады.');
+                        refundError.__bccToastShown = true;
+                        throw refundError;
                     }
                     if (selfRefundHint) selfRefundHint.textContent = (data.message || 'Запрос на возврат обрабатывается.') + ' / Қайтару сұрауы өңделуде.';
                     selfRefundBtn.remove();
@@ -352,7 +357,10 @@ require_once __DIR__ . '/../includes/header.php';
                 .catch(function (error) {
                     selfRefundBtn.disabled = false;
                     selfRefundBtn.textContent = 'Отменить покупку / Сатып алудан бас тарту';
-                    if (selfRefundHint) selfRefundHint.textContent = error.message;
+                    if (!error || !error.__bccToastShown) {
+                        showToast(error && error.message ? error.message : 'Ошибка возврата.', 'error', { duration: 7000 });
+                    }
+                    if (selfRefundHint) selfRefundHint.textContent = error && error.message ? error.message : 'Ошибка возврата.';
                 });
         });
     }

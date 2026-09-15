@@ -484,8 +484,14 @@
     }).then(function(r){ return r.json(); })
     .then(function(json){
       if (!json) { showToast('Неверный ответ сервера', 'error'); return; }
-      if (!json.success) { showToast(json.message || 'Ошибка возврата', 'error'); return; }
-      showToast('Возврат выполнен', 'success');
+      if (typeof window.showBccToast === 'function') {
+        window.showBccToast(json, 'refund');
+      } else if (!json.success) {
+        showToast(json.message || 'Ошибка возврата', 'error');
+      } else {
+        showToast('Возврат выполнен', 'success');
+      }
+      if (!json.success) return;
       hideRefundModal();
       setTimeout(function(){ loadTickets(); }, 400);
     }).catch(function(err){
