@@ -286,7 +286,7 @@ if ($action === 'get_ticket') {
     if (!$id) json_resp(['success' => false, 'message' => 'Неверный id'], 400);
     try {
         $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                       t.seat_id, t.purchased_at, t.created_at, t.price, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                       t.seat_id, t.purchased_at, t.created_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
                    t.payment_provider, t.payment_session_id,
                    tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
@@ -617,7 +617,7 @@ if ($action === 'list') {
     try {
         $sql = "SELECT
                     t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                    t.seat_id, t.purchased_at, t.created_at, t.price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                    t.seat_id, t.purchased_at, t.created_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                     t.customer_segment, t.payment_transaction_id,
                     tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
                     ps.order_number,
@@ -651,7 +651,7 @@ if ($action === 'list') {
         try {
             $csvSql = "SELECT
                         t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                        t.purchased_at, t.created_at, t.price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                        t.purchased_at, t.created_at, t.price, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
                         t.customer_segment, t.payment_transaction_id,
                         tx.payload AS tx_payload, tx.payment_method AS tx_payment_method,
                         ps.order_number,
@@ -830,15 +830,19 @@ try {
 
         // 3) Insert new ticket row (always INSERT)
         $ins = $pdo->prepare("INSERT INTO tickets
-            (ticket_uid, schedule_id, customer_id, seat_identifier, price, channel, payment_status, status, refund_status, customer_segment, purchased_at, created_at, updated_at)
+            (ticket_uid, schedule_id, customer_id, seat_identifier, price, original_price, final_price, discount, discount_amount,
+             channel, payment_status, status, refund_status, customer_segment, purchased_at, created_at, updated_at)
             VALUES
-            (:ticket_uid, :schedule_id, :customer_id, :seat_identifier, :price, :channel, :payment_status, 'issued', 'none', :customer_segment, NOW(), NOW(), NOW())");
+            (:ticket_uid, :schedule_id, :customer_id, :seat_identifier, :price, :original_price, :final_price, 0, 0,
+             :channel, :payment_status, 'issued', 'none', :customer_segment, NOW(), NOW(), NOW())");
         $ins->execute([
             ':ticket_uid' => $ticket_uid,
             ':schedule_id' => $schedule_id,
             ':customer_id' => $customer_id ?: null,
             ':seat_identifier' => $seat_identifier,
             ':price' => $price,
+            ':original_price' => $price,
+            ':final_price' => $price,
             ':channel' => $channel,
             ':payment_status' => $payment_status,
             ':customer_segment' => $customer_segment

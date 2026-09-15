@@ -49,6 +49,8 @@ try {
 								t.id,
 								t.schedule_id,
 								t.price,
+								t.original_price,
+								t.final_price,
 								t.discount,
 								t.discount_amount,
 								t.seat_identifier,

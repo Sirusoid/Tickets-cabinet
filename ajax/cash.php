@@ -619,13 +619,11 @@ case 'sell':
         // 3) Создаём запись транзакции (session_id хранит schedule_id)
         $txStmt = $pdo->prepare("INSERT INTO cash_transactions (type, session_id, user_id, amount_cents, currency, payment_method, payload, created_at) VALUES (:type, :session_id, :user_id, :amount_cents, :currency, :payment_method, :payload, NOW())");
         $payload = json_encode([
+            'schema_version' => 2,
             'action' => 'sale',
-            'seats_final' => $seats_final,
-            'customer' => $customer_input,
-            'customer_segment' => $customer_segment,
-            'manual_discount_amount' => $manualAmount,
-            'final_total' => $discountApplied['final_total'],
-            'total_discount' => $discountApplied['applied']['total_discount'] ?? null
+            'source' => 'cashier',
+            'payment_method' => $payment_method,
+            'customer_segment' => $customer_segment_store,
         ], JSON_UNESCAPED_UNICODE);
         $currency = 'KZT';
         $txStmt->execute([
@@ -752,6 +750,8 @@ case 'sell':
         $ticket_has_customer_city = column_exists($pdo, 'tickets', 'customer_city');
         $ticket_has_customer_gender = column_exists($pdo, 'tickets', 'customer_gender');
         $ticket_has_discount = column_exists($pdo, 'tickets', 'discount') || column_exists($pdo, 'tickets', 'discount_cents');
+        $ticket_has_original_price = column_exists($pdo, 'tickets', 'original_price');
+        $ticket_has_final_price = column_exists($pdo, 'tickets', 'final_price');
         $ticket_has_discount_amount = column_exists($pdo, 'tickets', 'discount_amount');
 
         // Extend baseCols to include any existing extra columns (we will not add new DB columns)
@@ -766,6 +766,8 @@ case 'sell':
         if ($ticket_has_customer_city) { $extraCols[] = 'customer_city'; $extraVals[] = ':customer_city'; }
         if ($ticket_has_customer_gender) { $extraCols[] = 'customer_gender'; $extraVals[] = ':customer_gender'; }
         if ($ticket_has_discount) { $extraCols[] = 'discount'; $extraVals[] = ':discount'; }
+        if ($ticket_has_original_price) { $extraCols[] = 'original_price'; $extraVals[] = ':original_price'; }
+        if ($ticket_has_final_price) { $extraCols[] = 'final_price'; $extraVals[] = ':final_price'; }
         if ($ticket_has_discount_amount) { $extraCols[] = 'discount_amount'; $extraVals[] = ':discount_amount'; }
 
         if (!empty($extraCols)) {
@@ -912,6 +914,12 @@ case 'sell':
             }
             if ($ticket_has_discount_amount) {
                 $bind[':discount_amount'] = number_format($ticket_discount_amount, 2, '.', '');
+            }
+            if ($ticket_has_original_price) {
+                $bind[':original_price'] = number_format($orig_price, 2, '.', '');
+            }
+            if ($ticket_has_final_price) {
+                $bind[':final_price'] = number_format($final_price, 2, '.', '');
             }
 
             $insStmt->execute($bind);

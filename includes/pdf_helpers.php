@@ -967,10 +967,22 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
                 ? max(0.0, (float)$ticket['discount_amount'])
                 : 0.0;
             $isCashTicket = strtolower(trim((string)($ticket['channel'] ?? ''))) === 'kassa';
+            $ticket_original_price_db = is_numeric($ticket['original_price'] ?? null)
+                ? max(0.0, (float)$ticket['original_price'])
+                : 0.0;
+            $ticket_final_price_db = is_numeric($ticket['final_price'] ?? null)
+                ? max(0.0, (float)$ticket['final_price'])
+                : 0.0;
 
             // tickets.price хранит уже оплаченный итог. Восстанавливаем исходную цену
             // по сохранённой денежной скидке, чтобы не применить процент повторно.
-            if ($isCashTicket && $ticket_price_db !== null) {
+            if ($isCashTicket && $ticket_original_price_db > 0 && $ticket_final_price_db >= 0) {
+                $pdf_fields['price_label'] = $ticket_original_price_db;
+                $pdf_fields['payment_label'] = $ticket_final_price_db;
+                $pdf_fields['discount_label_amount'] = $ticket_discount_amount_db > 0
+                    ? $ticket_discount_amount_db
+                    : max(0.0, $ticket_original_price_db - $ticket_final_price_db);
+            } elseif ($isCashTicket && $ticket_price_db !== null) {
                 $cashDiscountAmount = $ticket_discount_amount_db;
                 if ($cashDiscountAmount <= 0 && $ticket_discount_db !== null && $ticket_discount_db > 0 && $ticket_discount_db < 100) {
                     $cashBase = $ticket_price_db / (1 - ($ticket_discount_db / 100));

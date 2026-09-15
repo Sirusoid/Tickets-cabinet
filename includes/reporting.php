@@ -91,6 +91,15 @@ if (!function_exists('reporting_payment_label')) {
 if (!function_exists('reporting_discount_label')) {
     function reporting_discount_label(array $row): string
     {
+        $discountAmount = is_numeric($row['discount_amount'] ?? null) ? (float)$row['discount_amount'] : 0.0;
+        $segment = (string)($row['customer_segment'] ?? '');
+        if ($discountAmount > 0 && $segment === 'manual') {
+            return 'Ручная, фиксированная';
+        }
+        if ($discountAmount > 0 && $segment !== '') {
+            return 'По типу: ' . reporting_segment_label($segment);
+        }
+
         $payload = reporting_decode_payload($row['tx_payload'] ?? null);
         $discount = is_array($payload['discount'] ?? null) ? $payload['discount'] : [];
         $applied = is_array($discount['applied'] ?? null) ? $discount['applied'] : [];
@@ -113,6 +122,20 @@ if (!function_exists('reporting_discount_label')) {
 if (!function_exists('reporting_ticket_financials')) {
     function reporting_ticket_financials(array $row): array
     {
+        $canonicalOriginal = is_numeric($row['original_price'] ?? null) ? (float)$row['original_price'] : 0.0;
+        $canonicalFinal = is_numeric($row['final_price'] ?? null) ? (float)$row['final_price'] : 0.0;
+        $canonicalDiscount = is_numeric($row['discount_amount'] ?? null) ? (float)$row['discount_amount'] : 0.0;
+        if ($canonicalOriginal > 0 || $canonicalFinal > 0 || $canonicalDiscount > 0) {
+            $paid = max(0.0, $canonicalFinal > 0 ? $canonicalFinal : (float)($row['price'] ?? 0));
+            $original = max($paid, $canonicalOriginal > 0 ? $canonicalOriginal : $paid + $canonicalDiscount);
+            $discount = max(0.0, $canonicalDiscount > 0 ? $canonicalDiscount : $original - $paid);
+            return [
+                'original' => round($original, 2),
+                'discount' => round($discount, 2),
+                'paid' => round($paid, 2),
+            ];
+        }
+
         $paid = max(0.0, (float)($row['price'] ?? 0));
         if (is_numeric($row['discount_amount'] ?? null) && (float)$row['discount_amount'] > 0) {
             $discount = max(0.0, (float)$row['discount_amount']);

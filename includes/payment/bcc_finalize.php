@@ -150,15 +150,19 @@ if (!function_exists('bcc_finalize_payment_session')) {
                 $ticketUid = bin2hex(random_bytes(8));
 
                 $insertTicket = $pdo->prepare("INSERT INTO tickets
-                    (schedule_id, event_id, hall_id, seat_identifier, price, status, payment_status, payment_provider, payment_transaction_id, payment_session_id, customer_id, customer_name, customer_phone, customer_email, ticket_uid, channel, purchased_at, created_at, updated_at)
+                    (schedule_id, event_id, hall_id, seat_identifier, price, original_price, final_price, discount, discount_amount,
+                     status, payment_status, payment_provider, payment_transaction_id, payment_session_id, customer_id, customer_name, customer_phone, customer_email, ticket_uid, channel, purchased_at, created_at, updated_at)
                     VALUES
-                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :price, 'issued', 'paid', 'bcc', :txid, :payment_session_id, :customer_id, :customer_name, :customer_phone, :customer_email, :ticket_uid, 'web', NOW(), NOW(), NOW())");
+                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :price, :original_price, :final_price, 0, 0,
+                     'issued', 'paid', 'bcc', :txid, :payment_session_id, :customer_id, :customer_name, :customer_phone, :customer_email, :ticket_uid, 'web', NOW(), NOW(), NOW())");
                 $insertTicket->execute([
                     ':schedule_id' => (int)$lockedSession['session_id'],
                     ':event_id' => (int)$lockedSession['event_id'],
                     ':hall_id' => (int)$lockedSession['hall_id'],
                     ':seat_identifier' => $identifier,
                     ':price' => number_format($price, 2, '.', ''),
+                    ':original_price' => number_format($price, 2, '.', ''),
+                    ':final_price' => number_format($price, 2, '.', ''),
                     ':txid' => $transactionId,
                     ':payment_session_id' => $paymentSessionId,
                     ':customer_id' => $customerId,
