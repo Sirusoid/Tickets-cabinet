@@ -121,6 +121,53 @@ $methodLabels = [
     'noncash' => 'Безналичные',
     'bank' => 'Эквайринг',
 ];
+$refundHints = [
+    'customer' => [],
+    'ticket' => [],
+    'transaction' => [],
+    'order' => [],
+];
+try {
+    $hintParams = [
+        ':hint_date_from' => $dateFrom . ' 00:00:00',
+        ':hint_date_to' => $dateTo . ' 23:59:59',
+    ];
+    $hintWhere = 'r.created_at BETWEEN :hint_date_from AND :hint_date_to';
+    $refundHints['customer'] = array_column(db_fetch_all(
+        "SELECT DISTINCT c.full_name AS value
+         FROM refunds r
+         LEFT JOIN tickets t ON t.id = r.ticket_id
+         LEFT JOIN customers c ON c.id = t.customer_id
+         WHERE {$hintWhere} AND c.full_name IS NOT NULL AND c.full_name <> ''
+         ORDER BY c.full_name LIMIT 50",
+        $hintParams
+    ), 'value');
+    $refundHints['ticket'] = array_column(db_fetch_all(
+        "SELECT DISTINCT r.ticket_uid AS value
+         FROM refunds r
+         WHERE {$hintWhere} AND r.ticket_uid IS NOT NULL AND r.ticket_uid <> ''
+         ORDER BY r.ticket_uid LIMIT 50",
+        $hintParams
+    ), 'value');
+    $refundHints['transaction'] = array_column(db_fetch_all(
+        "SELECT DISTINCT r.refund_transaction_id AS value
+         FROM refunds r
+         WHERE {$hintWhere} AND r.refund_transaction_id IS NOT NULL AND r.refund_transaction_id <> ''
+         ORDER BY r.refund_transaction_id LIMIT 50",
+        $hintParams
+    ), 'value');
+    $refundHints['order'] = array_column(db_fetch_all(
+        "SELECT DISTINCT ps.order_number AS value
+         FROM refunds r
+         LEFT JOIN tickets t ON t.id = r.ticket_id
+         LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+         WHERE {$hintWhere} AND ps.order_number IS NOT NULL AND ps.order_number <> ''
+         ORDER BY ps.order_number LIMIT 50",
+        $hintParams
+    ), 'value');
+} catch (Throwable $e) {
+    error_log('[REFUNDS] Не удалось загрузить подсказки фильтров: ' . $e->getMessage());
+}
 $totalPages = max(1, (int)ceil($total / $perPage));
 $queryParams = [
     'date_from' => $dateFrom,
@@ -177,19 +224,31 @@ $queryParams = [
             </div>
             <div>
                 <label for="refunds-customer">Клиент</label>
-                <input id="refunds-customer" class="form-control" type="search" name="customer" value="<?= h($customerSearch) ?>" placeholder="ФИО клиента">
+                <input id="refunds-customer" class="form-control" type="search" name="customer" list="refunds-customer-hints" value="<?= h($customerSearch) ?>" placeholder="ФИО клиента">
+                <datalist id="refunds-customer-hints">
+                    <?php foreach ($refundHints['customer'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
+                </datalist>
             </div>
             <div>
                 <label for="refunds-ticket">Билет</label>
-                <input id="refunds-ticket" class="form-control" type="search" name="ticket" value="<?= h($ticketSearch) ?>" placeholder="UID билета">
+                <input id="refunds-ticket" class="form-control" type="search" name="ticket" list="refunds-ticket-hints" value="<?= h($ticketSearch) ?>" placeholder="UID билета">
+                <datalist id="refunds-ticket-hints">
+                    <?php foreach ($refundHints['ticket'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
+                </datalist>
             </div>
             <div>
                 <label for="refunds-transaction">Транзакция</label>
-                <input id="refunds-transaction" class="form-control" type="search" name="transaction" value="<?= h($transactionSearch) ?>" placeholder="ID транзакции">
+                <input id="refunds-transaction" class="form-control" type="search" name="transaction" list="refunds-transaction-hints" value="<?= h($transactionSearch) ?>" placeholder="ID транзакции">
+                <datalist id="refunds-transaction-hints">
+                    <?php foreach ($refundHints['transaction'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
+                </datalist>
             </div>
             <div>
                 <label for="refunds-order">Заказ</label>
-                <input id="refunds-order" class="form-control" type="search" name="order" value="<?= h($orderSearch) ?>" placeholder="Номер заказа">
+                <input id="refunds-order" class="form-control" type="search" name="order" list="refunds-order-hints" value="<?= h($orderSearch) ?>" placeholder="Номер заказа">
+                <datalist id="refunds-order-hints">
+                    <?php foreach ($refundHints['order'] as $hint): ?><option value="<?= h($hint) ?>"><?php endforeach; ?>
+                </datalist>
             </div>
             <div class="refunds-filters__actions">
                 <a class="btn btn-ghost" href="/refunds/list.php">Сбросить</a>
@@ -264,15 +323,11 @@ $queryParams = [
 (function () {
     var form = document.getElementById('refundsFiltersForm');
     if (!form) return;
-    var searchTimer = null;
     var controls = form.querySelectorAll('input, select');
     Array.prototype.forEach.call(controls, function (control) {
         if (control.type === 'search' || control.type === 'text') {
             control.addEventListener('input', function () {
-                window.clearTimeout(searchTimer);
-                searchTimer = window.setTimeout(function () {
-                    form.submit();
-                }, 350);
+                form.submit();
             });
             return;
         }
