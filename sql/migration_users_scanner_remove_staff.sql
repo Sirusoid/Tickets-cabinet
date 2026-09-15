@@ -27,6 +27,19 @@ FROM staff s
 LEFT JOIN users existing ON existing.username = CONCAT('legacy_staff_', s.id)
 WHERE existing.id IS NULL;
 
+-- Сначала снимаем старые ограничения, иначе перенос ID в users будет отклонён.
+ALTER TABLE audit_logs
+    DROP FOREIGN KEY fk_audit_logs_staff;
+
+ALTER TABLE checkins
+    DROP FOREIGN KEY fk_checkins_scanner;
+
+ALTER TABLE refunds
+    DROP FOREIGN KEY fk_refunds_processed_by;
+
+ALTER TABLE tickets
+    DROP FOREIGN KEY fk_tickets_sold_by;
+
 -- Перенос ссылок на legacy staff в users.
 UPDATE audit_logs a
 JOIN users u ON u.username = CONCAT('legacy_staff_', a.staff_id)
@@ -51,23 +64,19 @@ WHERE t.sold_by_staff_id IS NOT NULL;
 
 -- Перенастройка внешних ключей с staff на users.
 ALTER TABLE audit_logs
-    DROP FOREIGN KEY fk_audit_logs_staff,
     DROP COLUMN staff_id;
 
 ALTER TABLE checkins
-    DROP FOREIGN KEY fk_checkins_scanner,
     ADD CONSTRAINT fk_checkins_scanner_user
         FOREIGN KEY (scanner_id) REFERENCES users(id)
         ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE refunds
-    DROP FOREIGN KEY fk_refunds_processed_by,
     ADD CONSTRAINT fk_refunds_processed_by_user
         FOREIGN KEY (processed_by) REFERENCES users(id)
         ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE tickets
-    DROP FOREIGN KEY fk_tickets_sold_by,
     ADD CONSTRAINT fk_tickets_sold_by_user
         FOREIGN KEY (sold_by_staff_id) REFERENCES users(id)
         ON DELETE SET NULL ON UPDATE CASCADE;
