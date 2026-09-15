@@ -368,7 +368,41 @@ case 'sell':
 
     // discount functions expected to exist in project; fallback if not
     if (!function_exists('cash_get_discount_settings')) {
-        function cash_get_discount_settings($pdo) { return []; }
+        function cash_get_discount_settings($pdo) {
+            $settings = [
+                'segment_percent' => [
+                    'adult' => 0.0,
+                    'child' => 0.0,
+                    'student' => 0.0,
+                    'senior' => 0.0,
+                ],
+                'custom_max_amount' => 0.0,
+            ];
+            if (!($pdo instanceof PDO)) {
+                return $settings;
+            }
+
+            $stmt = $pdo->prepare("SELECT `key`, `value`
+                FROM settings
+                WHERE `key` IN (
+                    'tickets.discount_adult_percent',
+                    'tickets.discount_child_percent',
+                    'tickets.discount_student_percent',
+                    'tickets.discount_senior_percent',
+                    'tickets.custom_discount_max_amount'
+                )");
+            $stmt->execute();
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $key = (string)$row['key'];
+                $value = is_numeric($row['value']) ? max(0.0, (float)$row['value']) : 0.0;
+                if ($key === 'tickets.discount_adult_percent') $settings['segment_percent']['adult'] = $value;
+                if ($key === 'tickets.discount_child_percent') $settings['segment_percent']['child'] = $value;
+                if ($key === 'tickets.discount_student_percent') $settings['segment_percent']['student'] = $value;
+                if ($key === 'tickets.discount_senior_percent') $settings['segment_percent']['senior'] = $value;
+                if ($key === 'tickets.custom_discount_max_amount') $settings['custom_max_amount'] = $value;
+            }
+            return $settings;
+        }
     }
     if (!function_exists('cash_apply_sale_discounts')) {
         function cash_apply_sale_discounts($baseTotal, $customer_segment, $discount_input, $discountSettings) {
