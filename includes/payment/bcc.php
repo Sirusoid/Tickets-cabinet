@@ -15,6 +15,7 @@ if (!function_exists('bcc_config')) {
             'merchant' => '00000001',
             'terminal' => '88888881',
             'merch_name' => 'ZHAS SAHNA THEATER',
+            'merch_gmt' => '0',
             'mac_key' => '',
             'test_url' => 'https://test3ds.bcc.kz:5445/cgi-bin/cgi_link',
             'prod_url' => 'https://3dsecure.bcc.kz/webview',
@@ -55,6 +56,7 @@ if (!function_exists('bcc_config')) {
             'merchant' => 'payments.bcc_merchant',
             'terminal' => 'payments.bcc_terminal',
             'merch_name' => 'payments.bcc_merch_name',
+            'merch_gmt' => 'payments.bcc_merch_gmt',
             'mac_key' => 'payments.bcc_mac_key',
             'test_url' => 'payments.bcc_test_url',
             'prod_url' => 'payments.bcc_prod_url',
@@ -232,8 +234,11 @@ if (!function_exists('bcc_timestamp')) {
 }
 
 if (!function_exists('bcc_merchant_gmt')) {
-    function bcc_merchant_gmt(): string
+    function bcc_merchant_gmt(?array $cfg = null): string
     {
+        if (is_array($cfg) && isset($cfg['merch_gmt']) && trim((string)$cfg['merch_gmt']) !== '') {
+            return trim((string)$cfg['merch_gmt']);
+        }
         $configured = getenv('ZHASSAHNA_BCC_MERCH_GMT');
         return is_string($configured) && trim($configured) !== '' ? trim($configured) : '0';
     }
@@ -287,7 +292,7 @@ if (!function_exists('bcc_build_payment_form')) {
 
         $amount = number_format($amountCents / 100, 2, '.', '');
         $currency = '398';
-        $merchGmt = bcc_merchant_gmt();
+        $merchGmt = bcc_merchant_gmt($cfg);
         $trtype = '1';
         $timestamp = bcc_timestamp();
         $nonce = bcc_generate_nonce();

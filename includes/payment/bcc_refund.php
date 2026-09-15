@@ -134,7 +134,7 @@ if (!function_exists('bcc_build_refund_form')) {
         $intRef = trim((string)($originalResponse['INT_REF'] ?? ''));
         $terminal = trim((string)($cfg['terminal'] ?? ''));
         $timestamp = bcc_timestamp();
-        $merchGmt = bcc_merchant_gmt();
+        $merchGmt = bcc_merchant_gmt($cfg);
         $trtype = '14';
         $nonce = bcc_generate_nonce();
 

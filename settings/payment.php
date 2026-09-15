@@ -28,6 +28,17 @@ if (isset($pdo) && $pdo instanceof PDO) {
 	);
 	settings_upsert_value(
 		$pdo,
+		'payments.bcc_merch_gmt',
+		'BCC MERCH_GMT',
+		'0',
+		'string',
+		'payments',
+		'Часовой пояс торговца для BCC. По актуальной документации банка обычно используется 0; значение участвует в подписи P_SIGN.',
+		1,
+		15
+	);
+	settings_upsert_value(
+		$pdo,
 		'payments.bcc_self_refund_enabled',
 		'Разрешить самостоятельный возврат BCC',
 		'0',
