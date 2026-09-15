@@ -348,11 +348,8 @@ var Cashier = (function () {
           if (pricedSeats && typeof pricedSeats === 'object' && pricedSeats._ids && typeof pricedSeats._ids === 'object' && pricedSeats._ids[k]) {
             seatId = pricedSeats._ids[k];
           }
-          var price = 0;
-          if (pricedSeats && typeof pricedSeats === 'object' && typeof pricedSeats[k] !== 'undefined') {
-            var p = Number(pricedSeats[k]);
-            price = isNaN(p) ? 0 : p;
-          }
+          var price = Number(getSeatPrice(k));
+          if (!isFinite(price) || price <= 0) price = 0;
           seats.push({
             id: seatId,
             identifier: (row && seat) ? (row + ':' + seat) : String(k),
