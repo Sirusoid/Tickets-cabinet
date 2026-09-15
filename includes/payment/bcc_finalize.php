@@ -8,9 +8,22 @@ if (!function_exists('bcc_finalize_payment_session')) {
             throw new RuntimeException('Payment session id is missing.');
         }
 
+        $hasOrderEmailSentAt = false;
+        try {
+            $columnStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'payment_sessions'
+                    AND COLUMN_NAME = 'order_email_sent_at'");
+            $columnStmt->execute();
+            $hasOrderEmailSentAt = (bool)$columnStmt->fetchColumn();
+        } catch (Throwable $e) {
+            $hasOrderEmailSentAt = false;
+        }
+
+        $emailSentSelect = $hasOrderEmailSentAt ? ', order_email_sent_at' : '';
         $pdo->beginTransaction();
         try {
-            $lockStmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, amount_cents, seats_payload, ticket_uids, customer_phone, customer_name, customer_email, order_number, order_email_sent_at
+            $lockStmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, amount_cents, seats_payload, ticket_uids, customer_phone, customer_name, customer_email, order_number{$emailSentSelect}
                 FROM payment_sessions WHERE id = :id LIMIT 1 FOR UPDATE");
             $lockStmt->execute([':id' => $paymentSessionId]);
             $lockedSession = $lockStmt->fetch(PDO::FETCH_ASSOC);
@@ -188,12 +201,14 @@ if (!function_exists('bcc_finalize_payment_session')) {
 
             if (
                 function_exists('send_order_access_email')
-                && empty($lockedSession['order_email_sent_at'])
+                && (!$hasOrderEmailSentAt || empty($lockedSession['order_email_sent_at']))
                 && !empty($lockedSession['customer_email'])
                 && send_order_access_email((string)$lockedSession['customer_email'], (string)$lockedSession['order_number'])
             ) {
-                $emailSentStmt = $pdo->prepare('UPDATE payment_sessions SET order_email_sent_at = NOW(), updated_at = NOW() WHERE id = :id AND order_email_sent_at IS NULL');
-                $emailSentStmt->execute([':id' => $paymentSessionId]);
+                if ($hasOrderEmailSentAt) {
+                    $emailSentStmt = $pdo->prepare('UPDATE payment_sessions SET order_email_sent_at = NOW(), updated_at = NOW() WHERE id = :id AND order_email_sent_at IS NULL');
+                    $emailSentStmt->execute([':id' => $paymentSessionId]);
+                }
             }
 
             if (!empty($ticketUids) && function_exists('ticket_pdf_generate_by_ticket_uid')) {
