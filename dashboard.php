@@ -11,11 +11,14 @@ $page_styles = ['/assets/css/reports.css'];
 
 $todaySales = ['tickets' => 0, 'amount' => 0.0];
 $todayRefunds = ['tickets' => 0, 'amount' => 0.0];
+$todayDiscounts = 0.0;
 $todaySessions = [];
 $dashboardError = '';
 
 try {
-    $todaySalesRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.price), 0) AS amount
+    $todaySalesRow = db_fetch_one("SELECT COUNT(*) AS tickets,
+            COALESCE(SUM(t.final_price), 0) AS amount,
+            COALESCE(SUM(t.discount_amount), 0) AS discounts
         FROM tickets t
         WHERE DATE(t.purchased_at) = CURDATE()
             AND t.payment_status = 'paid'
@@ -25,8 +28,9 @@ try {
         'tickets' => (int)($todaySalesRow['tickets'] ?? 0),
         'amount' => (float)($todaySalesRow['amount'] ?? 0),
     ];
+    $todayDiscounts = (float)($todaySalesRow['discounts'] ?? 0);
 
-    $todayRefundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.price), 0) AS amount
+    $todayRefundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.final_price), 0) AS amount
         FROM tickets t
         WHERE DATE(t.refund_at) = CURDATE()
             AND t.payment_status = 'paid'
@@ -46,9 +50,9 @@ try {
                 AND COALESCE(t.refund_status, 'none') <> 'refunded' THEN 1 END) AS sold_tickets,
             COALESCE(SUM(CASE WHEN t.payment_status = 'paid'
                 AND t.status <> 'cancelled'
-                AND COALESCE(t.refund_status, 'none') <> 'refunded' THEN t.price ELSE 0 END), 0) AS sold_amount,
+                AND COALESCE(t.refund_status, 'none') <> 'refunded' THEN t.final_price ELSE 0 END), 0) AS sold_amount,
             COUNT(CASE WHEN t.refund_status = 'refunded' THEN 1 END) AS refund_tickets,
-            COALESCE(SUM(CASE WHEN t.refund_status = 'refunded' THEN t.price ELSE 0 END), 0) AS refund_amount
+            COALESCE(SUM(CASE WHEN t.refund_status = 'refunded' THEN t.final_price ELSE 0 END), 0) AS refund_amount
         FROM schedules s
         LEFT JOIN events e ON e.id = s.event_id
         LEFT JOIN halls h ON h.id = s.hall_id
@@ -57,7 +61,7 @@ try {
             AND t.status <> 'cancelled'
             AND COALESCE(t.refund_status, 'none') <> 'refunded'
         WHERE s.start_time >= NOW()
-            AND s.start_time < DATE_ADD(NOW(), INTERVAL 7 DAY)
+            AND s.start_time < DATE_ADD(NOW(), INTERVAL 14 DAY)
             AND s.status IN ('upcoming', 'active')
         GROUP BY s.id, s.start_time, e.title, h.name
         ORDER BY s.start_time ASC");
@@ -79,7 +83,7 @@ require __DIR__ . '/includes/panel.php';
         <div class="reports-toolbar__intro">
             <div class="reports-eyebrow">Рабочий день</div>
             <h3>Сегодня, <?= h(reporting_format_date(date('Y-m-d'))) ?></h3>
-            <p>Основные показатели кассы и сеансы на ближайшие 7 дней.</p>
+            <p>Основные показатели кассы и сеансы на ближайшие 14 дней.</p>
         </div>
         <div class="dashboard-actions">
             <a class="btn btn-primary" href="/cash/index.php">Открыть кассу</a>
@@ -87,7 +91,7 @@ require __DIR__ . '/includes/panel.php';
         </div>
     </div>
 
-    <div class="reports-kpi-grid">
+    <div class="reports-kpi-grid dashboard-kpi-grid">
         <div class="card reports-kpi reports-kpi--accent">
             <span>Продано сегодня</span>
             <strong><?= number_format($todaySales['tickets'], 0, '.', ' ') ?></strong>
@@ -97,6 +101,11 @@ require __DIR__ . '/includes/panel.php';
             <span>Выручка сегодня</span>
             <strong><?= number_format($todaySales['amount'], 2, '.', ' ') ?> <em>тг</em></strong>
             <small>после скидок</small>
+        </div>
+        <div class="card reports-kpi reports-kpi--discount">
+            <span>Скидки сегодня</span>
+            <strong>-<?= number_format($todayDiscounts, 2, '.', ' ') ?> <em>тг</em></strong>
+            <small>за выбранные продажи</small>
         </div>
         <div class="card reports-kpi reports-kpi--dark">
             <span>Возвраты сегодня</span>
@@ -132,7 +141,7 @@ require __DIR__ . '/includes/panel.php';
                 </thead>
                 <tbody>
                     <?php if (!$todaySessions): ?>
-                        <tr><td colspan="7" class="reports-empty">На ближайшие 7 дней сеансов нет.</td></tr>
+                        <tr><td colspan="7" class="reports-empty">На ближайшие 14 дней сеансов нет.</td></tr>
                     <?php else: foreach ($todaySessions as $session): ?>
                         <tr>
                             <td><?= h(reporting_format_date($session['start_time'], true)) ?></td>

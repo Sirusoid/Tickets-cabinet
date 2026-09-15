@@ -44,6 +44,10 @@
   gap: 6px;
 }
 
+.dashboard-kpi-grid {
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+}
+
 .reports-eyebrow {
   margin-bottom: 6px;
   color: #2563eb;
@@ -191,6 +195,7 @@
   .dashboard-toolbar { grid-template-columns: 1fr; }
   .dashboard-actions { justify-content: flex-start; }
   .reports-kpi-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  .dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
 }
 
 @media (max-width: 760px) {
