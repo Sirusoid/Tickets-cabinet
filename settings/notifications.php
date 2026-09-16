@@ -10,7 +10,7 @@ if (isset($pdo) && $pdo instanceof PDO) {
 			'label' => 'Отправлять письма с билетами',
 			'value' => '1',
 			'type' => 'bool',
-			'description' => 'После успешной онлайн-покупки клиент получает номер заказа и ссылку на билеты.',
+			'description' => 'После успешной онлайн-покупки клиент получает благодарность, дату и время сеанса, ссылки на PDF, PDF-вложения и ссылку на возврат.',
 			'sort' => 1,
 		],
 		[
@@ -125,6 +125,18 @@ if (isset($pdo) && $pdo instanceof PDO) {
 				':category' => 'notifications',
 				':description' => $setting['description'],
 				':sort_order' => $setting['sort'],
+			]);
+		} else {
+			$stmt = $pdo->prepare('UPDATE settings
+				SET label = :label, type = :type, options = :options, description = :description, sort_order = :sort_order
+				WHERE id = :id');
+			$stmt->execute([
+				':label' => $setting['label'],
+				':type' => $setting['type'],
+				':options' => $setting['options'] ?? null,
+				':description' => $setting['description'],
+				':sort_order' => $setting['sort'],
+				':id' => (int)$existing['id'],
 			]);
 		}
 	}

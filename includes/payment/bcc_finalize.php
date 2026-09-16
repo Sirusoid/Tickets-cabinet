@@ -191,6 +191,15 @@ if (!function_exists('bcc_finalize_payment_session')) {
                 ]);
             }
 
+            if (!empty($ticketUids) && function_exists('ticket_pdf_generate_by_ticket_uid')) {
+                foreach ($ticketUids as $ticketUid) {
+                    $pdfError = null;
+                    if (!ticket_pdf_generate_by_ticket_uid($ticketUid, false, $pdfError)) {
+                        error_log('[BCC] PDF generation failed for ' . $ticketUid . ': ' . ($pdfError ?? 'unknown error'));
+                    }
+                }
+            }
+
             if (
                 function_exists('send_order_access_email')
                 && (!$hasOrderEmailSentAt || empty($lockedSession['order_email_sent_at']))
@@ -200,15 +209,6 @@ if (!function_exists('bcc_finalize_payment_session')) {
                 if ($hasOrderEmailSentAt) {
                     $emailSentStmt = $pdo->prepare('UPDATE payment_sessions SET order_email_sent_at = NOW(), updated_at = NOW() WHERE id = :id AND order_email_sent_at IS NULL');
                     $emailSentStmt->execute([':id' => $paymentSessionId]);
-                }
-            }
-
-            if (!empty($ticketUids) && function_exists('ticket_pdf_generate_by_ticket_uid')) {
-                foreach ($ticketUids as $ticketUid) {
-                    $pdfError = null;
-                    if (!ticket_pdf_generate_by_ticket_uid($ticketUid, false, $pdfError)) {
-                        error_log('[BCC] PDF generation failed for ' . $ticketUid . ': ' . ($pdfError ?? 'unknown'));
-                    }
                 }
             }
 

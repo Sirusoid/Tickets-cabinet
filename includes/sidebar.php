@@ -49,6 +49,7 @@ $menu = [
 ];
 if ($currentRole === 'admin') {
   $menu[] = ['id'=>'audit','href'=>'/admin/audit.php','label'=>'Журнал действий','perm'=>null,'icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'];
+  $menu[] = ['id'=>'email_test','href'=>'/admin/email_test.php','label'=>'Тест email','perm'=>null,'icon'=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16v12H4z" stroke="currentColor" stroke-width="1.5"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'];
 }
 
 $settingsPermMap = [
