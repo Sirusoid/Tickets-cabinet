@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/payment/bcc_refund.php';
+require_once __DIR__ . '/../includes/settings_manager.php';
 
 $order = isset($_GET['order']) ? trim((string)$_GET['order']) : '';
 $token = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
@@ -63,6 +64,18 @@ $skip_require_login = true;
 $use_sidebar = false;
 $hide_admin_header = true;
 $publicSiteUrl = defined('TILDA_WIDGET_ORIGIN') ? (string)TILDA_WIDGET_ORIGIN : 'https://zhassahna.kz';
+$configuredReturnUrl = '';
+if ($pdo instanceof PDO && function_exists('settings_get_value')) {
+    $configuredReturnUrl = trim((string)settings_get_value($pdo, 'system.order_return_url', ''));
+}
+$returnUrlTemplate = $configuredReturnUrl !== ''
+    ? $configuredReturnUrl
+    : rtrim($publicSiteUrl, '/') . '/?order={order}';
+$returnUrlTemplate = trim($returnUrlTemplate);
+if (!preg_match('/^https?:\/\//i', $returnUrlTemplate)) {
+    $returnUrlTemplate = rtrim($publicSiteUrl, '/') . '/?order={order}';
+}
+$returnUrl = str_replace('{order}', rawurlencode($order), $returnUrlTemplate);
 $refundInfo = ['state' => 'unavailable', 'message' => '', 'deadline' => null];
 if (!$error && $session && $pdo instanceof PDO && (string)$session['status'] === 'paid') {
     $refundInfo = bcc_self_refund_status($pdo, $session, $tickets);
@@ -261,7 +274,7 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endif; ?>
 
             <div style="text-align:center; margin-top: 24px;">
-                <a href="#" class="btn btn-primary" id="backToTildaBtn">Вернуться на сайт / Сайтқа оралу</a>
+                <a href="<?= h($returnUrl) ?>" class="btn btn-primary" id="backToTildaBtn">Вернуться на сайт / Сайтқа оралу</a>
             </div>
         </div>
     <?php endif; ?>
@@ -303,6 +316,7 @@ require_once __DIR__ . '/../includes/header.php';
     if (backToTildaBtn) {
         backToTildaBtn.addEventListener('click', function (e) {
             e.preventDefault();
+            var returnUrl = <?= json_encode($returnUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
             var tildaOrigin = <?= json_encode(defined('TILDA_WIDGET_ORIGIN') ? constant('TILDA_WIDGET_ORIGIN') : 'https://zhassahna.kz') ?>;
             var order = <?= json_encode($order) ?>;
             var amount = <?= json_encode(number_format((int)$session['amount_cents'] / 100, 2, '.', ' ')) ?>;
@@ -321,7 +335,7 @@ require_once __DIR__ . '/../includes/header.php';
                     tickets: tickets
                 }, tildaOrigin);
             }
-            window.location.href = tildaOrigin + '/?order=' + encodeURIComponent(order);
+            window.location.href = returnUrl;
         });
     }
 
