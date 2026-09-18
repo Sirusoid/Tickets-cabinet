@@ -320,7 +320,6 @@ require __DIR__ . '/../includes/panel.php';
     <?php else: ?>
         <form id="errorLogsBulkForm" method="post" action="/admin/error_logs.php">
             <input type="hidden" name="csrf_token" value="<?= h((string)($_SESSION['csrf_token'] ?? '')) ?>">
-        <div class="audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
         <div class="card audit-table-wrap">
             <table class="admin-table audit-table">
                 <thead>
@@ -365,17 +364,28 @@ require __DIR__ . '/../includes/panel.php';
                 </tbody>
             </table>
         </div>
-        <?php if ($totalPages > 1): ?>
-            <nav class="audit-pagination" aria-label="Страницы логов ошибок">
-                <?php if ($page > 1): $queryParams['page'] = $page - 1; ?>
-                    <a class="btn btn-ghost btn-sm" href="/admin/error_logs.php?<?= h(http_build_query($queryParams)) ?>">Назад</a>
+        <?php
+        $previousQuery = $queryParams;
+        $previousQuery['page'] = max(1, $page - 1);
+        $nextQuery = $queryParams;
+        $nextQuery['page'] = min($totalPages, $page + 1);
+        ?>
+        <div class="error-logs-pager" style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <div class="audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <?php if ($page > 1): ?>
+                    <a class="btn btn-ghost" href="/admin/error_logs.php?<?= h(http_build_query($previousQuery)) ?>" aria-label="Предыдущая страница">←</a>
+                <?php else: ?>
+                    <button class="btn btn-ghost" type="button" disabled aria-label="Предыдущая страница">←</button>
                 <?php endif; ?>
-                <span>Страница <?= $page ?> из <?= $totalPages ?></span>
-                <?php if ($page < $totalPages): $queryParams['page'] = $page + 1; ?>
-                    <a class="btn btn-ghost btn-sm" href="/admin/error_logs.php?<?= h(http_build_query($queryParams)) ?>">Вперёд</a>
+                <span><?= (int)$page ?> / <?= (int)$totalPages ?></span>
+                <?php if ($page < $totalPages): ?>
+                    <a class="btn btn-ghost" href="/admin/error_logs.php?<?= h(http_build_query($nextQuery)) ?>" aria-label="Следующая страница">→</a>
+                <?php else: ?>
+                    <button class="btn btn-ghost" type="button" disabled aria-label="Следующая страница">→</button>
                 <?php endif; ?>
-            </nav>
-        <?php endif; ?>
+            </div>
+        </div>
         </form>
     <?php endif; ?>
 </div>
@@ -531,13 +541,10 @@ require __DIR__ . '/../includes/panel.php';
             .then(function (response) { return response.text(); })
             .then(function (html) {
                 var parsed = new DOMParser().parseFromString(html, 'text/html');
-                var currentSummary = document.querySelector('.audit-summary');
-                var nextSummary = parsed.querySelector('.audit-summary');
                 var currentTable = document.querySelector('.audit-table-wrap');
                 var nextTable = parsed.querySelector('.audit-table-wrap');
-                var currentPagination = document.querySelector('.audit-pagination');
-                var nextPagination = parsed.querySelector('.audit-pagination');
-                if (currentSummary && nextSummary) currentSummary.replaceWith(nextSummary);
+                var currentPagination = document.querySelector('.error-logs-pager');
+                var nextPagination = parsed.querySelector('.error-logs-pager');
                 if (currentTable && nextTable) currentTable.replaceWith(nextTable);
                 if (currentPagination && nextPagination) currentPagination.replaceWith(nextPagination);
                 if (currentPagination && !nextPagination) currentPagination.remove();
