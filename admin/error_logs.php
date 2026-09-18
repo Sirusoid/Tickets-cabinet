@@ -133,6 +133,12 @@ $levelLabels = [
     'warning' => 'Предупреждение',
     'info' => 'Информация',
 ];
+$levelClasses = [
+    'critical' => 'error-level-badge--critical',
+    'error' => 'error-level-badge--error',
+    'warning' => 'error-level-badge--warning',
+    'info' => 'error-level-badge--info',
+];
 
 $formatContext = static function ($raw): string {
     if ($raw === null || $raw === '') {
@@ -169,12 +175,23 @@ require __DIR__ . '/../includes/panel.php';
             </div>
             <div>
                 <label for="error-level">Уровень</label>
-                <select id="error-level" name="level" class="form-control">
-                    <option value="">Все уровни</option>
-                    <?php foreach ($levelLabels as $code => $label): ?>
-                        <option value="<?= h($code) ?>" <?= $level === $code ? 'selected' : '' ?>><?= h($label) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="error-level-picker">
+                    <select id="error-level" name="level" class="form-control">
+                        <option value="">Все уровни</option>
+                        <?php foreach ($levelLabels as $code => $label): ?>
+                            <option value="<?= h($code) ?>" <?= $level === $code ? 'selected' : '' ?>><?= h($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span id="error-level-badge" class="error-level-badge <?= $level !== '' ? h($levelClasses[$level] ?? '') : 'error-level-badge--all' ?>">
+                        <?= h($level !== '' ? ($levelLabels[$level] ?? $level) : 'Все') ?>
+                    </span>
+                </div>
+            </div>
+            <div class="error-log-presets" aria-label="Быстрый период">
+                <span class="error-log-presets__label">Период:</span>
+                <button type="button" class="btn btn-ghost btn-sm error-log-preset" data-date-preset="today">Сегодня</button>
+                <button type="button" class="btn btn-ghost btn-sm error-log-preset" data-date-preset="week">За неделю</button>
+                <button type="button" class="btn btn-ghost btn-sm error-log-preset" data-date-preset="month">За месяц</button>
             </div>
             <?php
             $suggestFields = [
@@ -229,7 +246,7 @@ require __DIR__ . '/../includes/panel.php';
                 ?>
                     <tr>
                         <td><?= h(date('d.m.Y H:i:s', strtotime((string)$row['created_at']))) ?></td>
-                        <td><span class="badge" style="background:<?= $rowLevel === 'critical' ? '#991b1b' : ($rowLevel === 'warning' ? '#b45309' : '#b91c1c') ?>; color:#fff;"><?= h($levelLabels[$rowLevel] ?? $rowLevel) ?></span></td>
+                        <td><span class="error-level-badge <?= h($levelClasses[$rowLevel] ?? 'error-level-badge--error') ?>"><?= h($levelLabels[$rowLevel] ?? $rowLevel) ?></span></td>
                         <td><?= h($row['source']) ?></td>
                         <td>
                             <button type="button" class="error-log-open" data-error-level="<?= h($levelLabels[$rowLevel] ?? $rowLevel) ?>" data-error-source="<?= h($row['source']) ?>" data-error-message="<?= h($row['message']) ?>" data-error-description="<?= h($description) ?>" data-error-order="<?= h($row['order_number'] ?: '—') ?>" data-error-code="<?= h($row['response_code'] ?: '—') ?>" data-error-context="<?= h($context) ?>">
@@ -292,6 +309,53 @@ require __DIR__ . '/../includes/panel.php';
     if (!form) return;
 
     var modal = document.getElementById('errorLogModal');
+    var levelLabels = {
+        '': 'Все',
+        critical: 'Критическая',
+        error: 'Ошибка',
+        warning: 'Предупреждение',
+        info: 'Информация'
+    };
+    var levelClasses = {
+        '': 'error-level-badge--all',
+        critical: 'error-level-badge--critical',
+        error: 'error-level-badge--error',
+        warning: 'error-level-badge--warning',
+        info: 'error-level-badge--info'
+    };
+    function updateLevelBadge() {
+        var select = document.getElementById('error-level');
+        var badge = document.getElementById('error-level-badge');
+        if (!select || !badge) return;
+        var value = select.value || '';
+        badge.className = 'error-level-badge ' + levelClasses[value];
+        badge.textContent = levelLabels[value];
+    }
+    updateLevelBadge();
+
+    function formatDate(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    }
+
+    function applyDatePreset(preset) {
+        var from = form.querySelector('[name="date_from"]');
+        var to = form.querySelector('[name="date_to"]');
+        if (!from || !to) return;
+        var today = new Date();
+        var start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        if (preset === 'week') {
+            start.setDate(start.getDate() - 6);
+        } else if (preset === 'month') {
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+        }
+        from.value = formatDate(start);
+        to.value = formatDate(today);
+        refreshTable();
+    }
+
     function closeErrorModal() {
         if (!modal) return;
         modal.classList.remove('is-visible');
@@ -434,6 +498,9 @@ require __DIR__ . '/../includes/panel.php';
                 }
             });
         } else {
+            if (control.id === 'error-level') {
+                control.addEventListener('change', updateLevelBadge);
+            }
             control.addEventListener('change', function () {
                 hideSuggestions();
                 refreshTable();
@@ -442,6 +509,11 @@ require __DIR__ . '/../includes/panel.php';
     });
     document.addEventListener('mousedown', function (event) {
         if (!form.contains(event.target)) hideSuggestions();
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('[data-date-preset]'), function (button) {
+        button.addEventListener('click', function () {
+            applyDatePreset(button.getAttribute('data-date-preset') || 'today');
+        });
     });
 })();
 </script>
@@ -453,6 +525,18 @@ require __DIR__ . '/../includes/panel.php';
     .error-log-typeahead__item { padding:8px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; }
     .error-log-typeahead__item:hover { background:#f8fafc; }
     .error-logs-page .audit-table th, .error-logs-page .audit-table td { vertical-align:top; }
+    .error-log-presets { grid-column:1 / -1; display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+    .error-log-presets__label { color:#52647e; font-size:12px; font-weight:600; margin-right:2px; }
+    .error-log-preset.is-active { background:#e0ecff; border-color:#2563eb; color:#1d4ed8; }
+    .error-level-picker { display:flex; align-items:center; gap:8px; }
+    .error-level-picker select { min-width:0; flex:1; }
+    .error-level-badge { display:inline-flex; align-items:center; gap:5px; min-height:24px; padding:3px 8px; border-radius:999px; white-space:nowrap; font-size:11px; font-weight:700; }
+    .error-level-badge::before { content:''; width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .error-level-badge--all { background:#f1f5f9; color:#64748b; }
+    .error-level-badge--critical { background:#fee2e2; color:#991b1b; }
+    .error-level-badge--error { background:#fee2e2; color:#b91c1c; }
+    .error-level-badge--warning { background:#fef3c7; color:#b45309; }
+    .error-level-badge--info { background:#dbeafe; color:#1d4ed8; }
     .error-log-open { max-width:360px; padding:0; border:0; background:transparent; color:#1d4ed8; text-align:left; cursor:pointer; font:inherit; text-decoration:underline; }
     .error-log-modal { position:fixed; inset:0; z-index:2400; display:none; align-items:center; justify-content:center; padding:20px; }
     .error-log-modal.is-visible { display:flex; }
