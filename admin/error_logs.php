@@ -311,11 +311,11 @@ require __DIR__ . '/../includes/panel.php';
             </div>
             <div class="audit-filters__actions error-log-actions">
                 <a class="btn btn-ghost" href="/admin/error_logs.php">Сбросить</a>
-                <button type="submit" form="errorLogsBulkForm" name="action" value="delete_selected" class="btn btn-danger" onclick="return confirm('Удалить выбранные записи логов?');">Удалить выбранные</button>
-                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_retention" class="btn btn-secondary" onclick="return confirm('Удалить все логи старше установленного срока хранения?');">Очистить старше <?= (int)$retentionDays ?> дн.</button>
-                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_1_day" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 1 суток?');">Удалить за сутки</button>
-                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_3_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 3 суток?');">Удалить за 3 суток</button>
-                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_7_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше недели?');">Удалить за неделю</button>
+                <button type="button" form="errorLogsBulkForm" value="delete_selected" class="btn btn-danger error-log-confirm-action" data-confirm-title="Удаление выбранных ошибок" data-confirm-message="Удалить выбранные записи логов?">Удалить выбранные</button>
+                <button type="button" form="errorLogsBulkForm" value="purge_retention" class="btn btn-secondary error-log-confirm-action" data-confirm-title="Очистка старых логов" data-confirm-message="Удалить все логи старше установленного срока хранения?">Очистить старше <?= (int)$retentionDays ?> дн.</button>
+                <button type="button" form="errorLogsBulkForm" value="purge_1_day" class="btn btn-secondary error-log-confirm-action" data-confirm-title="Очистка логов" data-confirm-message="Удалить логи старше 1 суток?">Удалить за сутки</button>
+                <button type="button" form="errorLogsBulkForm" value="purge_3_days" class="btn btn-secondary error-log-confirm-action" data-confirm-title="Очистка логов" data-confirm-message="Удалить логи старше 3 суток?">Удалить за 3 суток</button>
+                <button type="button" form="errorLogsBulkForm" value="purge_7_days" class="btn btn-secondary error-log-confirm-action" data-confirm-title="Очистка логов" data-confirm-message="Удалить логи старше недели?">Удалить за неделю</button>
             </div>
         </form>
     </div>
@@ -325,6 +325,7 @@ require __DIR__ . '/../includes/panel.php';
     <?php else: ?>
         <form id="errorLogsBulkForm" method="post" action="/admin/error_logs.php">
             <input type="hidden" name="csrf_token" value="<?= h((string)($_SESSION['csrf_token'] ?? '')) ?>">
+            <input type="hidden" name="action" id="errorLogsConfirmedAction" value="">
         <div class="card audit-table-wrap">
             <table class="admin-table audit-table">
                 <thead>
@@ -420,12 +421,70 @@ require __DIR__ . '/../includes/panel.php';
     </section>
 </div>
 
+<div id="errorLogConfirmModal" class="error-log-modal" aria-hidden="true">
+    <div class="error-log-modal__backdrop" data-error-confirm-close></div>
+    <section class="error-log-modal__dialog error-log-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="errorLogConfirmTitle">
+        <div class="error-log-modal__header">
+            <h2 id="errorLogConfirmTitle">Подтвердите действие</h2>
+            <button type="button" class="btn btn-ghost btn-sm" data-error-confirm-close aria-label="Закрыть">Нет</button>
+        </div>
+        <div class="error-log-modal__body">
+            <p id="errorLogConfirmMessage" class="error-log-modal__message"></p>
+            <div class="error-log-confirm-actions">
+                <button type="button" class="btn btn-ghost" data-error-confirm-close>Нет</button>
+                <button type="button" class="btn btn-danger" id="errorLogConfirmSubmit">Да</button>
+            </div>
+        </div>
+    </section>
+</div>
+
 <script>
 (function () {
     var form = document.getElementById('errorLogsFilters');
     if (!form) return;
 
     var modal = document.getElementById('errorLogModal');
+    var confirmModal = document.getElementById('errorLogConfirmModal');
+    var pendingActionButton = null;
+    function closeConfirmModal() {
+        if (!confirmModal) return;
+        pendingActionButton = null;
+        confirmModal.classList.remove('is-visible');
+        confirmModal.setAttribute('aria-hidden', 'true');
+    }
+    function openConfirmModal(button) {
+        if (!confirmModal) return;
+        pendingActionButton = button;
+        var title = document.getElementById('errorLogConfirmTitle');
+        var message = document.getElementById('errorLogConfirmMessage');
+        if (title) title.textContent = button.getAttribute('data-confirm-title') || 'Подтвердите действие';
+        if (message) message.textContent = button.getAttribute('data-confirm-message') || 'Подтвердить действие?';
+        confirmModal.classList.add('is-visible');
+        confirmModal.setAttribute('aria-hidden', 'false');
+    }
+    document.addEventListener('click', function (event) {
+        var actionButton = event.target.closest && event.target.closest('.error-log-confirm-action');
+        if (actionButton) {
+            event.preventDefault();
+            openConfirmModal(actionButton);
+            return;
+        }
+        if (event.target.closest && event.target.closest('[data-error-confirm-close]')) {
+            closeConfirmModal();
+        }
+    });
+    var confirmSubmit = document.getElementById('errorLogConfirmSubmit');
+    if (confirmSubmit) {
+        confirmSubmit.addEventListener('click', function () {
+            if (!pendingActionButton) return;
+            var bulkForm = document.getElementById('errorLogsBulkForm');
+            var actionField = document.getElementById('errorLogsConfirmedAction');
+            if (!bulkForm || !actionField) return;
+            actionField.value = pendingActionButton.value;
+            closeConfirmModal();
+            bulkForm.submit();
+        });
+    }
     var levelLabels = {
         '': 'Все',
         critical: 'Критическая',
@@ -512,7 +571,10 @@ require __DIR__ . '/../includes/panel.php';
         }
     });
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') closeErrorModal();
+        if (event.key === 'Escape') {
+            closeErrorModal();
+            closeConfirmModal();
+        }
     });
 
     function escapeHtml(value) {
@@ -675,5 +737,7 @@ require __DIR__ . '/../includes/panel.php';
     .error-log-modal__body h3 { margin:18px 0 8px; font-size:14px; color:#334155; }
     .error-log-modal__message { margin:0; color:#334155; white-space:pre-wrap; }
     .error-log-modal__context { max-height:330px; margin:0; padding:14px; overflow:auto; border-radius:8px; background:#0f172a; color:#e2e8f0; font-size:12px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+    .error-log-confirm-dialog { max-width:520px; }
+    .error-log-confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:22px; }
     @media (max-width:600px) { .error-log-modal__meta { grid-template-columns:1fr; } .error-log-modal__dialog { max-height:94vh; } .error-log-modal__body { max-height:calc(94vh - 70px); } }
 </style>
