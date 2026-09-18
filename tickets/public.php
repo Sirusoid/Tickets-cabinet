@@ -136,6 +136,10 @@ require_once __DIR__ . '/../includes/header.php';
     .ticket-pdf-button { font-weight:700; border:1px solid #2563eb; color:#1d4ed8; background:#eff6ff; }
     .ticket-pdf-button:hover { background:#dbeafe; border-color:#1d4ed8; }
     .ticket-action-label { display:inline-flex; flex-direction:column; line-height:1.15; text-align:center; }
+    .order-refunded-card { max-width:620px; margin:24px auto; padding:42px 28px; text-align:center; }
+    .order-refunded-icon { width:68px; height:68px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:18px; border-radius:50%; background:#dcfce7; color:#15803d; font-size:34px; font-weight:700; }
+    .order-refunded-text { max-width:480px; margin:0 auto; color:#64748b; line-height:1.6; }
+    .order-refunded-details { margin:24px auto 0; padding:14px 18px; max-width:420px; border-radius:10px; background:#f8fafc; color:#475569; }
     @media (max-width: 700px) {
         .ticket-card-layout { grid-template-columns:minmax(0,1fr) 116px; }
         .ticket-card-actions { grid-column:1 / -1; justify-content:flex-start; }
@@ -166,6 +170,26 @@ require_once __DIR__ . '/../includes/header.php';
             </p>
             <p style="color:#6b7280;" id="publicPendingHint">Страница обновится автоматически. / Бет автоматты түрде жаңартылады.</p>
             <a href="<?= h($publicSiteUrl) ?>/widget-test" class="btn btn-primary mt-3">Вернуться к покупке / Сатып алуға оралу</a>
+        </div>
+    <?php elseif ($refundInfo['state'] === 'refunded'): ?>
+        <div class="card order-refunded-card">
+            <div class="order-refunded-icon" aria-hidden="true">✓</div>
+            <h2 class="order-bilingual order-bilingual--block" style="margin:0 0 14px;">
+                <span>Возврат по заказу выполнен</span>
+                <span class="order-bilingual__kz">Тапсырыс бойынша қайтарым рәсімделді</span>
+            </h2>
+            <p class="order-refunded-text">
+                Спасибо, что воспользовались услугами театра «Жас сахна».
+                Оплата по этому заказу возвращена, а билеты аннулированы и больше недействительны.
+            </p>
+            <p class="order-refunded-text" style="margin-top:8px;">
+                «Жас сахна» театрының қызметін пайдаланғаныңызға рақмет.
+                Бұл тапсырыс бойынша төлем қайтарылды, билеттер жарамсыз.
+            </p>
+            <div class="order-refunded-details">
+                Заказ / Тапсырыс: <strong><?= h($order) ?></strong>
+            </div>
+            <a href="<?= h($returnUrl) ?>" class="btn btn-primary mt-4">Вернуться на сайт / Сайтқа оралу</a>
         </div>
     <?php else: ?>
         <div class="card" style="padding: 28px; margin-bottom: 20px;">
