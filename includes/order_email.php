@@ -247,7 +247,7 @@ if (!function_exists('order_email_build_order_message')) {
         $safeOrderUrl = order_email_escape($orderUrl);
         $safeFromName = order_email_escape($settings['from_name']);
         $logoUrl = $baseUrl . '/uploads/images/logo.svg';
-        $logoHtml = '<img src="' . order_email_escape($logoUrl) . '" alt="Жас сахна" width="190" style="display:block;max-width:190px;max-height:70px;width:auto;height:auto;margin:0 0 12px;border:0;outline:none;text-decoration:none">';
+        $logoHtml = '<img src="' . order_email_escape($logoUrl) . '" alt="Жас сахна" width="64" height="64" style="display:block;width:64px;height:64px;object-fit:contain;border:0;outline:none;text-decoration:none">';
 
         $ticketRows = '';
         foreach ($orderData['tickets'] as $index => $ticket) {
@@ -275,11 +275,13 @@ if (!function_exists('order_email_build_order_message')) {
         $html = '<!doctype html><html lang="ru"><head><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"></head><body bgcolor="#ffffff" style="margin:0;background:#ffffff!important;font-family:Arial,sans-serif;color:#172b4d;line-height:1.5">'
             . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;background:#ffffff!important"><tr><td align="center" bgcolor="#ffffff" style="padding:24px 12px;background:#ffffff!important">'
             . '<table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:680px;background:#ffffff!important;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">'
-            . '<tr><td bgcolor="#ffffff" style="padding:24px 28px;background:#ffffff!important;color:#111827;border-bottom:1px solid #e5e7eb">'
-            . $logoHtml
-            . '<h1 style="margin:8px 0 0;font-size:25px;line-height:1.2;color:#111827">Спасибо за покупку!</h1>'
+            . '<tr><td bgcolor="#ffffff" style="padding:18px 26px;background:#ffffff!important;color:#111827;border-bottom:1px solid #e5e7eb">'
+            . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr>'
+            . '<td valign="middle" style="padding:0 16px 0 0;width:64px">' . $logoHtml . '</td>'
+            . '<td valign="middle" style="padding:0"><h1 style="margin:0;font-size:24px;line-height:1.2;color:#111827;font-weight:700">Спасибо за покупку!</h1></td>'
+            . '</tr></table>'
             . '</td></tr><tr><td bgcolor="#ffffff" style="padding:28px;background:#ffffff!important;color:#172b4d">'
-            . '<p style="margin:0 0 14px">Благодарим за приобретение билетов.</p>'
+            . '<p style="margin:0 0 14px">Желаем Вам приятного отдыха.</p>'
             . '<p style="margin:0 0 4px"><strong>' . $safeEvent . '</strong></p>'
             . '<p style="margin:0;color:#475569">Дата: ' . $safeDate . ' · Время: ' . $safeTime
             . ($safeHall !== '' ? ' · Зал: ' . $safeHall : '') . '</p>'
