@@ -291,11 +291,16 @@ require __DIR__ . '/../includes/panel.php';
                 ['order', 'Заказ', 'Номер заказа', 'order'],
                 ['response_code', 'Код ответа', 'Код ответа банка', 'response_code'],
             ];
+            $suggestValues = [
+                'source' => $source,
+                'order' => $order,
+                'response_code' => $responseCode,
+            ];
             foreach ($suggestFields as [$name, $label, $placeholder, $suggest]): ?>
                 <div class="error-log-filter-field">
                     <label for="error-<?= h($name) ?>"><?= h($label) ?></label>
                     <div style="position:relative;">
-                        <input id="error-<?= h($name) ?>" type="search" name="<?= h($name) ?>" class="form-control" value="<?= h($$name) ?>" placeholder="<?= h($placeholder) ?>" data-error-suggest="<?= h($suggest) ?>" autocomplete="off">
+                        <input id="error-<?= h($name) ?>" type="search" name="<?= h($name) ?>" class="form-control" value="<?= h($suggestValues[$name] ?? '') ?>" placeholder="<?= h($placeholder) ?>" data-error-suggest="<?= h($suggest) ?>" autocomplete="off">
                         <div class="error-log-typeahead" data-error-suggestions="<?= h($suggest) ?>"></div>
                     </div>
                 </div>
