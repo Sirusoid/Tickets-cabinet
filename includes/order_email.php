@@ -140,34 +140,6 @@ if (!function_exists('order_email_prepare_ticket_assets')) {
     }
 }
 
-if (!function_exists('order_email_logo_asset')) {
-    function order_email_logo_asset(): ?array
-    {
-        $candidates = [
-            dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.png',
-            dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.jpg',
-            dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.png',
-        ];
-
-        foreach ($candidates as $path) {
-            if (!is_file($path) || !is_readable($path) || filesize($path) <= 0) {
-                continue;
-            }
-            $extension = strtolower((string)pathinfo($path, PATHINFO_EXTENSION));
-            $mime = $extension === 'jpg' || $extension === 'jpeg' ? 'image/jpeg' : 'image/png';
-            return [
-                'path' => $path,
-                'name' => 'zhassahna-logo.' . ($extension !== '' ? $extension : 'png'),
-                'cid' => 'zhassahna-logo',
-                'mime' => $mime,
-                'inline' => true,
-            ];
-        }
-
-        return null;
-    }
-}
-
 if (!function_exists('order_email_send_message')) {
     function order_email_send_message(
         string $email,
@@ -267,10 +239,6 @@ if (!function_exists('order_email_build_order_message')) {
         $orderUrl = $baseUrl . '/tickets/public.php?order=' . rawurlencode($order) . '&token=' . rawurlencode($orderToken);
         $datetime = order_email_format_datetime($orderData['schedule_start'] ?? null);
         $assets = order_email_prepare_ticket_assets($orderData['tickets'], $baseUrl);
-        $logoAsset = order_email_logo_asset();
-        if ($logoAsset !== null) {
-            $assets['attachments'][] = $logoAsset;
-        }
         $safeOrder = order_email_escape($order);
         $safeEvent = order_email_escape($orderData['event_title'] ?: 'Спектакль');
         $safeDate = order_email_escape($datetime['date'] ?: 'Дата уточняется');
@@ -278,9 +246,8 @@ if (!function_exists('order_email_build_order_message')) {
         $safeHall = order_email_escape($orderData['hall_name'] ?: '');
         $safeOrderUrl = order_email_escape($orderUrl);
         $safeFromName = order_email_escape($settings['from_name']);
-        $logoHtml = $logoAsset !== null
-            ? '<img src="cid:' . order_email_escape($logoAsset['cid']) . '" alt="Жас сахна" style="display:block;max-width:190px;max-height:70px;width:auto;height:auto;margin:0 0 12px">'
-            : '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.78">Жас сахна</div>';
+        $logoUrl = $baseUrl . '/uploads/images/logo.svg';
+        $logoHtml = '<img src="' . order_email_escape($logoUrl) . '" alt="Жас сахна" width="190" style="display:block;max-width:190px;max-height:70px;width:auto;height:auto;margin:0 0 12px;border:0;outline:none;text-decoration:none">';
 
         $ticketRows = '';
         foreach ($orderData['tickets'] as $index => $ticket) {
@@ -305,12 +272,13 @@ if (!function_exists('order_email_build_order_message')) {
         $feedbackEmail = filter_var($settings['feedback_email'], FILTER_VALIDATE_EMAIL)
             ? '<a href="mailto:' . order_email_escape($settings['feedback_email']) . '" style="color:#1d4ed8">' . order_email_escape($settings['feedback_email']) . '</a>'
             : 'ответьте на это письмо';
-        $html = '<!doctype html><html lang="ru"><body style="margin:0;background:#f3f6fa;font-family:Arial,sans-serif;color:#172b4d;line-height:1.5">'
-            . '<div style="max-width:680px;margin:24px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(23,43,77,.10)">'
-            . '<div style="padding:24px 28px;background:#173b67;color:#fff">'
+        $html = '<!doctype html><html lang="ru"><head><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"></head><body bgcolor="#ffffff" style="margin:0;background:#ffffff!important;font-family:Arial,sans-serif;color:#172b4d;line-height:1.5">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;background:#ffffff!important"><tr><td align="center" bgcolor="#ffffff" style="padding:24px 12px;background:#ffffff!important">'
+            . '<table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:680px;background:#ffffff!important;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">'
+            . '<tr><td bgcolor="#ffffff" style="padding:24px 28px;background:#ffffff!important;color:#111827;border-bottom:1px solid #e5e7eb">'
             . $logoHtml
-            . '<h1 style="margin:8px 0 0;font-size:25px;line-height:1.2">Спасибо за покупку!</h1>'
-            . '</div><div style="padding:28px">'
+            . '<h1 style="margin:8px 0 0;font-size:25px;line-height:1.2;color:#111827">Спасибо за покупку!</h1>'
+            . '</td></tr><tr><td bgcolor="#ffffff" style="padding:28px;background:#ffffff!important;color:#172b4d">'
             . '<p style="margin:0 0 14px">Благодарим за приобретение билетов.</p>'
             . '<p style="margin:0 0 4px"><strong>' . $safeEvent . '</strong></p>'
             . '<p style="margin:0;color:#475569">Дата: ' . $safeDate . ' · Время: ' . $safeTime
@@ -325,7 +293,7 @@ if (!function_exists('order_email_build_order_message')) {
             . '<p style="margin:20px 0 0;color:#475569">PDF-файлы билетов также прикреплены к этому письму. На странице заказа их можно скачать повторно.</p>'
             . '<p style="margin:18px 0 0"><a href="' . $safeOrderUrl . '" style="color:#b42318;font-weight:700">Оформить возврат</a> (если возврат доступен по правилам и срок ещё не истёк).</p>'
             . '<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">С уважением,<br>' . $safeFromName . '</p>'
-            . '</div></div></body></html>';
+            . '</td></tr></table></td></tr></table></body></html>';
 
         $sent = order_email_send_message((string)$email, $subject, $html, $settings, $assets['attachments']);
         return [
