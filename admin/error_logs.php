@@ -16,7 +16,8 @@ $order = trim((string)($_GET['order'] ?? ''));
 $responseCode = trim((string)($_GET['response_code'] ?? ''));
 $search = trim((string)($_GET['search'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 50;
+$requestedPerPage = (int)($_GET['per_page'] ?? 50);
+$perPage = in_array($requestedPerPage, [50, 100, 250, 500], true) ? $requestedPerPage : 50;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
@@ -65,6 +66,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'mode' => 'retention',
                         'count' => (int)$deleted,
                         'retention_days' => $retentionDays,
+                    ]);
+                }
+            } elseif (in_array($bulkAction, ['purge_1_day', 'purge_3_days', 'purge_7_days'], true)) {
+                $daysByAction = [
+                    'purge_1_day' => 1,
+                    'purge_3_days' => 3,
+                    'purge_7_days' => 7,
+                ];
+                $days = $daysByAction[$bulkAction];
+                $cutoff = (new DateTimeImmutable('now'))->modify('-' . $days . ' days')->format('Y-m-d H:i:s');
+                $stmt = $pdo->prepare('DELETE FROM error_logs WHERE created_at < :cutoff');
+                $stmt->execute([':cutoff' => $cutoff]);
+                $deleted = $stmt->rowCount();
+                $actionMessage = 'Удалено записей старше ' . $days . ' дн.: ' . (int)$deleted . '.';
+                if (function_exists('audit_log_event')) {
+                    audit_log_event($pdo, 'error_logs.deleted', 'error_logs', null, null, [], [
+                        'mode' => 'period',
+                        'count' => (int)$deleted,
+                        'days' => $days,
                     ]);
                 }
             }
@@ -179,6 +199,7 @@ $queryParams = [
     'order' => $order,
     'response_code' => $responseCode,
     'search' => $search,
+    'per_page' => $perPage,
 ];
 
 $levelLabels = [
@@ -237,6 +258,14 @@ require __DIR__ . '/../includes/panel.php';
                 <input id="error-date-to" type="date" name="date_to" class="form-control" value="<?= h($dateTo) ?>">
             </div>
             <div>
+                <label for="error-per-page">Ошибок на странице</label>
+                <select id="error-per-page" name="per_page" class="form-control">
+                    <?php foreach ([50, 100, 250, 500] as $pageSize): ?>
+                        <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
                 <label for="error-level">Уровень</label>
                 <div class="error-level-picker">
                     <select id="error-level" name="level" class="form-control">
@@ -279,6 +308,9 @@ require __DIR__ . '/../includes/panel.php';
                 <a class="btn btn-ghost" href="/admin/error_logs.php">Сбросить</a>
                 <button type="submit" form="errorLogsBulkForm" name="action" value="delete_selected" class="btn btn-danger" onclick="return confirm('Удалить выбранные записи логов?');">Удалить выбранные</button>
                 <button type="submit" form="errorLogsBulkForm" name="action" value="purge_retention" class="btn btn-secondary" onclick="return confirm('Удалить все логи старше установленного срока хранения?');">Очистить старше <?= (int)$retentionDays ?> дн.</button>
+                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_1_day" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 1 суток?');">Удалить за сутки</button>
+                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_3_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 3 дней?');">Удалить за 3 дня</button>
+                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_7_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше недели?');">Удалить за неделю</button>
             </div>
         </form>
     </div>
@@ -459,7 +491,7 @@ require __DIR__ . '/../includes/panel.php';
     });
     document.addEventListener('change', function (event) {
         if (event.target.id === 'error-log-select-all') {
-            Array.prototype.forEach.call(form.querySelectorAll('.error-log-select'), function (checkbox) {
+            Array.prototype.forEach.call(document.querySelectorAll('#errorLogsBulkForm .error-log-select'), function (checkbox) {
                 checkbox.checked = event.target.checked;
             });
         }
