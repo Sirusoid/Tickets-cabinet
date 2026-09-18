@@ -92,6 +92,13 @@ try {
     exit;
 }
 
+// 6.1) Глобально фиксируем PHP-ошибки после появления PDO.
+// display_errors уже выключен в production, поэтому пользователю детали не показываются.
+if (function_exists('system_register_error_handlers')) {
+    system_register_error_handlers($pdo);
+    error_reporting(E_ALL);
+}
+
 // 7) Подключаем PDF-хелперы, если они есть
 if (file_exists(__DIR__ . '/includes/pdf_helpers.php')) {
     require_once __DIR__ . '/includes/pdf_helpers.php';
