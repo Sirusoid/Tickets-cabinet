@@ -67,6 +67,7 @@ try {
         ORDER BY s.start_time ASC");
 } catch (Throwable $e) {
     $dashboardError = 'Не удалось загрузить сводку за сегодня.';
+    error_log('[DASHBOARD] Ошибка загрузки сводки: ' . $e->getMessage());
 }
 
 require __DIR__ . '/includes/header.php';
