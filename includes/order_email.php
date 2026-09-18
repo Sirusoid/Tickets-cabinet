@@ -140,6 +140,34 @@ if (!function_exists('order_email_prepare_ticket_assets')) {
     }
 }
 
+if (!function_exists('order_email_logo_asset')) {
+    function order_email_logo_asset(): ?array
+    {
+        $candidates = [
+            dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.png',
+            dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.jpg',
+            dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.png',
+        ];
+
+        foreach ($candidates as $path) {
+            if (!is_file($path) || !is_readable($path) || filesize($path) <= 0) {
+                continue;
+            }
+            $extension = strtolower((string)pathinfo($path, PATHINFO_EXTENSION));
+            $mime = $extension === 'jpg' || $extension === 'jpeg' ? 'image/jpeg' : 'image/png';
+            return [
+                'path' => $path,
+                'name' => 'zhassahna-logo.' . ($extension !== '' ? $extension : 'png'),
+                'cid' => 'zhassahna-logo',
+                'mime' => $mime,
+                'inline' => true,
+            ];
+        }
+
+        return null;
+    }
+}
+
 if (!function_exists('order_email_send_message')) {
     function order_email_send_message(
         string $email,
@@ -195,9 +223,12 @@ if (!function_exists('order_email_send_message')) {
                     continue;
                 }
                 $filename = preg_replace('/[^A-Za-z0-9_.-]+/', '_', (string)($attachment['name'] ?? basename($path)));
+                $isInline = !empty($attachment['inline']) && !empty($attachment['cid']);
+                $mime = (string)($attachment['mime'] ?? 'application/pdf');
                 $body .= '--' . $boundary . "\r\n"
-                    . 'Content-Type: application/pdf; name="' . $filename . '"' . "\r\n"
-                    . 'Content-Disposition: attachment; filename="' . $filename . '"' . "\r\n"
+                    . 'Content-Type: ' . $mime . '; name="' . $filename . '"' . "\r\n"
+                    . ($isInline ? 'Content-ID: <' . preg_replace('/[^A-Za-z0-9_.-]/', '', (string)$attachment['cid']) . '>\r\n' : '')
+                    . 'Content-Disposition: ' . ($isInline ? 'inline' : 'attachment') . '; filename="' . $filename . '"' . "\r\n"
                     . "Content-Transfer-Encoding: base64\r\n\r\n"
                     . chunk_split(base64_encode($content)) . "\r\n";
             }
@@ -236,6 +267,10 @@ if (!function_exists('order_email_build_order_message')) {
         $orderUrl = $baseUrl . '/tickets/public.php?order=' . rawurlencode($order) . '&token=' . rawurlencode($orderToken);
         $datetime = order_email_format_datetime($orderData['schedule_start'] ?? null);
         $assets = order_email_prepare_ticket_assets($orderData['tickets'], $baseUrl);
+        $logoAsset = order_email_logo_asset();
+        if ($logoAsset !== null) {
+            $assets['attachments'][] = $logoAsset;
+        }
         $safeOrder = order_email_escape($order);
         $safeEvent = order_email_escape($orderData['event_title'] ?: 'Спектакль');
         $safeDate = order_email_escape($datetime['date'] ?: 'Дата уточняется');
@@ -243,6 +278,9 @@ if (!function_exists('order_email_build_order_message')) {
         $safeHall = order_email_escape($orderData['hall_name'] ?: '');
         $safeOrderUrl = order_email_escape($orderUrl);
         $safeFromName = order_email_escape($settings['from_name']);
+        $logoHtml = $logoAsset !== null
+            ? '<img src="cid:' . order_email_escape($logoAsset['cid']) . '" alt="Жас сахна" style="display:block;max-width:190px;max-height:70px;width:auto;height:auto;margin:0 0 12px">'
+            : '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.78">Жас сахна</div>';
 
         $ticketRows = '';
         foreach ($orderData['tickets'] as $index => $ticket) {
@@ -270,7 +308,7 @@ if (!function_exists('order_email_build_order_message')) {
         $html = '<!doctype html><html lang="ru"><body style="margin:0;background:#f3f6fa;font-family:Arial,sans-serif;color:#172b4d;line-height:1.5">'
             . '<div style="max-width:680px;margin:24px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(23,43,77,.10)">'
             . '<div style="padding:24px 28px;background:#173b67;color:#fff">'
-            . '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.78">Жас сахна</div>'
+            . $logoHtml
             . '<h1 style="margin:8px 0 0;font-size:25px;line-height:1.2">Спасибо за покупку!</h1>'
             . '</div><div style="padding:28px">'
             . '<p style="margin:0 0 14px">Благодарим за приобретение билетов.</p>'
@@ -293,7 +331,9 @@ if (!function_exists('order_email_build_order_message')) {
         return [
             'success' => $sent,
             'message' => $sent ? 'Письмо передано почтовой службе хостинга. Доставка может занять несколько минут; проверьте также папку «Спам».' : 'PHP mail() не принял письмо. Проверьте настройки хостинга.',
-            'attachments' => count($assets['attachments']),
+            'attachments' => count(array_filter($assets['attachments'], static function (array $attachment): bool {
+                return empty($attachment['inline']);
+            })),
         ];
     }
 }
