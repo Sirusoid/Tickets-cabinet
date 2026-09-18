@@ -42,12 +42,10 @@ if (!$error && $session && $pdo instanceof PDO) {
             $placeholders = implode(',', array_fill(0, count($uids), '?'));
             $stmt = $pdo->prepare("                        SELECT t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.customer_segment, t.channel,
                         t.status, t.payment_status, t.refund_status, t.refund_at, t.purchased_at,
-                        COALESCE(c.full_name, '') AS customer_name,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS schedule_start,
                         h.name AS hall_name
                     FROM tickets t
-                    LEFT JOIN customers c ON c.id = t.customer_id
                     LEFT JOIN events e ON e.id = t.event_id
                     LEFT JOIN schedules s ON s.id = t.schedule_id
                     LEFT JOIN halls h ON h.id = t.hall_id
@@ -102,10 +100,6 @@ $formatPublicTime = static function ($datetime) {
     }
 };
 
-$formatPublicPhone = static function ($phone) {
-    return format_customer_phone($phone);
-};
-
 $formatPublicSeat = static function ($identifier) {
     $parts = preg_split('/\s*[-:\/]\s*/', trim((string)$identifier), 2);
     if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
@@ -117,7 +111,6 @@ $formatPublicSeat = static function ($identifier) {
 $publicEventTitle = mb_strtoupper(trim((string)($session['event_title'] ?? 'Спектакль')), 'UTF-8');
 $publicDate = $formatPublicDate($session['schedule_start'] ?? null);
 $publicTime = $formatPublicTime($session['schedule_start'] ?? null);
-$publicPhone = $formatPublicPhone($session['customer_phone'] ?? '');
 $publicErrorText = $error;
 if ($error === 'Ссылка недействительна или устарела.') $publicErrorText = 'Ссылка недействительна или устарела. / Сілтеме жарамсыз немесе мерзімі өткен.';
 if ($error === 'Ошибка подключения к базе данных.') $publicErrorText = 'Ошибка подключения к базе данных. / Дерекқорға қосылу қатесі.';
@@ -196,15 +189,6 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php if (!empty($session['hall_name'])): ?>
                     <div style="color:#4b5563; margin-top:4px;"><?= h($session['hall_name']) ?></div>
                 <?php endif; ?>
-                <?php if (!empty($session['customer_name'])): ?>
-                    <div style="color:#4b5563; margin-top:4px;">Клиент / Клиент: <?= h($session['customer_name']) ?></div>
-                <?php endif; ?>
-                <?php if ($publicPhone !== ''): ?>
-                    <div style="color:#4b5563;">Телефон / Телефон: <?= h($publicPhone) ?></div>
-                <?php endif; ?>
-                <?php if (!empty($session['customer_email'])): ?>
-                    <div style="color:#4b5563;">Email / E-mail: <?= h($session['customer_email']) ?></div>
-                <?php endif; ?>
             </div>
 
             <div style="display:flex; flex-wrap:wrap; gap: 10px; margin-bottom: 20px;">
@@ -253,9 +237,6 @@ require_once __DIR__ . '/../includes/header.php';
                                     <div style="color:#4b5563;">Цена / Бағасы: <?= number_format((float)$ticket['final_price'], 2, '.', ' ') ?> ₸</div>
                                     <?php if (($ticket['refund_status'] ?? 'none') === 'refunded'): ?>
                                         <div style="color:#b91c1c; font-weight:600;">Билет возвращён / Билет қайтарылды</div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($ticket['customer_name'])): ?>
-                                        <div style="color:#4b5563;">Клиент / Клиент: <?= h($ticket['customer_name']) ?></div>
                                     <?php endif; ?>
                                 </div>
                                 <div style="display:flex; justify-content:center; align-items:center; min-height:130px;">
