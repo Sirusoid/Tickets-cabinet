@@ -1,7 +1,7 @@
 <?php
 function h($value)
 {
-    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 if (!function_exists('app_setting_value')) {
