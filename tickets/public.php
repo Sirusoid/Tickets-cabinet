@@ -74,6 +74,7 @@ if (!preg_match('/^https?:\/\//i', $returnUrlTemplate)) {
     $returnUrlTemplate = rtrim($publicSiteUrl, '/') . '/?order={order}';
 }
 $returnUrl = str_replace('{order}', rawurlencode($order), $returnUrlTemplate);
+$orderPageUrl = '/tickets/public.php?order=' . rawurlencode($order) . '&token=' . rawurlencode($token);
 $refundInfo = ['state' => 'unavailable', 'message' => '', 'deadline' => null];
 if (!$error && $session && $pdo instanceof PDO && (string)$session['status'] === 'paid') {
     $refundInfo = bcc_self_refund_status($pdo, $session, $tickets);
@@ -247,6 +248,9 @@ require_once __DIR__ . '/../includes/header.php';
                         if ($uid === '') continue;
                         $pdfToken = ticket_public_token('pdf:' . $uid);
                         $pdfUrl = '/tickets/generate.php?uid=' . rawurlencode($uid) . '&t=' . rawurlencode($pdfToken);
+                        $isRefundedTicket = (string)($ticket['refund_status'] ?? 'none') === 'refunded';
+                        $ticketOpenUrl = $isRefundedTicket ? $orderPageUrl : $pdfUrl;
+                        $ticketDownloadUrl = $isRefundedTicket ? $orderPageUrl : $pdfUrl . '&download=1';
                         $publicSeat = $formatPublicSeat($ticket['seat_identifier'] ?? '');
                     ?>
                         <?php $qrDataUri = function_exists('ticket_qr_png_data_uri') ? ticket_qr_png_data_uri($uid, 5, 2) : null; ?>
@@ -269,8 +273,8 @@ require_once __DIR__ . '/../includes/header.php';
                                     <?php endif; ?>
                                 </div>
                                 <div class="ticket-card-actions">
-                                    <a href="<?= h($pdfUrl) ?>" class="btn btn-ghost btn-sm ticket-pdf-button"><span class="ticket-action-label"><span>Открыть PDF</span><span>PDF ашу</span></span></a>
-                                    <a href="<?= h($pdfUrl . '&download=1') ?>" class="btn btn-secondary btn-sm"><span class="ticket-action-label"><span>Скачать</span><span>Жүктеу</span></span></a>
+                                    <a href="<?= h($ticketOpenUrl) ?>" class="btn btn-ghost btn-sm ticket-pdf-button"><span class="ticket-action-label"><span>Открыть PDF</span><span>PDF ашу</span></span></a>
+                                    <a href="<?= h($ticketDownloadUrl) ?>" class="btn btn-secondary btn-sm"><span class="ticket-action-label"><span>Скачать</span><span>Жүктеу</span></span></a>
                                 </div>
                             </div>
                         </div>
