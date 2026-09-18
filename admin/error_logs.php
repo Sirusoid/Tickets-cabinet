@@ -213,32 +213,34 @@ require __DIR__ . '/../includes/panel.php';
                         <th>Уровень</th>
                         <th>Источник</th>
                         <th>Сообщение</th>
+                        <th>Краткое описание</th>
                         <th>Заказ</th>
                         <th>Код ответа</th>
-                        <th>Подробности</th>
+                        <th>Детали</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="7" class="audit-empty">Ошибок за выбранный период нет.</td></tr>
+                    <tr><td colspan="8" class="audit-empty">Ошибок за выбранный период нет.</td></tr>
                 <?php else: foreach ($rows as $row):
                     $rowLevel = (string)($row['level'] ?? 'error');
                     $context = $formatContext($row['context'] ?? '');
+                    $description = system_error_short_description($row);
                 ?>
                     <tr>
                         <td><?= h(date('d.m.Y H:i:s', strtotime((string)$row['created_at']))) ?></td>
                         <td><span class="badge" style="background:<?= $rowLevel === 'critical' ? '#991b1b' : ($rowLevel === 'warning' ? '#b45309' : '#b91c1c') ?>; color:#fff;"><?= h($levelLabels[$rowLevel] ?? $rowLevel) ?></span></td>
                         <td><?= h($row['source']) ?></td>
-                        <td><?= h($row['message']) ?></td>
+                        <td>
+                            <button type="button" class="error-log-open" data-error-level="<?= h($levelLabels[$rowLevel] ?? $rowLevel) ?>" data-error-source="<?= h($row['source']) ?>" data-error-message="<?= h($row['message']) ?>" data-error-description="<?= h($description) ?>" data-error-order="<?= h($row['order_number'] ?: '—') ?>" data-error-code="<?= h($row['response_code'] ?: '—') ?>" data-error-context="<?= h($context) ?>">
+                                <?= h($row['message']) ?>
+                            </button>
+                        </td>
+                        <td><?= h($description) ?></td>
                         <td><?= h($row['order_number'] ?: '—') ?></td>
                         <td><?= h($row['response_code'] ?: '—') ?></td>
                         <td>
-                            <?php if ($context !== ''): ?>
-                                <details>
-                                    <summary>Открыть</summary>
-                                    <pre style="max-width:520px; max-height:260px; overflow:auto; white-space:pre-wrap;"><?= h($context) ?></pre>
-                                </details>
-                            <?php else: ?>—<?php endif; ?>
+                            <button type="button" class="btn btn-ghost btn-sm error-log-open" data-error-level="<?= h($levelLabels[$rowLevel] ?? $rowLevel) ?>" data-error-source="<?= h($row['source']) ?>" data-error-message="<?= h($row['message']) ?>" data-error-description="<?= h($description) ?>" data-error-order="<?= h($row['order_number'] ?: '—') ?>" data-error-code="<?= h($row['response_code'] ?: '—') ?>" data-error-context="<?= h($context) ?>">Открыть</button>
                         </td>
                     </tr>
                 <?php endforeach; endif; ?>
@@ -261,10 +263,69 @@ require __DIR__ . '/../includes/panel.php';
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
 
+<div id="errorLogModal" class="error-log-modal" aria-hidden="true">
+    <div class="error-log-modal__backdrop" data-error-modal-close></div>
+    <section class="error-log-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="errorLogModalTitle">
+        <div class="error-log-modal__header">
+            <h2 id="errorLogModalTitle">Детали ошибки</h2>
+            <button type="button" class="btn btn-ghost btn-sm" data-error-modal-close aria-label="Закрыть">Закрыть</button>
+        </div>
+        <div class="error-log-modal__body">
+            <div class="error-log-modal__summary" id="errorLogModalDescription"></div>
+            <dl class="error-log-modal__meta">
+                <div><dt>Уровень</dt><dd id="errorLogModalLevel"></dd></div>
+                <div><dt>Источник</dt><dd id="errorLogModalSource"></dd></div>
+                <div><dt>Заказ</dt><dd id="errorLogModalOrder"></dd></div>
+                <div><dt>Код ответа</dt><dd id="errorLogModalCode"></dd></div>
+            </dl>
+            <h3>Техническое сообщение</h3>
+            <p id="errorLogModalMessage" class="error-log-modal__message"></p>
+            <h3>Полный контекст и комментарии сервера</h3>
+            <pre id="errorLogModalContext" class="error-log-modal__context"></pre>
+        </div>
+    </section>
+</div>
+
 <script>
 (function () {
     var form = document.getElementById('errorLogsFilters');
     if (!form) return;
+
+    var modal = document.getElementById('errorLogModal');
+    function closeErrorModal() {
+        if (!modal) return;
+        modal.classList.remove('is-visible');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    function openErrorModal(button) {
+        if (!modal) return;
+        var fields = {
+            errorLogModalDescription: button.dataset.errorDescription || 'Описание отсутствует.',
+            errorLogModalLevel: button.dataset.errorLevel || '—',
+            errorLogModalSource: button.dataset.errorSource || '—',
+            errorLogModalOrder: button.dataset.errorOrder || '—',
+            errorLogModalCode: button.dataset.errorCode || '—',
+            errorLogModalMessage: button.dataset.errorMessage || '—',
+            errorLogModalContext: button.dataset.errorContext || 'Контекст отсутствует.'
+        };
+        Object.keys(fields).forEach(function (id) {
+            var element = document.getElementById(id);
+            if (element) element.textContent = fields[id];
+        });
+        modal.classList.add('is-visible');
+        modal.setAttribute('aria-hidden', 'false');
+    }
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('.error-log-open');
+        if (button) {
+            openErrorModal(button);
+            return;
+        }
+        if (event.target.closest && event.target.closest('[data-error-modal-close]')) closeErrorModal();
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeErrorModal();
+    });
 
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, function (char) {
@@ -392,4 +453,21 @@ require __DIR__ . '/../includes/panel.php';
     .error-log-typeahead__item { padding:8px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; }
     .error-log-typeahead__item:hover { background:#f8fafc; }
     .error-logs-page .audit-table th, .error-logs-page .audit-table td { vertical-align:top; }
+    .error-log-open { max-width:360px; padding:0; border:0; background:transparent; color:#1d4ed8; text-align:left; cursor:pointer; font:inherit; text-decoration:underline; }
+    .error-log-modal { position:fixed; inset:0; z-index:2400; display:none; align-items:center; justify-content:center; padding:20px; }
+    .error-log-modal.is-visible { display:flex; }
+    .error-log-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,.52); }
+    .error-log-modal__dialog { position:relative; z-index:1; width:min(820px, 100%); max-height:90vh; overflow:hidden; border-radius:14px; background:#fff; box-shadow:0 20px 70px rgba(15,23,42,.28); }
+    .error-log-modal__header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; border-bottom:1px solid #e5e7eb; }
+    .error-log-modal__header h2 { margin:0; font-size:20px; }
+    .error-log-modal__body { max-height:calc(90vh - 70px); overflow:auto; padding:20px; }
+    .error-log-modal__summary { padding:14px 16px; border-left:4px solid #b91c1c; border-radius:6px; background:#fef2f2; color:#7f1d1d; font-weight:600; line-height:1.5; }
+    .error-log-modal__meta { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px 18px; margin:18px 0; }
+    .error-log-modal__meta div { padding:10px 12px; border-radius:8px; background:#f8fafc; }
+    .error-log-modal__meta dt { color:#64748b; font-size:12px; }
+    .error-log-modal__meta dd { margin:3px 0 0; color:#172b4d; font-weight:600; word-break:break-word; }
+    .error-log-modal__body h3 { margin:18px 0 8px; font-size:14px; color:#334155; }
+    .error-log-modal__message { margin:0; color:#334155; white-space:pre-wrap; }
+    .error-log-modal__context { max-height:330px; margin:0; padding:14px; overflow:auto; border-radius:8px; background:#0f172a; color:#e2e8f0; font-size:12px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+    @media (max-width:600px) { .error-log-modal__meta { grid-template-columns:1fr; } .error-log-modal__dialog { max-height:94vh; } .error-log-modal__body { max-height:calc(94vh - 70px); } }
 </style>
