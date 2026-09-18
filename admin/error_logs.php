@@ -304,12 +304,12 @@ require __DIR__ . '/../includes/panel.php';
                 <label for="error-search">Поиск в сообщении и деталях</label>
                 <input id="error-search" type="search" name="search" class="form-control" value="<?= h($search) ?>" placeholder="Текст ошибки, билет, детали">
             </div>
-            <div class="audit-filters__actions">
+            <div class="audit-filters__actions error-log-actions">
                 <a class="btn btn-ghost" href="/admin/error_logs.php">Сбросить</a>
                 <button type="submit" form="errorLogsBulkForm" name="action" value="delete_selected" class="btn btn-danger" onclick="return confirm('Удалить выбранные записи логов?');">Удалить выбранные</button>
                 <button type="submit" form="errorLogsBulkForm" name="action" value="purge_retention" class="btn btn-secondary" onclick="return confirm('Удалить все логи старше установленного срока хранения?');">Очистить старше <?= (int)$retentionDays ?> дн.</button>
                 <button type="submit" form="errorLogsBulkForm" name="action" value="purge_1_day" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 1 суток?');">Удалить за сутки</button>
-                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_3_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 3 дней?');">Удалить за 3 дня</button>
+                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_3_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше 3 суток?');">Удалить за 3 суток</button>
                 <button type="submit" form="errorLogsBulkForm" name="action" value="purge_7_days" class="btn btn-secondary" onclick="return confirm('Удалить логи старше недели?');">Удалить за неделю</button>
             </div>
         </form>
@@ -643,6 +643,7 @@ require __DIR__ . '/../includes/panel.php';
     .error-logs-page .audit-table th, .error-logs-page .audit-table td { vertical-align:top; }
     .error-log-presets { grid-column:1 / -1; display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
     .error-log-presets__label { color:#52647e; font-size:12px; font-weight:600; margin-right:2px; }
+    .error-log-actions { grid-column:1 / -1; flex-wrap:wrap; }
     .error-log-preset.is-active { background:#e0ecff; border-color:#2563eb; color:#1d4ed8; }
     .error-level-picker { display:flex; align-items:center; gap:8px; }
     .error-level-picker select { min-width:0; flex:1; }
