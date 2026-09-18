@@ -70,8 +70,6 @@ if (empty($data)) {
     }
 }
 
-write_log('Incoming: ' . json_encode($data, JSON_UNESCAPED_UNICODE));
-
 $parsed = bcc_parse_response($data);
 $order = $parsed['order'];
 
