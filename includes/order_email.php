@@ -246,7 +246,8 @@ if (!function_exists('order_email_build_order_message')) {
         $safeHall = order_email_escape($orderData['hall_name'] ?: '');
         $safeOrderUrl = order_email_escape($orderUrl);
         $safeFromName = order_email_escape($settings['from_name']);
-        $logoUrl = $baseUrl . '/uploads/images/logo.svg';
+        // PNG is supported more reliably than external SVG in Mail.ru dark mode.
+        $logoUrl = $baseUrl . '/uploads/images/logo.png';
         $logoHtml = '<img src="' . order_email_escape($logoUrl) . '" alt="Жас сахна" width="64" height="64" style="display:block;width:64px;height:64px;object-fit:contain;border:0;outline:none;text-decoration:none">';
 
         $ticketRows = '';
