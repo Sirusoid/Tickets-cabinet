@@ -240,7 +240,8 @@ if (!function_exists('order_email_build_order_message')) {
         $datetime = order_email_format_datetime($orderData['schedule_start'] ?? null);
         $assets = order_email_prepare_ticket_assets($orderData['tickets'], $baseUrl);
         $safeOrder = order_email_escape($order);
-        $safeEvent = order_email_escape($orderData['event_title'] ?: 'Спектакль');
+        $eventTitle = trim((string)($orderData['event_title'] ?: 'Спектакль'));
+        $safeEvent = order_email_escape('«' . mb_strtoupper($eventTitle, 'UTF-8') . '»');
         $safeDate = order_email_escape($datetime['date'] ?: 'Дата уточняется');
         $safeTime = order_email_escape($datetime['time'] ?: 'Время уточняется');
         $safeHall = order_email_escape($orderData['hall_name'] ?: '');
@@ -284,8 +285,8 @@ if (!function_exists('order_email_build_order_message')) {
             . '</td></tr><tr><td bgcolor="#ffffff" style="padding:28px;background:#ffffff!important;color:#172b4d">'
             . '<p style="margin:0 0 14px">Желаем Вам приятного просмотра!</p>'
             . '<p style="margin:0 0 4px"><strong>' . $safeEvent . '</strong></p>'
-            . '<p style="margin:0;color:#475569">Дата: ' . $safeDate . ' · Время: ' . $safeTime
-            . ($safeHall !== '' ? ' · Зал: ' . $safeHall : '') . '</p>'
+            . '<p style="margin:0;color:#475569"><strong>Дата: ' . $safeDate . ' · Время: ' . $safeTime
+            . ($safeHall !== '' ? ' · Зал: ' . $safeHall : '') . '</strong></p>'
             . '<p style="margin:18px 0 4px;color:#64748b">Номер заказа</p>'
             . '<p style="margin:0 0 20px;font-size:22px;font-weight:700;color:#173b67">' . $safeOrder . '</p>'
             . '<a href="' . $safeOrderUrl . '" style="display:inline-block;padding:13px 20px;border-radius:9px;background:#18a957;color:#fff;text-decoration:none;font-weight:700">Открыть страницу заказа</a>'
