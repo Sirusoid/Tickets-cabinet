@@ -282,7 +282,7 @@ if (!function_exists('order_email_build_order_message')) {
             . '<td valign="middle" style="padding:0"><h1 style="margin:0;font-size:24px;line-height:1.2;color:#111827;font-weight:700">Спасибо за покупку!</h1></td>'
             . '</tr></table>'
             . '</td></tr><tr><td bgcolor="#ffffff" style="padding:28px;background:#ffffff!important;color:#172b4d">'
-            . '<p style="margin:0 0 14px">Желаем Вам приятного отдыха.</p>'
+            . '<p style="margin:0 0 14px">Желаем Вам приятного просмотра!</p>'
             . '<p style="margin:0 0 4px"><strong>' . $safeEvent . '</strong></p>'
             . '<p style="margin:0;color:#475569">Дата: ' . $safeDate . ' · Время: ' . $safeTime
             . ($safeHall !== '' ? ' · Зал: ' . $safeHall : '') . '</p>'
