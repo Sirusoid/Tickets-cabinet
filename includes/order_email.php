@@ -174,14 +174,15 @@ if (!function_exists('order_email_send_message')) {
 
         if (empty($attachments)) {
             $headers[] = 'Content-Type: text/html; charset=UTF-8';
-            $body = $html;
+            $headers[] = 'Content-Transfer-Encoding: base64';
+            $body = chunk_split(base64_encode($html));
         } else {
             $boundary = '=_Zhassahna_' . bin2hex(random_bytes(12));
             $headers[] = 'Content-Type: multipart/mixed; boundary="' . $boundary . '"';
             $body = '--' . $boundary . "\r\n"
                 . "Content-Type: text/html; charset=UTF-8\r\n"
-                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-                . $html . "\r\n";
+                . "Content-Transfer-Encoding: base64\r\n\r\n"
+                . chunk_split(base64_encode($html)) . "\r\n";
 
             foreach ($attachments as $attachment) {
                 $path = (string)($attachment['path'] ?? '');
