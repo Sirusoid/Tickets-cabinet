@@ -112,6 +112,12 @@ $requiredFields = ['ACTION', 'RC', 'P_SIGN', 'AMOUNT', 'CURRENCY', 'MERCHANT', '
 foreach ($requiredFields as $field) {
     if (!isset($data[$field]) || trim((string)$data[$field]) === '') {
         write_log('Required response field missing: ' . $field . ' for ' . $order);
+        if (function_exists('system_error_log')) {
+            system_error_log($pdo, 'bcc.notify', 'В уведомлении BCC отсутствует обязательное поле.', [
+                'field' => $field,
+                'ORDER' => $order,
+            ], 'error');
+        }
         json_response(['success' => false, 'message' => 'Invalid callback'], 400);
     }
 }
@@ -123,10 +129,16 @@ if ((string)$data['MERCHANT'] !== trim((string)($cfg['merchant'] ?? ''))
     || number_format((float)$data['AMOUNT'], 2, '.', '') !== $expectedAmount
     || !bcc_validate_response_signature($data, $cfg)) {
     write_log('Callback validation failed for ' . $order);
+    if (function_exists('system_error_log')) {
+        system_error_log($pdo, 'bcc.notify', 'Не удалось проверить уведомление BCC.', bcc_error_context($data), 'error');
+    }
     json_response(['success' => false, 'message' => 'Invalid callback'], 400);
 }
 
 if (!$parsed['success']) {
+    if (function_exists('system_error_log')) {
+        system_error_log($pdo, 'bcc.payment', 'Банк отклонил оплату.', bcc_error_context($data), 'error');
+    }
     $wasPending = (string)($session['status'] ?? '') === 'pending';
     $upd = $pdo->prepare("UPDATE payment_sessions
         SET status = CASE WHEN status = 'paid' THEN status ELSE 'failed' END,

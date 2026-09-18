@@ -309,7 +309,7 @@ if (!function_exists('bcc_process_refund_request')) {
             'response' => $responseData,
             'message' => $success
                 ? 'Возврат подтверждён банком.'
-                : 'Банк не подтвердил возврат. ' . trim((string)($responseData['RC_TEXT'] ?? '')),
+                : 'Возврат не выполнен. Обратитесь в кассу театра.',
         ];
     }
 }
@@ -337,6 +337,18 @@ if (!function_exists('bcc_mark_refund_result')) {
         try {
             if (!$success) {
                 $reason = 'BCC response: ' . $responseJson;
+                if (function_exists('system_error_log')) {
+                    system_error_log(
+                        $pdo,
+                        'bcc.refund',
+                        'Банк не подтвердил возврат.',
+                        array_merge(
+                            bcc_error_context($data),
+                            ['source' => $source, 'order' => $order]
+                        ),
+                        'error'
+                    );
+                }
                 $updateRejected = $pdo->prepare("UPDATE refunds SET refund_status = 'rejected', refund_provider = 'bcc', refund_transaction_id = :transaction_id, reason = :reason WHERE ticket_id = :ticket_id AND refund_status = 'requested'");
                 foreach ($tickets as $ticket) {
                     $updateRejected->execute([

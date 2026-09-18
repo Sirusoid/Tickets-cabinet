@@ -177,11 +177,6 @@ if ($body === false || $curlError !== '') {
         'state' => 'rejected',
         'code' => 'transport_error',
         'message' => 'Не удалось подключиться к банку. Возврат не отправлен, повторите попытку позже.',
-        'bank_response' => [
-            'ACTION' => '',
-            'RC' => 'TRANSPORT_ERROR',
-            'RC_TEXT' => $curlError !== '' ? $curlError : 'BCC gateway connection failed',
-        ],
     ], 502);
 }
 
@@ -200,6 +195,12 @@ try {
     $result = bcc_mark_refund_result($pdo, $order, $responseData, $success, 'bcc_refund');
 } catch (Throwable $e) {
     error_log('[BCC REFUND] Result processing error for ' . $order . ': ' . $e->getMessage());
+    if (function_exists('system_error_log')) {
+        system_error_log($pdo, 'bcc.refund', 'Ошибка обработки ответа BCC по возврату клиента.', [
+            'message' => $e->getMessage(),
+            'order' => $order,
+        ], 'error');
+    }
     public_refund_response(['success' => false, 'message' => 'Не удалось обработать ответ банка.'], 500);
 }
 
@@ -207,8 +208,7 @@ if (!$success) {
     public_refund_response([
         'success' => false,
         'state' => 'rejected',
-        'message' => 'Банк не подтвердил возврат. ' . trim((string)($responseData['RC_TEXT'] ?? '')),
-        'bank_response' => array_intersect_key($responseData, array_flip(['ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF'])),
+        'message' => 'Возврат не выполнен. Обратитесь в театр.',
     ], 400);
 }
 
@@ -216,5 +216,4 @@ public_refund_response([
     'success' => true,
     'state' => $result['status'],
     'message' => 'Запрос на возврат принят банком. Зачисление обычно выполняется после клиринга.',
-    'bank_response' => array_intersect_key($responseData, array_flip(['ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF'])),
 ]);

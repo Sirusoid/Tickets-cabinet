@@ -894,15 +894,20 @@ if ($action === 'refund') {
                     $originalResponse,
                     'cashier_bcc_refund'
                 );
-                $bankResponse = is_array($refundResult['response'] ?? null) ? $refundResult['response'] : [];
                 json_resp([
                     'success' => !empty($refundResult['success']),
                     'state' => $refundResult['state'] ?? 'rejected',
                     'message' => $refundResult['message'] ?? 'Возврат обработан.',
-                    'bank_response' => array_intersect_key($bankResponse, array_flip(['ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF'])),
                 ], !empty($refundResult['success']) ? 200 : 400);
             } catch (Throwable $e) {
                 error_log('[BCC REFUND] Ошибка возврата кассиром: ' . $e->getMessage());
+                if (function_exists('system_error_log')) {
+                    system_error_log($pdo, 'bcc.refund', 'Ошибка обработки возврата кассиром.', [
+                        'message' => $e->getMessage(),
+                        'ticket_id' => $ticket_id,
+                        'order' => $paymentSession['order_number'] ?? null,
+                    ], 'error');
+                }
                 $isExpectedError = $e instanceof RuntimeException;
                 json_resp([
                     'success' => false,

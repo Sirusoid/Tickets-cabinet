@@ -61,6 +61,10 @@ if ($order !== '' && $pdo instanceof PDO) {
         $stmt2->execute([':id' => $paymentSessionId]);
         $session = $stmt2->fetch(PDO::FETCH_ASSOC);
 
+        if (!$parsed['success'] && function_exists('system_error_log')) {
+            system_error_log($pdo, 'bcc.payment', 'Банк отклонил оплату.', bcc_error_context($data), 'error');
+        }
+
         if ($parsed['success']) {
             $cfg = bcc_config($pdo);
             $requiredFields = ['ACTION', 'RC', 'P_SIGN', 'AMOUNT', 'CURRENCY', 'MERCHANT', 'TERMINAL', 'TIMESTAMP', 'NONCE'];
@@ -92,6 +96,9 @@ if ($order !== '' && $pdo instanceof PDO) {
             } else {
                 $status = 'failed';
                 $message = 'Ответ банка не прошёл проверку.';
+                if (function_exists('system_error_log')) {
+                    system_error_log($pdo, 'bcc.return', 'Ответ BCC не прошёл проверку.', bcc_error_context($data), 'error');
+                }
             }
 
             if ($responseMatchesOrder && $status === 'paid') {

@@ -88,10 +88,13 @@ ZHASSAHNA_TICKET_PUBLIC_SECRET=...
 - `settings/tickets.php` — лимиты билетов и резервы;
 - `settings/payment.php` — эквайринг;
 - `settings/notifications.php` — callback/уведомления;
+- `settings/email.php` — почта и письма с билетами;
 - `settings/users.php` — сотрудники;
 - `settings/permissions.php` — роли и доступы.
 
 Все стандартные настройки сохраняются в таблице `settings` через `includes/settings_manager.php`.
+
+Доступ к странице `admin/error_logs.php` управляется правом `error_logs` в матрице ролей. Перед использованием страницы на существующей базе применить `sql/migration_error_logs.sql`.
 
 ## Режим обслуживания
 
@@ -127,6 +130,8 @@ ZHASSAHNA_TICKET_PUBLIC_SECRET=...
 - `ajax/public_refund.php`;
 - `includes/payment/bcc_refund.php`;
 - BCC `TRTYPE=14`.
+
+Ошибки BCC и возвратов записываются в `error_logs` с очищенным контекстом без `P_SIGN` и данных карты. Пользовательские тосты показывают только короткий результат; подробности доступны в `admin/error_logs.php`.
 
 Не менять порядок и идемпотентность финализатора без теста повторного callback.
 

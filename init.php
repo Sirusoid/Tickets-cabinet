@@ -62,6 +62,8 @@ $requiredFiles = [
     __DIR__ . '/includes/helper.php',
     __DIR__ . '/includes/auth.php',
     __DIR__ . '/includes/audit.php',
+    __DIR__ . '/includes/error_log.php',
+    __DIR__ . '/includes/permissions.php',
     __DIR__ . '/includes/order_email.php',
 ];
 

@@ -249,31 +249,25 @@
     var bank = data.bank_response && typeof data.bank_response === 'object' ? data.bank_response : data;
     var action = String(bank.ACTION || '').trim();
     var rc = String(bank.RC || data.code || '').trim();
-    var rcText = String(bank.RC_TEXT || '').trim();
     var label = bccOperationLabel(operation);
     var isProcessing = data.state === 'processing';
     var isSuccess = data.success === true && !isProcessing && (action === '' || action === '0') && (rc === '' || rc === '00');
 
     if (isSuccess) {
-      var successText = label + ' подтверждён банком';
-      if (action || rc) successText += ' (ACTION=' + (action || '0') + ', RC=' + (rc || '00') + ')';
-      if (operation === 'refund') successText += '. Билет отменён, место освобождено.';
-      return showToast(successText + '.', 'success', { duration: 6000 });
+      return showToast(operation === 'refund' ? 'Возврат выполнен. Билет отменён, место освобождено.' : 'Операция выполнена.', 'success', { duration: 6000 });
     }
 
     if (isProcessing) {
-      return showToast(label + ' принят банком и ожидает окончательного подтверждения. Не отправляйте повторный запрос.', 'info', { duration: 8000 });
+      return showToast(operation === 'refund' ? 'Запрос на возврат отправлен и обрабатывается.' : 'Операция отправлена на обработку.', 'info', { duration: 8000 });
     }
 
-    var info = bccResponseMap[rc] || null;
-    var text = label + ': ';
-    if (rc !== '') text += 'код ' + rc + '. ';
-    text += info ? info[0] : (rcText || data.message || 'Банк не подтвердил операцию.');
-    if (rcText && info && rcText !== info[0]) text += ' Ответ банка: ' + rcText + '.';
-    if (action !== '') text += ' ACTION=' + action + '.';
-    if (info) text += ' Действие: ' + info[1];
-    else if (data.message) text += ' Действие: проверьте статус операции и журнал банка перед повтором.';
-    return showToast(text, 'error', { duration: 11000 });
+    return showToast(
+      operation === 'refund'
+        ? 'Возврат не выполнен. Обратитесь в кассу театра.'
+        : 'Операция не выполнена. Попробуйте ещё раз или обратитесь в театр.',
+      'error',
+      { duration: 8000 }
+    );
   }
 
   window.showBccToast = bccBankToast;

@@ -427,6 +427,24 @@ if (!function_exists('bcc_parse_response')) {
     }
 }
 
+if (!function_exists('bcc_error_context')) {
+    function bcc_error_context(array $data): array
+    {
+        $allowedFields = [
+            'ACTION', 'RC', 'RC_TEXT', 'ORDER', 'RRN', 'INT_REF',
+            'TRTYPE', 'AMOUNT', 'ORG_AMOUNT', 'CURRENCY', 'MERCHANT',
+            'TERMINAL', 'TIMESTAMP',
+        ];
+        $context = [];
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $data) && $data[$field] !== '') {
+                $context[$field] = is_scalar($data[$field]) ? (string)$data[$field] : $data[$field];
+            }
+        }
+        return $context;
+    }
+}
+
 if (!function_exists('bcc_release_payment_holds')) {
     function bcc_release_payment_holds(PDO $pdo, array $paymentSession): int
     {
