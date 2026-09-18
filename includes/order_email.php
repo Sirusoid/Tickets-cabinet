@@ -282,18 +282,17 @@ if (!function_exists('order_email_build_order_message')) {
             . '<a href="' . $safeOrderUrl . '" style="display:inline-block;padding:13px 20px;border-radius:9px;background:#18a957;color:#fff;text-decoration:none;font-weight:700">Открыть страницу заказа</a>'
             . '<h2 style="margin:28px 0 10px;font-size:18px">Ваши билеты</h2>'
             . '<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px">'
-            . '<tr style="background:#f1f5f9"><th align="left" style="padding:9px 8px">№</th><th align="left" style="padding:9px 8px">Место</th><th align="left" style="padding:9px 8px">Цена</th><th align="left" style="padding:9px 8px">Файл</th></tr>'
+            . '<tr style="background:#f1f5f9"><th align="left" style="padding:9px 8px">№</th><th align="left" style="padding:9px 8px">Ряд / Место</th><th align="left" style="padding:9px 8px">Цена</th><th align="left" style="padding:9px 8px">Файл</th></tr>'
             . $ticketRows . '</table>'
             . '<p style="margin:20px 0 0;color:#475569">PDF-файлы билетов также прикреплены к этому письму. На странице заказа их можно скачать повторно.</p>'
             . '<p style="margin:18px 0 0"><a href="' . $safeOrderUrl . '" style="color:#b42318;font-weight:700">Оформить возврат</a> (если возврат доступен по правилам и срок ещё не истёк).</p>'
-            . '<p style="margin:24px 0 0;color:#64748b;font-size:13px">Вопросы по заказу? Напишите нам: ' . $feedbackEmail . '</p>'
             . '<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">С уважением,<br>' . $safeFromName . '</p>'
             . '</div></div></body></html>';
 
         $sent = order_email_send_message((string)$email, $subject, $html, $settings, $assets['attachments']);
         return [
             'success' => $sent,
-            'message' => $sent ? 'Письмо отправлено.' : 'PHP mail() не принял письмо. Проверьте настройки хостинга.',
+            'message' => $sent ? 'Письмо передано почтовой службе хостинга. Доставка может занять несколько минут; проверьте также папку «Спам».' : 'PHP mail() не принял письмо. Проверьте настройки хостинга.',
             'attachments' => count($assets['attachments']),
         ];
     }
@@ -355,7 +354,7 @@ if (!function_exists('send_order_test_email')) {
             $sent = order_email_send_message($email, $subject, $html, $settings);
             return [
                 'success' => $sent,
-                'message' => $sent ? 'Тестовое письмо отправлено.' : 'PHP mail() не принял тестовое письмо.',
+                'message' => $sent ? 'Тестовое письмо передано почтовой службе хостинга. Доставка не гарантируется самим PHP; проверьте «Спам» и mail-log.' : 'PHP mail() не принял тестовое письмо.',
                 'attachments' => 0,
             ];
         } catch (Throwable $exception) {
