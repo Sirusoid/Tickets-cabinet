@@ -78,7 +78,7 @@ if ($order === '') {
     json_response(['success' => false, 'message' => 'ORDER missing']);
 }
 
-$stmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, seats_payload, customer_phone, customer_name, customer_email FROM payment_sessions WHERE order_number = :order LIMIT 1");
+$stmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, amount_cents, seats_payload, customer_phone, customer_name, customer_email FROM payment_sessions WHERE order_number = :order LIMIT 1");
 $stmt->execute([':order' => $order]);
 $session = $stmt->fetch(PDO::FETCH_ASSOC);
 
