@@ -3,5 +3,6 @@
     "chat.agent.maxRequests": 200,
     "git.autofetch": true,
     "git.confirmSync": false,
+    "git.enableSmartCommit": true,
     "git.postCommitCommand": "sync"
 }

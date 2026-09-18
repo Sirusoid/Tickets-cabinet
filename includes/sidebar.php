@@ -59,6 +59,7 @@ $settingsPermMap = [
   'discounts' => 'settings_discounts',
   'payment' => 'settings_payment',
   'notifications' => 'settings_notifications',
+  'email' => 'settings_email',
   'security' => 'settings_security',
   'users' => 'settings_users',
   'permissions' => 'settings_permissions',

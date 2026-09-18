@@ -48,8 +48,16 @@ if (!function_exists('settings_pages_map')) {
                 'path' => '/settings/notifications.php',
                 'label' => 'Уведомления',
                 'title' => 'Настройки уведомлений',
-                'subtitle' => 'Email, SMS и Telegram-уведомления',
+                'subtitle' => 'BCC callback и системные уведомления',
                 'categories' => ['notifications'],
+                'mode' => 'settings',
+            ],
+            'email' => [
+                'path' => '/settings/email.php',
+                'label' => 'Почта',
+                'title' => 'Почта',
+                'subtitle' => 'Отправитель, ответы и письма с билетами',
+                'categories' => ['email'],
                 'mode' => 'settings',
             ],
             'security' => [
@@ -90,6 +98,7 @@ if (!function_exists('settings_category_titles')) {
             'discounts' => 'Скидки',
             'payments' => 'Платежи',
             'notifications' => 'Уведомления',
+            'email' => 'Почта',
             'security' => 'Безопасность',
         ];
     }
