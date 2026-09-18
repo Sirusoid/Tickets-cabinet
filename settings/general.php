@@ -17,6 +17,17 @@ if (isset($pdo) && $pdo instanceof PDO) {
 		1,
 		20
 	);
+	settings_upsert_value(
+		$pdo,
+		'system.error_log_retention_days',
+		'Срок хранения логов ошибок (дни)',
+		'90',
+		'int',
+		'system',
+		'Ошибки старше указанного количества дней можно удалить кнопкой на странице логов или автоматически через cron. Минимум 1 день.',
+		1,
+		30
+	);
 }
 
 $settingsPageKey = 'general';

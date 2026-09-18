@@ -21,6 +21,60 @@ $perPage = 50;
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
 
+$actionMessage = '';
+$actionError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $csrfToken = (string)($_POST['csrf_token'] ?? '');
+    if (!validate_csrf($csrfToken)) {
+        $actionError = 'Не удалось подтвердить действие. Обновите страницу и повторите попытку.';
+    } else {
+        $bulkAction = trim((string)($_POST['action'] ?? ''));
+        try {
+            if ($bulkAction === 'delete_selected') {
+                $ids = isset($_POST['ids']) && is_array($_POST['ids']) ? array_map('intval', $_POST['ids']) : [];
+                $ids = array_values(array_filter(array_unique($ids), static function (int $id): bool {
+                    return $id > 0;
+                }));
+                if (empty($ids)) {
+                    $actionError = 'Выберите хотя бы одну запись.';
+                } else {
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $stmt = $pdo->prepare("DELETE FROM error_logs WHERE id IN ($placeholders)");
+                    $stmt->execute($ids);
+                    $deleted = $stmt->rowCount();
+                    $actionMessage = 'Удалено записей: ' . (int)$deleted . '.';
+                    if (function_exists('audit_log_event')) {
+                        audit_log_event($pdo, 'error_logs.deleted', 'error_logs', null, null, [], [
+                            'mode' => 'selected',
+                            'count' => (int)$deleted,
+                        ]);
+                    }
+                }
+            } elseif ($bulkAction === 'purge_retention') {
+                $retentionDays = function_exists('settings_get_value')
+                    ? (int)settings_get_value($pdo, 'system.error_log_retention_days', 90)
+                    : 90;
+                $retentionDays = max(1, min(3650, $retentionDays));
+                $cutoff = (new DateTimeImmutable('now'))->modify('-' . $retentionDays . ' days')->format('Y-m-d H:i:s');
+                $stmt = $pdo->prepare('DELETE FROM error_logs WHERE created_at < :cutoff');
+                $stmt->execute([':cutoff' => $cutoff]);
+                $deleted = $stmt->rowCount();
+                $actionMessage = 'Удалено старых записей: ' . (int)$deleted . '. Срок хранения: ' . $retentionDays . ' дн.';
+                if (function_exists('audit_log_event')) {
+                    audit_log_event($pdo, 'error_logs.deleted', 'error_logs', null, null, [], [
+                        'mode' => 'retention',
+                        'count' => (int)$deleted,
+                        'retention_days' => $retentionDays,
+                    ]);
+                }
+            }
+        } catch (Throwable $exception) {
+            $actionError = 'Не удалось очистить логи ошибок.';
+            error_log('[ERROR LOGS] Ошибка очистки: ' . $exception->getMessage());
+        }
+    }
+}
+
 $suggestType = trim((string)($_GET['suggest'] ?? ''));
 if ($suggestType !== '') {
     header('Content-Type: application/json; charset=utf-8');
@@ -139,6 +193,9 @@ $levelClasses = [
     'warning' => 'error-level-badge--warning',
     'info' => 'error-level-badge--info',
 ];
+$retentionDays = function_exists('settings_get_value')
+    ? max(1, min(3650, (int)settings_get_value($pdo, 'system.error_log_retention_days', 90)))
+    : 90;
 
 $formatContext = static function ($raw): string {
     if ($raw === null || $raw === '') {
@@ -163,6 +220,12 @@ require __DIR__ . '/../includes/panel.php';
 ?>
 
 <div class="page container-full audit-page error-logs-page">
+    <?php if ($actionMessage !== ''): ?>
+        <div class="card alert settings-alert settings-alert--success"><?= h($actionMessage) ?></div>
+    <?php endif; ?>
+    <?php if ($actionError !== ''): ?>
+        <div class="card alert alert--danger"><?= h($actionError) ?></div>
+    <?php endif; ?>
     <div class="card audit-filters">
         <form id="errorLogsFilters" method="get" class="audit-filters__form">
             <div>
@@ -214,6 +277,8 @@ require __DIR__ . '/../includes/panel.php';
             </div>
             <div class="audit-filters__actions">
                 <a class="btn btn-ghost" href="/admin/error_logs.php">Сбросить</a>
+                <button type="submit" form="errorLogsBulkForm" name="action" value="delete_selected" class="btn btn-danger" onclick="return confirm('Удалить выбранные записи логов?');">Удалить выбранные</button>
+                <button type="submit" form="errorLogsBulkForm" name="action" value="purge_retention" class="btn btn-secondary" onclick="return confirm('Удалить все логи старше установленного срока хранения?');">Очистить старше <?= (int)$retentionDays ?> дн.</button>
             </div>
         </form>
     </div>
@@ -221,11 +286,14 @@ require __DIR__ . '/../includes/panel.php';
     <?php if ($errorText !== ''): ?>
         <div class="card alert alert--danger"><?= h($errorText) ?></div>
     <?php else: ?>
+        <form id="errorLogsBulkForm" method="post" action="/admin/error_logs.php">
+            <input type="hidden" name="csrf_token" value="<?= h((string)($_SESSION['csrf_token'] ?? '')) ?>">
         <div class="audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
         <div class="card audit-table-wrap">
             <table class="admin-table audit-table">
                 <thead>
                     <tr>
+                        <th><input type="checkbox" id="error-log-select-all" aria-label="Выбрать все"></th>
                         <th>Дата и время</th>
                         <th>Уровень</th>
                         <th>Источник</th>
@@ -238,13 +306,14 @@ require __DIR__ . '/../includes/panel.php';
                 </thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="8" class="audit-empty">Ошибок за выбранный период нет.</td></tr>
+                    <tr><td colspan="9" class="audit-empty">Ошибок за выбранный период нет.</td></tr>
                 <?php else: foreach ($rows as $row):
                     $rowLevel = (string)($row['level'] ?? 'error');
                     $context = $formatContext($row['context'] ?? '');
                     $description = system_error_short_description($row);
                 ?>
                     <tr>
+                        <td><input type="checkbox" name="ids[]" value="<?= (int)$row['id'] ?>" class="error-log-select" aria-label="Выбрать ошибку"></td>
                         <td><?= h(date('d.m.Y H:i:s', strtotime((string)$row['created_at']))) ?></td>
                         <td><span class="error-level-badge <?= h($levelClasses[$rowLevel] ?? 'error-level-badge--error') ?>"><?= h($levelLabels[$rowLevel] ?? $rowLevel) ?></span></td>
                         <td><?= h($row['source']) ?></td>
@@ -275,6 +344,7 @@ require __DIR__ . '/../includes/panel.php';
                 <?php endif; ?>
             </nav>
         <?php endif; ?>
+        </form>
     <?php endif; ?>
 </div>
 
@@ -386,6 +456,13 @@ require __DIR__ . '/../includes/panel.php';
             return;
         }
         if (event.target.closest && event.target.closest('[data-error-modal-close]')) closeErrorModal();
+    });
+    document.addEventListener('change', function (event) {
+        if (event.target.id === 'error-log-select-all') {
+            Array.prototype.forEach.call(form.querySelectorAll('.error-log-select'), function (checkbox) {
+                checkbox.checked = event.target.checked;
+            });
+        }
     });
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') closeErrorModal();

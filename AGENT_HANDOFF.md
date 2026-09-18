@@ -95,6 +95,7 @@ ZHASSAHNA_TICKET_PUBLIC_SECRET=...
 Все стандартные настройки сохраняются в таблице `settings` через `includes/settings_manager.php`.
 
 Доступ к странице `admin/error_logs.php` управляется правом `error_logs` в матрице ролей. Перед использованием страницы на существующей базе применить `sql/migration_error_logs.sql`.
+Срок хранения задаётся ключом `system.error_log_retention_days`; автоматическую очистку выполняет `tools/cron_cleanup_error_logs.php`.
 
 ## Режим обслуживания
 
