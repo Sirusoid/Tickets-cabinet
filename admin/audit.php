@@ -218,19 +218,19 @@ $queryParams = [
     'per_page' => $perPage,
 ];
 $page_scripts = ['/assets/js/audit.js'];
+$page_inline_scripts = $page_inline_scripts ?? [];
+if ($cleanupSuccess !== null || $cleanupError !== null) {
+    $page_inline_scripts[] = 'if (typeof window.showToast === "function") { window.showToast(' . json_encode(
+        $cleanupSuccess ?? $cleanupError,
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ) . ', ' . json_encode($cleanupSuccess !== null ? 'success' : 'error') . ', { duration: 4500 }); }';
+}
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
 ?>
 
 <div class="page container-full audit-page">
-    <?php if ($cleanupSuccess !== null): ?>
-        <div class="alert settings-alert settings-alert--success"><?= h($cleanupSuccess) ?></div>
-    <?php endif; ?>
-    <?php if ($cleanupError !== null): ?>
-        <div class="alert alert--danger"><?= h($cleanupError) ?></div>
-    <?php endif; ?>
-
     <div class="card audit-cleanup">
         <div class="audit-cleanup__title">Очистка журнала</div>
         <div class="audit-cleanup__actions">
