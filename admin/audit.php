@@ -21,6 +21,52 @@ $search = trim((string)($_GET['search'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $requestedPerPage = (int)($_GET['per_page'] ?? 50);
 $perPage = in_array($requestedPerPage, [50, 100, 250, 500], true) ? $requestedPerPage : 50;
+$cleanupSuccess = null;
+$cleanupError = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'cleanup_audit') {
+    if (!validate_csrf($_POST['csrf_token'] ?? '')) {
+        $cleanupError = 'Неверный CSRF-токен. Обновите страницу и повторите действие.';
+    } else {
+        $cleanupPeriod = (string)($_POST['cleanup_period'] ?? '');
+        $cleanupDays = [
+            '1' => 1,
+            '3' => 3,
+            '7' => 7,
+            '30' => 30,
+        ][$cleanupPeriod] ?? null;
+        try {
+            if (!isset($pdo) || !($pdo instanceof PDO)) {
+                throw new RuntimeException('Database connection unavailable.');
+            }
+            $pdo->beginTransaction();
+            foreach (['audit_logs', 'cash_audit_log'] as $table) {
+                $tableStmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table');
+                $tableStmt->execute([':table' => $table]);
+                if (!(bool)$tableStmt->fetchColumn()) {
+                    continue;
+                }
+                if ($cleanupPeriod === 'all') {
+                    $pdo->exec('DELETE FROM `' . $table . '`');
+                } elseif ($cleanupDays !== null) {
+                    $pdo->exec('DELETE FROM `' . $table . '` WHERE created_at < DATE_SUB(NOW(), INTERVAL ' . (int)$cleanupDays . ' DAY)');
+                } else {
+                    throw new InvalidArgumentException('Не выбран период очистки.');
+                }
+            }
+            $pdo->commit();
+            $cleanupSuccess = $cleanupPeriod === 'all'
+                ? 'Журнал действий полностью очищен.'
+                : 'Удалены записи журнала старше ' . (int)$cleanupDays . ' ' . ($cleanupDays === 1 ? 'суток' : 'суток') . '.';
+        } catch (Throwable $exception) {
+            if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $cleanupError = 'Не удалось очистить журнал действий.';
+            error_log('[AUDIT] Ошибка очистки журнала: ' . $exception->getMessage());
+        }
+    }
+}
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
     $dateFrom = date('Y-m-01');
@@ -163,6 +209,33 @@ require __DIR__ . '/../includes/panel.php';
 ?>
 
 <div class="page container-full audit-page">
+    <?php if ($cleanupSuccess !== null): ?>
+        <div class="alert settings-alert settings-alert--success"><?= h($cleanupSuccess) ?></div>
+    <?php endif; ?>
+    <?php if ($cleanupError !== null): ?>
+        <div class="alert alert--danger"><?= h($cleanupError) ?></div>
+    <?php endif; ?>
+
+    <div class="card audit-cleanup">
+        <div class="audit-cleanup__title">Очистка журнала</div>
+        <div class="audit-cleanup__actions">
+            <?php foreach ([['1', 'За 1 сутки'], ['3', 'За 3 суток'], ['7', 'За неделю'], ['30', 'За 1 месяц']] as $cleanupOption): ?>
+                <form method="post" onsubmit="return confirm('Удалить выбранные старые записи журнала?');">
+                    <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
+                    <input type="hidden" name="action" value="cleanup_audit">
+                    <input type="hidden" name="cleanup_period" value="<?= h($cleanupOption[0]) ?>">
+                    <button class="btn btn-ghost btn-sm" type="submit"><?= h($cleanupOption[1]) ?></button>
+                </form>
+            <?php endforeach; ?>
+            <form method="post" onsubmit="return confirm('Полностью очистить журнал действий? Это действие нельзя отменить.');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
+                <input type="hidden" name="action" value="cleanup_audit">
+                <input type="hidden" name="cleanup_period" value="all">
+                <button class="btn btn-danger btn-sm" type="submit">Очистить полностью</button>
+            </form>
+        </div>
+    </div>
+
     <div class="card audit-filters">
         <form id="auditFilters" method="get" class="audit-filters__form">
             <div>
