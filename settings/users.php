@@ -35,12 +35,11 @@ $roles = [
 
 $saveSuccess = null;
 $saveErrors = [];
+$action = trim((string)($_POST['action'] ?? ''));
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
 		$saveErrors[] = 'Подключение к базе данных недоступно.';
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-		$action = trim((string)($_POST['action'] ?? ''));
-
 		try {
 				if ($action === 'create_user') {
 						$username = trim((string)($_POST['username'] ?? ''));
@@ -146,6 +145,13 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 		} catch (Throwable $e) {
 				$saveErrors[] = 'Ошибка при сохранении: ' . $e->getMessage();
 		}
+}
+
+$page_inline_scripts = $page_inline_scripts ?? [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reset_password') {
+	$toastMessage = $saveSuccess ?: (!empty($saveErrors) ? implode(' ', $saveErrors) : 'Не удалось изменить пароль.');
+	$toastType = $saveSuccess ? 'success' : 'error';
+	$page_inline_scripts[] = 'if (typeof window.showToast === "function") { window.showToast(' . json_encode($toastMessage, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ', ' . json_encode($toastType) . ', { duration: 4500 }); }';
 }
 
 $users = [];
