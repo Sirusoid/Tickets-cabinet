@@ -390,6 +390,11 @@ if (!function_exists('bcc_mark_refund_result')) {
                     $deleteOccupancy->execute([':ticket_id' => (int)$ticket['id']]);
                 }
                 $pdo->commit();
+                foreach ($tickets as $ticket) {
+                    if (function_exists('ticket_pdf_delete_by_uid')) {
+                        ticket_pdf_delete_by_uid($ticket['ticket_uid'] ?? '');
+                    }
+                }
                 return ['status' => 'refunded', 'ticket_uids' => array_column($tickets, 'ticket_uid')];
             }
 
@@ -419,6 +424,11 @@ if (!function_exists('bcc_mark_refund_result')) {
             ]);
 
             $pdo->commit();
+            foreach ($tickets as $ticket) {
+                if (function_exists('ticket_pdf_delete_by_uid')) {
+                    ticket_pdf_delete_by_uid($ticket['ticket_uid'] ?? '');
+                }
+            }
             if (function_exists('audit_log_event')) {
                 audit_log_event($pdo, 'payment.refund_completed', 'payment_session', (int)$session['id'], $order, [], [
                     'order' => $order,

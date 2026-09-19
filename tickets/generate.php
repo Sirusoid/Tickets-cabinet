@@ -61,6 +61,22 @@ try {
         exit;
     }
 
+    if ((string)($ticket['refund_status'] ?? 'none') === 'refunded') {
+        if (function_exists('ticket_pdf_delete_by_uid')) {
+            ticket_pdf_delete_by_uid((string)($ticket['ticket_uid'] ?? ''));
+        }
+        http_response_code(410);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html lang="ru"><meta charset="utf-8"><title>Билет аннулирован</title>';
+        echo '<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#f8fafc;color:#172b4d;font-family:Arial,sans-serif">';
+        echo '<main style="max-width:520px;margin:24px;padding:32px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 12px 30px rgba(15,23,42,.08)">';
+        echo '<div style="font-size:42px;margin-bottom:12px">!</div>';
+        echo '<h1 style="margin:0 0 12px">Билет аннулирован</h1>';
+        echo '<p style="margin:0;color:#64748b;line-height:1.6">Возврат по этому билету оформлен. Билет больше недействителен, а PDF недоступен для скачивания.</p>';
+        echo '</main></body></html>';
+        exit;
+    }
+
     $ticket_uid = trim((string)$ticket['ticket_uid']);
     if ($ticket_uid === '') {
         throw new RuntimeException('Ticket UID missing.');

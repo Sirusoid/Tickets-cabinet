@@ -756,6 +756,10 @@ if (!function_exists('ticket_pdf_generate_from_ticket')) {
             $error = 'ticket_uid missing';
             return false;
         }
+        if ((string)($ticket['refund_status'] ?? 'none') === 'refunded') {
+            $error = 'Билет аннулирован после возврата; PDF не создаётся.';
+            return false;
+        }
         if (!ensure_ticket_pdf_directory()) {
             $error = 'Не удалось создать папку для PDF-файлов';
             return false;

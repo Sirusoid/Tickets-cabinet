@@ -84,7 +84,7 @@ if (!function_exists('order_email_load_order')) {
 
         $ticketStmt = $pdo->prepare("SELECT
                 id, ticket_uid, seat_identifier, original_price, final_price,
-                discount, discount_amount
+                discount, discount_amount, refund_status
             FROM tickets
             WHERE payment_session_id = :payment_session_id
             ORDER BY id ASC");
@@ -108,6 +108,9 @@ if (!function_exists('order_email_prepare_ticket_assets')) {
         foreach ($tickets as $ticket) {
             $uid = trim((string)($ticket['ticket_uid'] ?? ''));
             if ($uid === '') {
+                continue;
+            }
+            if ((string)($ticket['refund_status'] ?? 'none') === 'refunded') {
                 continue;
             }
 

@@ -1012,6 +1012,9 @@ if ($action === 'refund') {
         }
 
         $pdo->commit();
+        if (function_exists('ticket_pdf_delete_by_uid') && !empty($t['ticket_uid'])) {
+            ticket_pdf_delete_by_uid($t['ticket_uid']);
+        }
         json_resp(['success' => true, 'message' => 'Возврат выполнен, статус билета обновлён']);
     } catch (Exception $e) {
         try { $pdo->rollBack(); } catch (Exception $_) {}
