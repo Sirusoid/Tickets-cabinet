@@ -51,6 +51,7 @@ if (!function_exists('audit_log_event')) {
                 'auth.login' => 'Вход в систему',
                 'auth.logout' => 'Выход из системы',
                 'auth.password_changed' => 'Изменение пароля',
+                'auth.password_reset' => 'Восстановление пароля',
                 'user.create' => 'Добавление пользователя',
                 'user.update' => 'Изменение пользователя',
                 'user.delete' => 'Удаление пользователя',

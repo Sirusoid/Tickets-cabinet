@@ -65,6 +65,7 @@ $requiredFiles = [
     __DIR__ . '/includes/error_log.php',
     __DIR__ . '/includes/permissions.php',
     __DIR__ . '/includes/order_email.php',
+    __DIR__ . '/includes/password_reset.php',
 ];
 
 foreach ($requiredFiles as $f) {

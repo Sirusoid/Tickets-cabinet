@@ -91,6 +91,38 @@ body::before{
   border: 1px solid rgba(220,38,38,0.12);
 }
 
+.alert-success{
+  color: #166534;
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+
+.login-link{
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.login-link:hover{ text-decoration: underline; }
+
+.login-link-button{
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.login-link-button:hover{
+  transform: none;
+  box-shadow: none;
+}
+
+.recovery-form{ margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+
 /* Form */
 form{
   display: flex;
