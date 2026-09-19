@@ -352,7 +352,8 @@ require_once __DIR__ . '/../includes/header.php';
     const selfRefundHint = document.getElementById('selfRefundHint');
     if (selfRefundBtn) {
         selfRefundBtn.addEventListener('click', function () {
-            if (!window.confirm('Отменить покупку и оформить возврат всех билетов заказа? / Сатып алудан бас тартып, барлық билеттерге қайтарым жасайсыз ба?')) return;
+            if (typeof window.showConfirmModal !== 'function') return;
+            window.showConfirmModal('Отменить покупку и оформить возврат всех билетов заказа? / Сатып алудан бас тартып, барлық билеттерге қайтарым жасайсыз ба?', function () {
             selfRefundBtn.disabled = true;
             selfRefundBtn.textContent = 'Отправка запроса... / Сұрау жіберілуде...';
             fetch('/ajax/public_refund.php', {
@@ -385,6 +386,7 @@ require_once __DIR__ . '/../includes/header.php';
                     }
                     if (selfRefundHint) selfRefundHint.textContent = error && error.message ? error.message : 'Ошибка возврата.';
                 });
+            });
         });
     }
 })();

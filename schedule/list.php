@@ -437,7 +437,7 @@ foreach ($schedules_raw as $s) {
 
   // Делегируем клик по документу (удаление / дублирование / переход в редактирование)
   document.addEventListener('click', function(e){
-    // Дублирование (новая логика, без confirm())
+    // Дублирование использует общую модалку подтверждения.
     var dupBtn = e.target.closest('.js-duplicate-session');
     if (dupBtn) {
       e.preventDefault();
@@ -569,8 +569,9 @@ foreach ($schedules_raw as $s) {
       try {
         window.showModalDelete(modalText, { external: true, id: id, title: 'Удалить сеанс', eventTitle: eventTitle });
       } catch (err) {
-        if (!confirm(modalText)) return;
-        performDelete(id);
+        if (typeof window.showConfirmModal === 'function') {
+          window.showConfirmModal(modalText, function () { performDelete(id); });
+        }
         return;
       }
 

@@ -235,14 +235,14 @@ require __DIR__ . '/../includes/panel.php';
         <div class="audit-cleanup__title">Очистка журнала</div>
         <div class="audit-cleanup__actions">
             <?php foreach ([['1', 'За 1 сутки'], ['3', 'За 3 суток'], ['7', 'За неделю'], ['30', 'За 1 месяц']] as $cleanupOption): ?>
-                <form method="post" onsubmit="return confirm('Удалить выбранные старые записи журнала?');">
+                <form method="post" data-confirm-submit="Удалить выбранные старые записи журнала?">
                     <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
                     <input type="hidden" name="action" value="cleanup_audit">
                     <input type="hidden" name="cleanup_period" value="<?= h($cleanupOption[0]) ?>">
                     <button class="btn btn-ghost btn-sm" type="submit"><?= h($cleanupOption[1]) ?></button>
                 </form>
             <?php endforeach; ?>
-            <form method="post" onsubmit="return confirm('Удалить записи журнала за выбранный период?');">
+            <form method="post" data-confirm-submit="Удалить записи журнала за выбранный период?">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
                 <input type="hidden" name="action" value="cleanup_audit">
                 <input type="hidden" name="cleanup_period" value="range">
@@ -250,7 +250,7 @@ require __DIR__ . '/../includes/panel.php';
                 <input type="hidden" name="cleanup_date_to" value="<?= h($dateTo) ?>">
                 <button class="btn btn-secondary btn-sm" type="submit">За выбранный период</button>
             </form>
-            <form method="post" onsubmit="return confirm('Полностью очистить журнал действий? Это действие нельзя отменить.');">
+            <form method="post" data-confirm-submit="Полностью очистить журнал действий? Это действие нельзя отменить.">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
                 <input type="hidden" name="action" value="cleanup_audit">
                 <input type="hidden" name="cleanup_period" value="all">

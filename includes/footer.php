@@ -89,6 +89,34 @@ $page_scripts = $page_scripts ?? [];
     window.hideModalDelete = _hideModalDelete_internal;
     window.getModalMeta = _getModalMeta_internal;
 
+    window.showConfirmModal = function(text, callback){
+      var confirmButton = document.getElementById('modal-delete-confirm');
+      if (!confirmButton) return;
+      showModalDelete(text || 'Подтвердите действие', { external: true });
+      if (confirmButton._externalConfirmHandler) {
+        confirmButton.removeEventListener('click', confirmButton._externalConfirmHandler);
+      }
+      var handler = function(){
+        confirmButton.removeEventListener('click', handler);
+        delete confirmButton._externalConfirmHandler;
+        hideModalDelete();
+        if (typeof callback === 'function') callback();
+      };
+      confirmButton._externalConfirmHandler = handler;
+      confirmButton.addEventListener('click', handler);
+    };
+
+    document.addEventListener('submit', function(e){
+      var form = e.target.closest && e.target.closest('form[data-confirm-submit]');
+      if (!form || form.dataset.confirming === 'true') return;
+      e.preventDefault();
+      form.dataset.confirming = 'true';
+      window.showConfirmModal(form.getAttribute('data-confirm-submit'), function(){
+        form.submit();
+      });
+      delete form.dataset.confirming;
+    }, false);
+
     function showLogoutModal(){
       var wrap = document.getElementById('modal-logout');
       if (!wrap) return;

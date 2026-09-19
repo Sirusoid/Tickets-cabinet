@@ -132,11 +132,10 @@ require __DIR__ . '/../includes/footer.php';
     if (typeof window.showModalDelete === 'function') {
       var text = 'Удалить зал "' + hallName + '"? Это действие нельзя отменить.';
       window.showModalDelete(text, { hallId: hallId, hallName: hallName });
-    } else {
-      // fallback: нативное подтверждение
-      if (confirm('Удалить зал "' + hallName + '"?')) {
+    } else if (typeof window.showConfirmModal === 'function') {
+      window.showConfirmModal('Удалить зал "' + hallName + '"? Это действие нельзя отменить.', function () {
         performDelete(hallId, btn);
-      }
+      });
     }
   }, false);
 

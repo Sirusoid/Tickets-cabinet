@@ -309,7 +309,7 @@ require __DIR__ . '/../includes/panel.php';
 									<input type="password" name="new_password" minlength="8" placeholder="Новый пароль" required>
 									<button type="submit" class="btn btn-ghost btn-sm">Сброс пароля</button>
 								</form>
-								<form method="post" class="settings-inline-form settings-inline-form--delete" onsubmit="return confirm('Удалить пользователя?');">
+								<form method="post" class="settings-inline-form settings-inline-form--delete" data-confirm-submit="Удалить пользователя?">
 									<input type="hidden" name="action" value="delete_user">
 									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
 									<button type="submit" class="btn btn-danger btn-sm">Удалить</button>

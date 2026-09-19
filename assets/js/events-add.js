@@ -83,7 +83,9 @@
       confirmBtn.addEventListener('click', handler, false);
       return;
     }
-    if (confirm(text)) { if (isFunction(callback)) callback(); }
+    if (typeof window.showConfirmModal === 'function') {
+      window.showConfirmModal(text, callback);
+    }
   }
 
   /* -----------------------
