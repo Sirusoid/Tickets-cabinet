@@ -292,7 +292,6 @@ require __DIR__ . '/../includes/panel.php';
     <?php if ($errorText !== ''): ?>
         <div class="card alert alert--danger"><?= h($errorText) ?></div>
     <?php else: ?>
-        <div id="auditSummary" class="audit-summary">Найдено записей: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
         <div class="card audit-table-wrap table-shell">
             <table class="admin-table audit-table">
                 <thead>
@@ -341,8 +340,8 @@ require __DIR__ . '/../includes/panel.php';
                     <?php endif; ?>
                 </tbody>
             </table>
-            <nav id="auditPagination" class="table-pagination audit-pagination<?= $totalPages <= 1 ? ' is-empty' : '' ?>" aria-label="Страницы журнала">
-                <div id="auditPagerSummary" class="table-pagination__summary">Найдено: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+            <nav id="auditPagination" class="table-pagination audit-pagination" aria-label="Страницы журнала">
+                <div id="auditSummary" class="table-pagination__summary">Найдено: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
                 <label class="table-pagination__size">На странице
                     <select id="auditPagerPerPage" class="form-control" aria-label="Количество записей журнала на странице">
                         <?php foreach ([25, 50, 100, 500] as $pageSize): ?>

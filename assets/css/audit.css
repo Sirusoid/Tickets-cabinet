@@ -15,7 +15,6 @@
 .audit-table pre { max-width: 380px; max-height: 220px; margin: 8px 0 0; padding: 8px; overflow: auto; background: #f8fafc; color: #334155; font-size: 11px; white-space: pre-wrap; }
 .audit-empty { padding: 32px 12px !important; color: #64748b; text-align: center; }
 .audit-pagination { justify-content: flex-end; margin-top: 0; color: #64748b; }
-.audit-pagination.is-empty { display: none; }
 .audit-pagination button:disabled { opacity: .45; pointer-events: none; }
 #auditTbody.is-loading { opacity: .55; transition: opacity .12s ease; }
 @media (max-width: 950px) { .audit-filters__form { grid-template-columns: repeat(2, minmax(140px, 1fr)); } .audit-filters__actions { grid-column: 1 / -1; } }

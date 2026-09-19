@@ -66,9 +66,7 @@
         if (pagerPerPage) pagerPerPage.value = String(payload.per_page || 25);
         renderRows(payload.rows || []);
         if (summary) summary.innerHTML = 'Найдено записей: <strong>' + Number(payload.total || 0).toLocaleString('ru-RU') + '</strong>';
-        if (pageLabel) pageLabel.textContent = 'Страница ' + page + ' из ' + totalPages;
-        var pagination = document.getElementById('auditPagination');
-        if (pagination) pagination.classList.toggle('is-empty', totalPages <= 1);
+        if (pageLabel) pageLabel.textContent = page + ' / ' + totalPages;
         if (prev) prev.disabled = page <= 1;
         if (next) next.disabled = page >= totalPages;
       })
