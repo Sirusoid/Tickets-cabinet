@@ -3,34 +3,20 @@
 // Модуль бокового меню. Header перед подключением устанавливает $sidebar_active = $active_menu (опционально).
 
 require_once __DIR__ . '/settings_manager.php';
+require_once __DIR__ . '/permissions.php';
 
 $active = $sidebar_active ?? null;
 $currentPath = (string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $settingsPages = function_exists('settings_pages_map') ? settings_pages_map() : [];
 $isSettingsPath = strpos($currentPath, '/settings/') === 0;
-$currentRole = (string)($_SESSION['user']['role'] ?? '');
-$rawMatrix = '';
-if (isset($pdo) && $pdo instanceof PDO && function_exists('settings_get_value')) {
-  $rawMatrix = (string)settings_get_value($pdo, 'security.role_permissions', '');
-}
-$permissionsMatrix = function_exists('settings_decode_json_value')
-  ? settings_decode_json_value($rawMatrix, [])
-  : [];
-$hasPermissionsMatrix = is_array($permissionsMatrix) && !empty($permissionsMatrix);
-$isAllowed = function ($permKey, $fallback = true) use ($currentRole, $permissionsMatrix, $hasPermissionsMatrix) {
-  if ($currentRole === 'admin') {
-    return true;
+$currentRole = trim((string)($_SESSION['user']['role'] ?? ''));
+$isAllowed = function ($permKey, $fallback = false) use ($pdo) {
+  if ($permKey === null || $permKey === '') {
+    return (string)($_SESSION['user']['role'] ?? '') === 'admin';
   }
-  if (!$hasPermissionsMatrix || $permKey === null || $permKey === '') {
-    return (bool)$fallback;
-  }
-  $roleMatrix = $permissionsMatrix[$currentRole] ?? null;
-  if (!is_array($roleMatrix)) {
-    return (bool)$fallback;
-  }
-  return array_key_exists($permKey, $roleMatrix)
-    ? !empty($roleMatrix[$permKey])
-    : (bool)$fallback;
+  return isset($pdo) && $pdo instanceof PDO
+    ? user_has_permission($pdo, (string)$permKey, (bool)$fallback)
+    : false;
 };
 
 // Основное меню (простые ссылки)
@@ -69,7 +55,7 @@ $settingsPermMap = [
 $allowedSettingsLinks = [];
 foreach ($settingsPages as $slug => $cfg) {
   $perm = $settingsPermMap[$slug] ?? null;
-  if ($isAllowed($perm, true)) {
+  if ($isAllowed($perm, false)) {
     $allowedSettingsLinks[$slug] = $cfg;
   }
 }
@@ -81,7 +67,7 @@ $isSettingsExpanded = $isSettingsPath ? 'true' : 'false';
   <div class="sidebar-inner">
     <nav class="sidebar-menu" role="navigation" aria-label="Главная навигация">
       <?php foreach ($menu as $item):
-        if (!$isAllowed($item['perm'] ?? null, true)) {
+        if (!$isAllowed($item['perm'] ?? null, false)) {
           continue;
         }
         $isActive = ($active === $item['id']) ? ' is-active' : '';
