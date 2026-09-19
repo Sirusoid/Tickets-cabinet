@@ -282,14 +282,6 @@ require __DIR__ . '/../includes/panel.php';
                 <label for="audit-search">Поиск</label>
                 <input id="audit-search" type="search" name="search" class="form-control" value="<?= h($search) ?>" placeholder="Пользователь, объект, ID, IP">
             </div>
-            <div>
-                <label for="audit-per-page">Записей на странице</label>
-                <select id="audit-per-page" name="per_page" class="form-control">
-                    <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
-                        <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
             <div class="audit-filters__actions">
                 <a class="btn btn-ghost" href="/admin/audit.php">Сбросить</a>
                 <button class="btn btn-primary" type="submit">Показать</button>
@@ -301,7 +293,7 @@ require __DIR__ . '/../includes/panel.php';
         <div class="card alert alert--danger"><?= h($errorText) ?></div>
     <?php else: ?>
         <div id="auditSummary" class="audit-summary">Найдено записей: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
-        <div class="card audit-table-wrap">
+        <div class="card audit-table-wrap table-shell">
             <table class="admin-table audit-table">
                 <thead>
                     <tr>
@@ -349,16 +341,22 @@ require __DIR__ . '/../includes/panel.php';
                     <?php endif; ?>
                 </tbody>
             </table>
+            <nav id="auditPagination" class="table-pagination audit-pagination<?= $totalPages <= 1 ? ' is-empty' : '' ?>" aria-label="Страницы журнала">
+                <div id="auditPagerSummary" class="table-pagination__summary">Найдено: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+                <label class="table-pagination__size">На странице
+                    <select id="auditPagerPerPage" class="form-control" aria-label="Количество записей журнала на странице">
+                        <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+                            <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="table-pagination__controls">
+                    <button id="auditPrev" type="button" class="btn btn-ghost btn-sm" aria-label="Предыдущая страница" <?= $page <= 1 ? 'disabled' : '' ?>>←</button>
+                    <span id="auditPageLabel"><?= $page ?> / <?= $totalPages ?></span>
+                    <button id="auditNext" type="button" class="btn btn-ghost btn-sm" aria-label="Следующая страница" <?= $page >= $totalPages ? 'disabled' : '' ?>>→</button>
+                </div>
+            </nav>
         </div>
-
-        <nav id="auditPagination" class="table-pagination audit-pagination<?= $totalPages <= 1 ? ' is-empty' : '' ?>" aria-label="Страницы журнала">
-            <div class="table-pagination__summary">Найдено: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
-            <div class="table-pagination__controls">
-                <button id="auditPrev" type="button" class="btn btn-ghost btn-sm" <?= $page <= 1 ? 'disabled' : '' ?>>←</button>
-                <span id="auditPageLabel">Страница <?= $page ?> из <?= $totalPages ?></span>
-                <button id="auditNext" type="button" class="btn btn-ghost btn-sm" <?= $page >= $totalPages ? 'disabled' : '' ?>>→</button>
-            </div>
-        </nav>
     <?php endif; ?>
 </div>
 

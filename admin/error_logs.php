@@ -258,14 +258,6 @@ require __DIR__ . '/../includes/panel.php';
                 <input id="error-date-to" type="date" name="date_to" class="form-control" value="<?= h($dateTo) ?>">
             </div>
             <div>
-                <label for="error-per-page">Ошибок на странице</label>
-                <select id="error-per-page" name="per_page" class="form-control">
-                    <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
-                        <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
                 <label for="error-level">Уровень</label>
                 <div class="error-level-picker">
                     <select id="error-level" name="level" class="form-control">
@@ -326,7 +318,7 @@ require __DIR__ . '/../includes/panel.php';
         <form id="errorLogsBulkForm" method="post" action="/admin/error_logs.php">
             <input type="hidden" name="csrf_token" value="<?= h((string)($_SESSION['csrf_token'] ?? '')) ?>">
             <input type="hidden" name="action" id="errorLogsConfirmedAction" value="">
-        <div class="card audit-table-wrap">
+        <div class="card audit-table-wrap table-shell">
             <table class="admin-table audit-table">
                 <thead>
                     <tr>
@@ -369,27 +361,34 @@ require __DIR__ . '/../includes/panel.php';
                 <?php endforeach; endif; ?>
                 </tbody>
             </table>
-        </div>
-        <?php
+            <?php
         $previousQuery = $queryParams;
         $previousQuery['page'] = max(1, $page - 1);
         $nextQuery = $queryParams;
         $nextQuery['page'] = min($totalPages, $page + 1);
-        ?>
-        <div class="table-pagination error-logs-pager">
-            <div class="table-pagination__summary audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
-            <div class="table-pagination__controls">
-                <?php if ($page > 1): ?>
-                    <a class="btn btn-ghost" href="/admin/error_logs.php?<?= h(http_build_query($previousQuery)) ?>" aria-label="Предыдущая страница">←</a>
-                <?php else: ?>
-                    <button class="btn btn-ghost" type="button" disabled aria-label="Предыдущая страница">←</button>
-                <?php endif; ?>
-                <span><?= (int)$page ?> / <?= (int)$totalPages ?></span>
-                <?php if ($page < $totalPages): ?>
-                    <a class="btn btn-ghost" href="/admin/error_logs.php?<?= h(http_build_query($nextQuery)) ?>" aria-label="Следующая страница">→</a>
-                <?php else: ?>
-                    <button class="btn btn-ghost" type="button" disabled aria-label="Следующая страница">→</button>
-                <?php endif; ?>
+            ?>
+            <div class="table-pagination error-logs-pager">
+                <div class="table-pagination__summary audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+                <label class="table-pagination__size">На странице
+                    <select class="form-control" data-list-per-page data-list-path="/admin/error_logs.php" aria-label="Количество логов на странице">
+                        <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+                            <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="table-pagination__controls">
+                    <?php if ($page > 1): ?>
+                        <a class="btn btn-ghost btn-sm" href="/admin/error_logs.php?<?= h(http_build_query($previousQuery)) ?>" aria-label="Предыдущая страница">←</a>
+                    <?php else: ?>
+                        <button class="btn btn-ghost btn-sm" type="button" disabled aria-label="Предыдущая страница">←</button>
+                    <?php endif; ?>
+                    <span><?= (int)$page ?> / <?= (int)$totalPages ?></span>
+                    <?php if ($page < $totalPages): ?>
+                        <a class="btn btn-ghost btn-sm" href="/admin/error_logs.php?<?= h(http_build_query($nextQuery)) ?>" aria-label="Следующая страница">→</a>
+                    <?php else: ?>
+                        <button class="btn btn-ghost btn-sm" type="button" disabled aria-label="Следующая страница">→</button>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
         </form>

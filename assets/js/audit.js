@@ -7,6 +7,7 @@
   var pageLabel = document.getElementById('auditPageLabel');
   var prev = document.getElementById('auditPrev');
   var next = document.getElementById('auditNext');
+  var pagerPerPage = document.getElementById('auditPagerPerPage');
   var timer = null;
   var page = 1;
   var totalPages = 1;
@@ -52,6 +53,7 @@
     var data = new FormData(form);
     data.set('format', 'json');
     data.set('page', String(page));
+    data.set('per_page', pagerPerPage ? String(pagerPerPage.value) : '25');
     var params = new URLSearchParams();
     data.forEach(function (value, key) { params.set(key, value); });
     tbody.classList.add('is-loading');
@@ -61,6 +63,7 @@
         if (!payload || !payload.success) throw new Error(payload && payload.message ? payload.message : 'Ошибка загрузки журнала');
         page = Number(payload.page || 1);
         totalPages = Number(payload.total_pages || 1);
+        if (pagerPerPage) pagerPerPage.value = String(payload.per_page || 25);
         renderRows(payload.rows || []);
         if (summary) summary.innerHTML = 'Найдено записей: <strong>' + Number(payload.total || 0).toLocaleString('ru-RU') + '</strong>';
         if (pageLabel) pageLabel.textContent = 'Страница ' + page + ' из ' + totalPages;
@@ -74,6 +77,10 @@
   }
 
   form.addEventListener('submit', function (event) { event.preventDefault(); page = 1; loadAudit(); });
+  if (pagerPerPage) pagerPerPage.addEventListener('change', function () {
+    page = 1;
+    loadAudit();
+  });
   Array.prototype.forEach.call(form.querySelectorAll('input, select'), function (field) {
     field.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { page = 1; loadAudit(); }, 300); });
     field.addEventListener('change', function () { page = 1; loadAudit(); });
