@@ -20,7 +20,8 @@ $ticketSearch = trim((string)($_GET['ticket'] ?? ''));
 $transactionSearch = trim((string)($_GET['transaction'] ?? ''));
 $orderSearch = trim((string)($_GET['order'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 50;
+$requestedPerPage = (int)($_GET['per_page'] ?? 25);
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
@@ -196,6 +197,7 @@ $queryParams = [
     'ticket' => $ticketSearch,
     'transaction' => $transactionSearch,
     'order' => $orderSearch,
+    'per_page' => $perPage,
 ];
 ?>
 
@@ -277,7 +279,7 @@ $queryParams = [
         <div class="card alert alert--danger"><?= h($errorText) ?></div>
     <?php else: ?>
         <div class="refunds-summary">Найдено возвратов: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
-        <div class="card refunds-table-wrap">
+        <div class="card table-shell refunds-table-wrap">
             <table class="admin-table refunds-table">
                 <thead>
                     <tr>
@@ -318,19 +320,23 @@ $queryParams = [
                 <?php endforeach; endif; ?>
                 </tbody>
             </table>
-        </div>
-
-        <?php if ($totalPages > 1): ?>
-            <nav class="refunds-pagination" aria-label="Страницы возвратов">
-                <?php if ($page > 1): $queryParams['page'] = $page - 1; ?>
-                    <a class="btn btn-ghost btn-sm" href="/refunds/list.php?<?= h(http_build_query($queryParams)) ?>">Назад</a>
-                <?php endif; ?>
-                <span>Страница <?= $page ?> из <?= $totalPages ?></span>
-                <?php if ($page < $totalPages): $queryParams['page'] = $page + 1; ?>
-                    <a class="btn btn-ghost btn-sm" href="/refunds/list.php?<?= h(http_build_query($queryParams)) ?>">Вперёд</a>
-                <?php endif; ?>
+            <nav class="table-pagination refunds-pagination" aria-label="Страницы возвратов">
+                <div class="table-pagination__summary">Найдено: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+                <label class="table-pagination__size">На странице
+                    <select class="form-control" data-list-per-page data-list-path="/refunds/list.php" aria-label="Количество возвратов на странице">
+                        <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+                            <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="table-pagination__controls">
+                    <?php $previousPage = max(1, $page - 1); $nextPage = min($totalPages, $page + 1); ?>
+                    <a class="btn btn-ghost btn-sm" href="/refunds/list.php?<?= h(http_build_query(array_merge($queryParams, ['page' => $previousPage]))) ?>" aria-label="Предыдущая страница" <?= $page <= 1 ? 'aria-disabled="true" tabindex="-1"' : '' ?>>←</a>
+                    <span><?= (int)$page ?> / <?= (int)$totalPages ?></span>
+                    <a class="btn btn-ghost btn-sm" href="/refunds/list.php?<?= h(http_build_query(array_merge($queryParams, ['page' => $nextPage]))) ?>" aria-label="Следующая страница" <?= $page >= $totalPages ? 'aria-disabled="true" tabindex="-1"' : '' ?>>→</a>
+                </div>
             </nav>
-        <?php endif; ?>
+        </div>
     <?php endif; ?>
 </div>
 

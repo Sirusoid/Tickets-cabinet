@@ -534,6 +534,95 @@ button.btn-secondary[disabled] {
   max-width: 360px;
 }
 
+/* Унифицированная пагинация таблиц: контролы встроены в нижнюю полосу таблицы. */
+.table-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-top: 1px solid #edf0f4;
+  color: #667085;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.table-pagination__summary {
+  margin-right: auto;
+}
+
+.table-pagination__size {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.table-pagination__size .form-control {
+  width: 76px;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.table-pagination__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.table-pagination__controls .btn {
+  min-width: 40px;
+  height: 36px;
+  padding: 5px 10px;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.table-pagination__controls .btn:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.table-pagination__controls .btn[aria-disabled="true"] {
+  opacity: .45;
+  pointer-events: none;
+  cursor: default;
+}
+
+.table-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 42px;
+  padding: 4px 0 10px;
+}
+
+.table-bulk-toolbar__selection {
+  margin-right: auto;
+  color: #667085;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .table-pagination {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .table-pagination__summary {
+    width: 100%;
+    margin-right: 0;
+  }
+}
+
 /* Общий стиль тоста */
 .toast {
   pointer-events: auto;

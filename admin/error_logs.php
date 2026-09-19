@@ -17,7 +17,7 @@ $responseCode = trim((string)($_GET['response_code'] ?? ''));
 $search = trim((string)($_GET['search'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $requestedPerPage = (int)($_GET['per_page'] ?? 50);
-$perPage = in_array($requestedPerPage, [50, 100, 250, 500], true) ? $requestedPerPage : 50;
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
@@ -260,7 +260,7 @@ require __DIR__ . '/../includes/panel.php';
             <div>
                 <label for="error-per-page">Ошибок на странице</label>
                 <select id="error-per-page" name="per_page" class="form-control">
-                    <?php foreach ([50, 100, 250, 500] as $pageSize): ?>
+                    <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
                         <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -376,9 +376,9 @@ require __DIR__ . '/../includes/panel.php';
         $nextQuery = $queryParams;
         $nextQuery['page'] = min($totalPages, $page + 1);
         ?>
-        <div class="error-logs-pager" style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-            <div class="audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
-            <div style="display:flex; align-items:center; gap:8px;">
+        <div class="table-pagination error-logs-pager">
+            <div class="table-pagination__summary audit-summary">Найдено ошибок: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+            <div class="table-pagination__controls">
                 <?php if ($page > 1): ?>
                     <a class="btn btn-ghost" href="/admin/error_logs.php?<?= h(http_build_query($previousQuery)) ?>" aria-label="Предыдущая страница">←</a>
                 <?php else: ?>

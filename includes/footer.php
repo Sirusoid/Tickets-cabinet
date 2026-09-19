@@ -319,6 +319,20 @@ $page_scripts = $page_scripts ?? [];
       if (e.key === 'Escape') hideLogoutModal();
     }, false);
 
+    document.addEventListener('change', function(e){
+      var select = e.target.closest && e.target.closest('[data-list-per-page]');
+      if (!select) return;
+      var value = parseInt(select.value, 10);
+      if ([25, 50, 100, 500].indexOf(value) === -1) return;
+      var url = new URL(select.getAttribute('data-list-path') || window.location.pathname, window.location.origin);
+      new URLSearchParams(window.location.search).forEach(function(paramValue, paramName){
+        if (paramName !== 'page' && paramName !== 'per_page') url.searchParams.set(paramName, paramValue);
+      });
+      url.searchParams.set('page', '1');
+      url.searchParams.set('per_page', String(value));
+      window.location.href = url.pathname + '?' + url.searchParams.toString();
+    }, false);
+
   })();
   </script>
 

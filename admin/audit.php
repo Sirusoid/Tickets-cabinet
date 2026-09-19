@@ -20,7 +20,7 @@ $action = trim((string)($_GET['action'] ?? ''));
 $search = trim((string)($_GET['search'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $requestedPerPage = (int)($_GET['per_page'] ?? 50);
-$perPage = in_array($requestedPerPage, [50, 100, 250, 500], true) ? $requestedPerPage : 50;
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
 $cleanupSuccess = null;
 $cleanupError = null;
 
@@ -285,7 +285,7 @@ require __DIR__ . '/../includes/panel.php';
             <div>
                 <label for="audit-per-page">Записей на странице</label>
                 <select id="audit-per-page" name="per_page" class="form-control">
-                    <?php foreach ([50, 100, 250, 500] as $pageSize): ?>
+                    <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
                         <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -351,10 +351,13 @@ require __DIR__ . '/../includes/panel.php';
             </table>
         </div>
 
-        <nav id="auditPagination" class="audit-pagination" aria-label="Страницы журнала<?= $totalPages <= 1 ? ' is-empty' : '' ?>">
+        <nav id="auditPagination" class="table-pagination audit-pagination<?= $totalPages <= 1 ? ' is-empty' : '' ?>" aria-label="Страницы журнала">
+            <div class="table-pagination__summary">Найдено: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+            <div class="table-pagination__controls">
                 <button id="auditPrev" type="button" class="btn btn-ghost btn-sm" <?= $page <= 1 ? 'disabled' : '' ?>>←</button>
                 <span id="auditPageLabel">Страница <?= $page ?> из <?= $totalPages ?></span>
                 <button id="auditNext" type="button" class="btn btn-ghost btn-sm" <?= $page >= $totalPages ? 'disabled' : '' ?>>→</button>
+            </div>
         </nav>
     <?php endif; ?>
 </div>

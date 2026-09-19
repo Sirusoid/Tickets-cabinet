@@ -237,6 +237,8 @@ foreach ($schedules_raw as $s) {
 
     $schedules[] = $s;
 }
+  $cashTotalSchedules = count($schedules);
+  $schedules = array_slice($schedules, 0, 25);
 ?>
 <link rel="stylesheet" href="/assets/css/schedule.css">
 <link rel="stylesheet" href="/assets/css/cashier.css">
@@ -275,7 +277,7 @@ foreach ($schedules_raw as $s) {
       <a id="btnClear" class="btn btn-ghost" href="/cash/index.php">Сброс</a>
     </form>
 
-    <div id="schedulesContainer">
+    <div id="schedulesContainer" class="table-shell">
       <table class="table admin-table table--compact" id="schedulesTable">
         <thead>
           <tr>
@@ -371,6 +373,21 @@ foreach ($schedules_raw as $s) {
           <?php endif; ?>
         </tbody>
       </table>
+      <div id="cashSchedulePagination" class="table-pagination" data-page="1" data-total-pages="<?= max(1, (int)ceil($cashTotalSchedules / 25)) ?>">
+        <div class="table-pagination__summary">Найдено: <strong id="cashScheduleTotal"><?= number_format($cashTotalSchedules, 0, '.', ' ') ?></strong></div>
+        <label class="table-pagination__size">На странице
+          <select id="cashSchedulePerPage" class="form-control" aria-label="Количество сеансов на странице">
+            <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+              <option value="<?= $pageSize ?>"><?= $pageSize ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <div class="table-pagination__controls">
+          <button type="button" class="btn btn-ghost btn-sm" id="cashSchedulePrev" aria-label="Предыдущая страница" disabled>←</button>
+          <span id="cashSchedulePageLabel">1 / <?= max(1, (int)ceil($cashTotalSchedules / 25)) ?></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="cashScheduleNext" aria-label="Следующая страница" <?= $cashTotalSchedules <= 25 ? 'disabled' : '' ?>>→</button>
+        </div>
+      </div>
     </div>
 </div>
 
@@ -418,7 +435,38 @@ foreach ($schedules_raw as $s) {
     return { label: label, style: style };
   }
 
+  var scheduleRows = [];
+  var schedulePage = 1;
+  var schedulePerPage = 25;
+
+  function updateSchedulePager() {
+    var total = scheduleRows.length;
+    var totalPages = Math.max(1, Math.ceil(total / schedulePerPage));
+    schedulePage = Math.min(schedulePage, totalPages);
+    var pager = document.getElementById('cashSchedulePagination');
+    var label = document.getElementById('cashSchedulePageLabel');
+    var totalEl = document.getElementById('cashScheduleTotal');
+    var prev = document.getElementById('cashSchedulePrev');
+    var next = document.getElementById('cashScheduleNext');
+    if (pager) {
+      pager.setAttribute('data-page', String(schedulePage));
+      pager.setAttribute('data-total-pages', String(totalPages));
+    }
+    if (label) label.textContent = schedulePage + ' / ' + totalPages;
+    if (totalEl) totalEl.textContent = Number(total).toLocaleString('ru-RU');
+    if (prev) prev.disabled = schedulePage <= 1;
+    if (next) next.disabled = schedulePage >= totalPages;
+  }
+
   function renderSchedules(rows){
+    scheduleRows = Array.isArray(rows) ? rows : [];
+    schedulePage = 1;
+    renderSchedulePage();
+  }
+
+  function renderSchedulePage(){
+    updateSchedulePager();
+    var rows = scheduleRows.slice((schedulePage - 1) * schedulePerPage, schedulePage * schedulePerPage);
     var tbody = document.getElementById('schedulesTbody');
     if (!tbody) return;
     if (!Array.isArray(rows) || rows.length === 0){
@@ -533,6 +581,29 @@ foreach ($schedules_raw as $s) {
   document.getElementById('btnFilter').addEventListener('click', function(){ window.fetchSessions(readFilters()); });
 
   document.getElementById('btnClear').addEventListener('click', function(){ setTimeout(function(){ window.fetchSessions(readFilters()); }, 50); });
+
+  document.addEventListener('click', function(e){
+    if (e.target.closest('#cashSchedulePrev') && schedulePage > 1) {
+      schedulePage -= 1;
+      renderSchedulePage();
+    }
+    if (e.target.closest('#cashScheduleNext')) {
+      var totalPages = Math.max(1, Math.ceil(scheduleRows.length / schedulePerPage));
+      if (schedulePage < totalPages) {
+        schedulePage += 1;
+        renderSchedulePage();
+      }
+    }
+  });
+
+  var cashPerPageSelect = document.getElementById('cashSchedulePerPage');
+  if (cashPerPageSelect) cashPerPageSelect.addEventListener('change', function(){
+    var value = parseInt(this.value, 10);
+    if ([25, 50, 100, 500].indexOf(value) === -1) return;
+    schedulePerPage = value;
+    schedulePage = 1;
+    renderSchedulePage();
+  });
 
   document.addEventListener('DOMContentLoaded', function(){
     // single initial request

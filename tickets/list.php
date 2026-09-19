@@ -159,9 +159,9 @@ require __DIR__ . '/../includes/panel.php';
           </table>
         </div>
 
-        <div id="ticketsPager" style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-          <div id="ticketsSummary" style="color:#666;">—</div>
-          <div style="display:flex; align-items:center; gap:8px;">
+        <div id="ticketsPager" class="table-pagination">
+          <div id="ticketsSummary" class="table-pagination__summary" style="color:#666;">—</div>
+          <div class="table-pagination__controls">
             <button id="prevPage" class="btn btn-ghost">←</button>
             <span id="currentPage">1 / 1</span>
             <button id="nextPage" class="btn btn-ghost">→</button>

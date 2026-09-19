@@ -60,6 +60,9 @@ $filter_event = isset($_GET['event_id']) && $_GET['event_id'] !== '' ? (int)$_GE
 $filter_date = isset($_GET['date']) && $_GET['date'] !== '' ? $_GET['date'] : null; // YYYY-MM-DD
 $filter_status = isset($_GET['status']) ? (string)$_GET['status'] : ''; // '', active, upcoming, draft, archive, cancelled
 $sort = isset($_GET['sort']) ? (string)$_GET['sort'] : 'date_desc'; // date_asc | date_desc
+$requestedPage = (int)($_GET['page'] ?? 1);
+$requestedPerPage = (int)($_GET['per_page'] ?? 25);
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
 
 $where = [];
 if ($filter_hall) $where[] = 's.hall_id = ' . $filter_hall;
@@ -81,8 +84,7 @@ $sql = "SELECT s.id, s.event_id, s.hall_id, s.start_time, s.end_time, s.base_pri
         LEFT JOIN events e ON e.id = s.event_id
         LEFT JOIN halls h ON h.id = s.hall_id
         {$where_sql}
-        ORDER BY {$order_by}
-        LIMIT 500";
+        ORDER BY {$order_by}";
 $schedules_raw = db_fetch_all($sql);
 
 // допустимые статусы
@@ -99,6 +101,11 @@ foreach ($schedules_raw as $s) {
     $s['_computed_status'] = $computed;
     $schedules[] = $s;
 }
+  $totalSchedules = count($schedules);
+  $totalPages = max(1, (int)ceil($totalSchedules / $perPage));
+  $page = max(1, min($requestedPage, $totalPages));
+  $offset = ($page - 1) * $perPage;
+  $schedules = array_slice($schedules, $offset, $perPage);
 ?>
 <link rel="stylesheet" href="/assets/css/schedule.css">
 
@@ -139,10 +146,15 @@ foreach ($schedules_raw as $s) {
       <a id="btnClear" class="btn btn-ghost" href="/schedule/list.php">Сброс</a>
     </form>
 
-    <div id="schedulesContainer">
+    <div id="schedulesContainer" class="table-shell schedule-table-shell">
+      <div class="table-bulk-toolbar" id="scheduleBulkToolbar">
+        <div class="table-bulk-toolbar__selection"><strong id="scheduleSelectedCount">0</strong> выбрано</div>
+        <button type="button" class="btn btn-danger btn-sm" id="scheduleBulkDelete" disabled>Удалить выбранные</button>
+      </div>
       <table class="table admin-table table--compact" id="schedulesTable">
         <thead>
           <tr>
+            <th class="schedule-select-col"><input type="checkbox" id="scheduleSelectAll" aria-label="Выбрать все сеансы на странице"></th>
             <th style="width:6%;">#</th>
             <th style="width:12%;">Дата</th>
             <th style="width:22%;">Событие</th>
@@ -157,9 +169,9 @@ foreach ($schedules_raw as $s) {
         </thead>
         <tbody id="schedulesTbody">
           <?php if (empty($schedules)): ?>
-            <tr><td colspan="10" style="text-align:center; color:#666; padding:18px;">Сеансов не найдено</td></tr>
+            <tr><td colspan="11" style="text-align:center; color:#666; padding:18px;">Сеансов не найдено</td></tr>
           <?php else: ?>
-            <?php foreach ($schedules as $s): ?>
+            <?php foreach ($schedules as $rowIndex => $s): ?>
               <?php
                 $startTs = !empty($s['start_time']) ? strtotime($s['start_time']) : false;
                 $endTs = !empty($s['end_time']) ? strtotime($s['end_time']) : false;
@@ -266,7 +278,8 @@ foreach ($schedules_raw as $s) {
                 $noteDisplay = $rawNote !== '' ? h($rawNote) : '<span style="color:#888">—</span>';
               ?>
               <tr data-id="<?= h($s['id']) ?>" data-event-title="<?= $event_title_attr ?>" style="cursor:pointer;">
-                <td style="padding:10px; vertical-align:middle;"><?= h($s['id']) ?></td>
+                <td class="schedule-select-col" style="padding:10px; vertical-align:middle;"><input type="checkbox" class="schedule-select" value="<?= h($s['id']) ?>" aria-label="Выбрать сеанс <?= h($s['id']) ?>"></td>
+                <td style="padding:10px; vertical-align:middle;"><?= h($offset + $rowIndex + 1) ?></td>
                 <td style="padding:10px; vertical-align:middle;"><?= h($date) ?></td>
                 <td style="padding:10px; vertical-align:middle;"><?= h($s['event_title'] ?? ('#' . $s['event_id'])) ?></td>
 
@@ -291,6 +304,21 @@ foreach ($schedules_raw as $s) {
           <?php endif; ?>
         </tbody>
       </table>
+      <div id="schedulePagination" class="table-pagination" data-page="<?= (int)$page ?>" data-total-pages="<?= (int)$totalPages ?>" data-total="<?= (int)$totalSchedules ?>">
+        <div class="table-pagination__summary">Найдено: <strong><?= number_format($totalSchedules, 0, '.', ' ') ?></strong></div>
+        <label class="table-pagination__size">На странице
+          <select id="schedulePerPage" class="form-control" aria-label="Количество сеансов на странице">
+            <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+              <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <div class="table-pagination__controls">
+          <button type="button" class="btn btn-ghost btn-sm" id="schedulePrevPage" aria-label="Предыдущая страница" <?= $page <= 1 ? 'disabled' : '' ?>>←</button>
+          <span id="schedulePageLabel"><?= (int)$page ?> / <?= (int)$totalPages ?></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="scheduleNextPage" aria-label="Следующая страница" <?= $page >= $totalPages ? 'disabled' : '' ?>>→</button>
+        </div>
+      </div>
     </div>
 </div>
 
@@ -352,6 +380,100 @@ foreach ($schedules_raw as $s) {
     var debounceMs = 300;
     var timer = null;
 
+    function getPageSize() {
+      var select = document.getElementById('schedulePerPage');
+      var value = select ? parseInt(select.value, 10) : 25;
+      return [25, 50, 100, 500].indexOf(value) !== -1 ? value : 25;
+    }
+
+    function getPageFromUrl() {
+      var value = parseInt(new URLSearchParams(window.location.search).get('page') || '1', 10);
+      return value > 0 ? value : 1;
+    }
+
+    function updateSelectionState() {
+      var checks = Array.prototype.slice.call(document.querySelectorAll('.schedule-select'));
+      var selected = checks.filter(function (check) { return check.checked; });
+      var count = document.getElementById('scheduleSelectedCount');
+      var bulkButton = document.getElementById('scheduleBulkDelete');
+      var selectAll = document.getElementById('scheduleSelectAll');
+      if (count) count.textContent = String(selected.length);
+      if (bulkButton) bulkButton.disabled = selected.length === 0;
+      if (selectAll) {
+        selectAll.checked = checks.length > 0 && selected.length === checks.length;
+        selectAll.indeterminate = selected.length > 0 && selected.length < checks.length;
+      }
+    }
+
+    function bindSelection() {
+      var selectAll = document.getElementById('scheduleSelectAll');
+      if (selectAll) selectAll.addEventListener('change', function () {
+        Array.prototype.forEach.call(document.querySelectorAll('.schedule-select'), function (check) {
+          check.checked = selectAll.checked;
+        });
+        updateSelectionState();
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.schedule-select'), function (check) {
+        check.addEventListener('change', updateSelectionState);
+      });
+      updateSelectionState();
+    }
+
+    function deleteSelectedSchedules() {
+      var ids = Array.prototype.map.call(document.querySelectorAll('.schedule-select:checked'), function (check) {
+        return check.value;
+      });
+      if (!ids.length) {
+        showToast('Выберите хотя бы один сеанс', 'info');
+        return;
+      }
+
+      var remove = function () {
+        var body = new URLSearchParams();
+        body.append('action', 'delete_many');
+        body.append('csrf_token', window.APP_CSRF_TOKEN || '');
+        ids.forEach(function (id) { body.append('ids[]', id); });
+        var button = document.getElementById('scheduleBulkDelete');
+        if (button) { button.disabled = true; button.textContent = 'Удаление...'; }
+        fetch('/ajax/schedule.php', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: body.toString()
+        }).then(function (response) { return response.json(); })
+          .then(function (payload) {
+            if (!payload || !payload.success) throw new Error((payload && payload.message) || 'Ошибка удаления');
+            showToast(payload.message || 'Выбранные сеансы удалены', 'success');
+            fetchAndReplace(window.location.search.substring(1), false, getPageFromUrl());
+          })
+          .catch(function (error) {
+            if (button) { button.disabled = false; button.textContent = 'Удалить выбранные'; }
+            showToast(error.message || 'Ошибка удаления выбранных сеансов', 'error');
+          });
+      };
+
+      if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal('Удалить выбранные сеансы? Это действие нельзя отменить.', remove);
+      } else {
+        remove();
+      }
+    }
+
+    function bindPagination() {
+      var pager = document.getElementById('schedulePagination');
+      if (!pager) return;
+      var currentPage = parseInt(pager.getAttribute('data-page') || '1', 10);
+      var totalPages = parseInt(pager.getAttribute('data-total-pages') || '1', 10);
+      var prev = document.getElementById('schedulePrevPage');
+      var next = document.getElementById('scheduleNextPage');
+      var perPage = document.getElementById('schedulePerPage');
+      if (prev) prev.onclick = function () { if (currentPage > 1) fetchAndReplace(window.location.search.substring(1), true, currentPage - 1); };
+      if (next) next.onclick = function () { if (currentPage < totalPages) fetchAndReplace(window.location.search.substring(1), true, currentPage + 1); };
+      if (perPage) perPage.onchange = function () { fetchAndReplace(window.location.search.substring(1), true, 1); };
+      var bulkButton = document.getElementById('scheduleBulkDelete');
+      if (bulkButton) bulkButton.onclick = deleteSelectedSchedules;
+    }
+
     function serializeForm(frm) {
       var params = new URLSearchParams();
       Array.prototype.slice.call(frm.elements).forEach(function(el){
@@ -364,8 +486,13 @@ foreach ($schedules_raw as $s) {
       return params.toString();
     }
 
-    function fetchAndReplace(queryString, pushUrl) {
-      var url = window.location.pathname + (queryString ? ('?' + queryString) : '');
+    function fetchAndReplace(queryString, pushUrl, requestedPage) {
+      var params = new URLSearchParams(queryString || '');
+      var targetPage = requestedPage || parseInt(params.get('page') || '1', 10) || 1;
+      params.set('page', String(targetPage));
+      params.set('per_page', String(getPageSize()));
+      var normalizedQuery = params.toString();
+      var url = window.location.pathname + (normalizedQuery ? ('?' + normalizedQuery) : '');
       var table = document.getElementById('schedulesTable');
       if (table) table.style.opacity = '0.6';
 
@@ -381,6 +508,11 @@ foreach ($schedules_raw as $s) {
           if (!newTbody) throw new Error('Не удалось получить данные таблицы от сервера');
           var currentTbody = document.querySelector('#schedulesTbody');
           if (currentTbody) currentTbody.innerHTML = newTbody.innerHTML;
+          var newPager = doc.querySelector('#schedulePagination');
+          var currentPager = document.querySelector('#schedulePagination');
+          if (newPager && currentPager) currentPager.replaceWith(newPager);
+          bindSelection();
+          bindPagination();
           if (pushUrl) {
             try { history.replaceState({}, '', url); } catch (e) {}
           }
@@ -397,7 +529,7 @@ foreach ($schedules_raw as $s) {
       if (timer) clearTimeout(timer);
       timer = setTimeout(function () {
         var qs = serializeForm(form);
-        fetchAndReplace(qs, pushUrl !== false);
+        fetchAndReplace(qs, pushUrl !== false, 1);
       }, debounceMs);
     }
 
@@ -408,7 +540,7 @@ foreach ($schedules_raw as $s) {
           ev.preventDefault();
           if (timer) clearTimeout(timer);
           var qs = serializeForm(form);
-          fetchAndReplace(qs, true);
+          fetchAndReplace(qs, true, 1);
         }
       });
     });
@@ -418,7 +550,7 @@ foreach ($schedules_raw as $s) {
       applyBtn.addEventListener('click', function (ev) {
         ev.preventDefault();
         var qs = serializeForm(form);
-        fetchAndReplace(qs, true);
+        fetchAndReplace(qs, true, 1);
       });
     }
 
@@ -433,6 +565,12 @@ foreach ($schedules_raw as $s) {
       var qs = window.location.search ? window.location.search.substring(1) : '';
       fetchAndReplace(qs, false);
     });
+
+    window.refreshScheduleTable = function () {
+      fetchAndReplace(window.location.search.substring(1), false, getPageFromUrl());
+    };
+    bindSelection();
+    bindPagination();
   })();
 
   // Делегируем клик по документу (удаление / дублирование / переход в редактирование)
@@ -617,8 +755,7 @@ foreach ($schedules_raw as $s) {
           try { window.hideModalDelete && window.hideModalDelete(); } catch(e){}
           if (json && json.success) {
             showToast('Сеанс удалён', 'success');
-            var row = document.querySelector('tr[data-id="'+id+'"]');
-            if (row) row.remove();
+            if (typeof window.refreshScheduleTable === 'function') window.refreshScheduleTable();
           } else {
             var msg = (json && json.message) ? json.message : 'Ошибка при удалении';
             showToast(msg, 'error');
@@ -669,8 +806,7 @@ foreach ($schedules_raw as $s) {
     }).then(function(json){
       if (json && json.success) {
         showToast('Сеанс удалён', 'success');
-        var row = document.querySelector('tr[data-id="'+id+'"]');
-        if (row) row.remove();
+        if (typeof window.refreshScheduleTable === 'function') window.refreshScheduleTable();
       } else {
         var msg = (json && json.message) ? json.message : 'Ошибка при удалении';
         showToast(msg, 'error');

@@ -186,9 +186,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reset_password') {
 	$page_inline_scripts[] = 'if (typeof window.showToast === "function") { window.showToast(' . json_encode($toastMessage, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ', ' . json_encode($toastType) . ', { duration: 4500 }); }';
 }
 
+$usersPage = max(1, (int)($_GET['page'] ?? 1));
+$usersPerPageParam = (int)($_GET['per_page'] ?? 25);
+$usersPerPage = in_array($usersPerPageParam, [25, 50, 100, 500], true) ? $usersPerPageParam : 25;
+$usersTotal = 0;
+$usersTotalPages = 1;
+$usersOffset = 0;
 $users = [];
 if (isset($pdo) && $pdo instanceof PDO) {
-		$users = db_fetch_all('SELECT id, username, full_name, email, role, is_active, last_login_at, created_at, password_changed_at FROM users ORDER BY id ASC');
+		$usersTotalRow = db_fetch_one('SELECT COUNT(*) AS total FROM users');
+		$usersTotal = (int)($usersTotalRow['total'] ?? 0);
+		$usersTotalPages = max(1, (int)ceil($usersTotal / $usersPerPage));
+		$usersPage = min($usersPage, $usersTotalPages);
+		$usersOffset = ($usersPage - 1) * $usersPerPage;
+		$users = db_fetch_all('SELECT id, username, full_name, email, role, is_active, last_login_at, created_at, password_changed_at FROM users ORDER BY id ASC LIMIT ' . (int)$usersPerPage . ' OFFSET ' . (int)$usersOffset);
 }
 
 require __DIR__ . '/../includes/header.php';
@@ -248,7 +259,7 @@ require __DIR__ . '/../includes/panel.php';
 
 	<section class="form-block">
 		<h2 class="settings-block__title">Пользователи системы</h2>
-		<div class="settings-table-wrap">
+		<div class="table-shell settings-table-wrap">
 			<table class="table table--compact settings-table-users">
 				<thead>
 					<tr>
@@ -319,6 +330,22 @@ require __DIR__ . '/../includes/panel.php';
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+			<nav class="table-pagination" aria-label="Страницы пользователей">
+				<div class="table-pagination__summary">Найдено: <strong><?= number_format($usersTotal, 0, '.', ' ') ?></strong></div>
+				<label class="table-pagination__size">На странице
+					<select class="form-control" data-list-per-page data-list-path="/settings/users.php" aria-label="Количество пользователей на странице">
+						<?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+							<option value="<?= $pageSize ?>" <?= $usersPerPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<div class="table-pagination__controls">
+					<?php $previousPage = max(1, $usersPage - 1); $nextPage = min($usersTotalPages, $usersPage + 1); ?>
+					<a class="btn btn-ghost btn-sm" href="/settings/users.php?page=<?= $previousPage ?>&per_page=<?= $usersPerPage ?>" aria-label="Предыдущая страница" <?= $usersPage <= 1 ? 'aria-disabled="true" tabindex="-1"' : '' ?>>←</a>
+					<span><?= (int)$usersPage ?> / <?= (int)$usersTotalPages ?></span>
+					<a class="btn btn-ghost btn-sm" href="/settings/users.php?page=<?= $nextPage ?>&per_page=<?= $usersPerPage ?>" aria-label="Следующая страница" <?= $usersPage >= $usersTotalPages ? 'aria-disabled="true" tabindex="-1"' : '' ?>>→</a>
+				</div>
+			</nav>
 		</div>
 	</section>
 </div>

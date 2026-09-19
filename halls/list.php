@@ -4,12 +4,15 @@
 require_once __DIR__ . '/../init.php';
 require_login();
 
-$sql = "
-    SELECT id, name, created_at
-    FROM halls
-    ORDER BY name ASC
-";
-$stmt = $pdo->query($sql);
+$requestedPage = max(1, (int)($_GET['page'] ?? 1));
+$requestedPerPage = (int)($_GET['per_page'] ?? 25);
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
+$totalRow = db_fetch_one('SELECT COUNT(*) AS total FROM halls');
+$totalHalls = (int)($totalRow['total'] ?? 0);
+$totalPages = max(1, (int)ceil($totalHalls / $perPage));
+$page = min($requestedPage, $totalPages);
+$offset = ($page - 1) * $perPage;
+$halls = db_fetch_all("SELECT id, name, created_at FROM halls ORDER BY name ASC LIMIT " . (int)$perPage . " OFFSET " . (int)$offset);
 $use_sidebar = true;
 $active_menu = 'halls'; // dashboard, schedule, events, tickets, halls, reports
 $page_title_meta = 'Залы - Админка';
@@ -26,13 +29,11 @@ require_once __DIR__ . '/../includes/panel.php';
 ?>
 
 <div class="card halls-list">
-  <?php
-  $useArray = isset($halls) && is_array($halls);
-  $hasRows = $useArray ? !empty($halls) : ($stmt && $stmt->rowCount() > 0);
-  ?>
+  <?php $hasRows = !empty($halls); ?>
   <?php if (!$hasRows): ?>
     <div class="no-data">Залов не найдено.</div>
   <?php else: ?>
+    <div class="table-shell">
     <table class="table admin-table table--compact" aria-describedby="halls-table">
       <thead>
         <tr>
@@ -42,10 +43,7 @@ require_once __DIR__ . '/../includes/panel.php';
         </tr>
       </thead>
       <tbody>
-        <?php
-        if ($useArray) {
-          $i = 1;
-          foreach ($halls as $h): ?>
+        <?php $i = $offset + 1; foreach ($halls as $h): ?>
             <tr class="hall-row" data-id="<?= h($h['id']) ?>">
               <td><?= $i++ ?></td>
               <td><?= h($h['name']) ?></td>
@@ -54,23 +52,26 @@ require_once __DIR__ . '/../includes/panel.php';
                 <button class="btn btn-danger btn-sm js-delete-hall" data-id="<?= h($h['id']) ?>" data-name="<?= h($h['name']) ?>" title="Удалить">Удалить</button>
               </td>
             </tr>
-          <?php endforeach;
-        } else {
-          $i = 1;
-          while ($row = $stmt->fetch(PDO::FETCH_ASSOC)): ?>
-            <tr class="hall-row" data-id="<?= h($row['id']) ?>">
-              <td><?= $i++ ?></td>
-              <td><?= h($row['name']) ?></td>
-              <td class="actions actions--center">
-                <a href="/halls/edit.php?id=<?= h($row['id']) ?>" class="btn btn-ghost btn-sm" title="Редактировать">Редактировать</a>
-                <button class="btn btn-danger btn-sm js-delete-hall" data-id="<?= h($row['id']) ?>" data-name="<?= h($row['name']) ?>" title="Удалить">Удалить</button>
-              </td>
-            </tr>
-          <?php endwhile;
-        }
-        ?>
+          <?php endforeach; ?>
       </tbody>
     </table>
+    <nav class="table-pagination" aria-label="Страницы залов">
+      <div class="table-pagination__summary">Найдено: <strong><?= number_format($totalHalls, 0, '.', ' ') ?></strong></div>
+      <label class="table-pagination__size">На странице
+        <select class="form-control" data-list-per-page data-list-path="/halls/list.php" aria-label="Количество залов на странице">
+          <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+            <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <div class="table-pagination__controls">
+        <?php $previousPage = max(1, $page - 1); $nextPage = min($totalPages, $page + 1); ?>
+        <a class="btn btn-ghost btn-sm" href="/halls/list.php?page=<?= $previousPage ?>&per_page=<?= $perPage ?>" aria-label="Предыдущая страница" <?= $page <= 1 ? 'aria-disabled="true" tabindex="-1"' : '' ?>>←</a>
+        <span><?= (int)$page ?> / <?= (int)$totalPages ?></span>
+        <a class="btn btn-ghost btn-sm" href="/halls/list.php?page=<?= $nextPage ?>&per_page=<?= $perPage ?>" aria-label="Следующая страница" <?= $page >= $totalPages ? 'aria-disabled="true" tabindex="-1"' : '' ?>>→</a>
+      </div>
+    </nav>
+    </div>
   <?php endif; ?>
 </div>
 

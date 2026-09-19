@@ -41,7 +41,7 @@
 .refunds-status.is-pending { background: #fef3c7; color: #92400e; }
 .refunds-reason { max-width: 240px; color: #475569; }
 .refunds-empty { padding: 32px 12px !important; color: #64748b; text-align: center; }
-.refunds-pagination { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 14px; color: #64748b; }
+.refunds-pagination { justify-content: flex-end; margin-top: 0; color: #64748b; }
 @media (max-width: 950px) {
     .refunds-filters__form { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
     .refunds-filters__actions { grid-column: 1 / -1; }

@@ -16,7 +16,8 @@ require_once __DIR__ . '/../includes/panel.php';
 
 // Параметры
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 25;
+$requestedPerPage = (int)($_GET['per_page'] ?? 25);
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
 $offset = ($page - 1) * $perPage;
 
 // Определяем, какой маркер используется для профилей: IS NULL или = 0 или другой
@@ -118,18 +119,23 @@ function actor_phone_from_row($row) {
       </div>
     <?php endif; ?>
 
-    <div style="margin-top:18px; display:flex; justify-content:space-between; align-items:center;">
-      <div class="u-muted">Всего: <?= $total ?></div>
-      <div>
-        <?php
-          $pages = max(1, ceil($total / $perPage));
-          for ($p = 1; $p <= $pages; $p++):
-            $cls = $p === $page ? 'btn btn-ghost btn-sm is-active' : 'btn btn-ghost btn-sm';
-        ?>
-          <a href="/actors/list.php?page=<?= $p ?>" class="<?= h($cls) ?>"><?= $p ?></a>
-        <?php endfor; ?>
+    <?php $pages = max(1, (int)ceil($total / $perPage)); ?>
+    <nav class="table-pagination" aria-label="Страницы актёров">
+      <div class="table-pagination__summary">Всего: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+      <label class="table-pagination__size">На странице
+        <select class="form-control" data-list-per-page data-list-path="/actors/list.php" aria-label="Количество актёров на странице">
+          <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+            <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <div class="table-pagination__controls">
+        <?php $previousPage = max(1, $page - 1); $nextPage = min($pages, $page + 1); ?>
+        <a class="btn btn-ghost btn-sm" href="/actors/list.php?page=<?= $previousPage ?>&per_page=<?= $perPage ?>" aria-label="Предыдущая страница" <?= $page <= 1 ? 'aria-disabled="true" tabindex="-1"' : '' ?>>←</a>
+        <span><?= (int)$page ?> / <?= (int)$pages ?></span>
+        <a class="btn btn-ghost btn-sm" href="/actors/list.php?page=<?= $nextPage ?>&per_page=<?= $perPage ?>" aria-label="Следующая страница" <?= $page >= $pages ? 'aria-disabled="true" tabindex="-1"' : '' ?>>→</a>
       </div>
-    </div>
+    </nav>
 
   </div>
 </div>

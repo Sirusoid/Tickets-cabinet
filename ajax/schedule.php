@@ -219,6 +219,16 @@ if ($action === 'list') {
             if (function_exists('db_connect')) $pdo = db_connect();
         }
 
+        $requestedPage = max(1, (int)($_GET['page'] ?? 1));
+        $requestedPerPage = (int)($_GET['per_page'] ?? 25);
+        $perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
+
+        $countStmt = $pdo->query('SELECT COUNT(*) FROM schedules');
+        $total = (int)$countStmt->fetchColumn();
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        $page = min($requestedPage, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
         $sql = "SELECT
                     s.id,
                     COALESCE(e.title, '') AS event_title,
@@ -233,12 +243,19 @@ if ($action === 'list') {
                 FROM schedules s
                 LEFT JOIN events e ON e.id = s.event_id
                 LEFT JOIN halls h ON h.id = s.hall_id
-                ORDER BY s.start_time DESC";
+                ORDER BY s.start_time DESC
+                LIMIT " . (int)$perPage . " OFFSET " . (int)$offset;
 
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        json_resp(true, '', ['data' => $rows]);
+        json_resp(true, '', [
+            'data' => $rows,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'total_pages' => $totalPages,
+        ]);
     } catch (Throwable $e) {
         error_log('Schedule list error: ' . $e->getMessage());
         json_resp(false, 'Ошибка получения списка: ' . $e->getMessage());
@@ -267,6 +284,45 @@ if ($action === 'delete') {
     } catch (Throwable $e) {
         error_log('Schedule delete error: ' . $e->getMessage());
         json_resp(false, 'Ошибка удаления');
+    }
+}
+
+/*
+  DELETE_MANY action
+  Удаляет выбранные сеансы одной транзакцией.
+*/
+if ($action === 'delete_many') {
+    $csrf = $_POST['csrf_token'] ?? '';
+    if (!check_csrf($csrf)) json_resp(false, 'CSRF token invalid');
+
+    $ids = isset($_POST['ids']) && is_array($_POST['ids']) ? $_POST['ids'] : [];
+    $ids = array_values(array_filter(array_unique(array_map('intval', $ids)), static function ($id) {
+        return $id > 0;
+    }));
+    if (empty($ids)) json_resp(false, 'Выберите хотя бы один сеанс');
+
+    try {
+        if (!isset($pdo) || !$pdo) {
+            if (function_exists('db_connect')) $pdo = db_connect();
+        }
+        if (!isset($pdo) || !$pdo) throw new RuntimeException('Database connection not available');
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('DELETE FROM schedules WHERE id IN (' . $placeholders . ')');
+        $stmt->execute($ids);
+        $deleted = (int)$stmt->rowCount();
+        if (function_exists('audit_log_event')) {
+            foreach ($ids as $id) {
+                audit_log_event($pdo, 'schedule.delete', 'schedule', $id, null);
+            }
+        }
+        $pdo->commit();
+        json_resp(true, 'Удалено сеансов: ' . $deleted, ['deleted' => $deleted]);
+    } catch (Throwable $e) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
+        error_log('Schedule bulk delete error: ' . $e->getMessage());
+        json_resp(false, 'Ошибка удаления выбранных сеансов');
     }
 }
 

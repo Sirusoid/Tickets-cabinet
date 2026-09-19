@@ -115,7 +115,7 @@ $exportUrl = '/customers/export_excel.php?' . http_build_query([
 	<?php if ($errorText !== ''): ?>
 		<div class="customers-message customers-message--error"><?= h($errorText) ?></div>
 	<?php else: ?>
-		<div class="customers-table-wrap">
+		<div class="table-shell customers-table-wrap">
 			<table class="table admin-table table--compact customers-table">
 				<thead>
 					<tr>
@@ -151,9 +151,9 @@ $exportUrl = '/customers/export_excel.php?' . http_build_query([
 			</table>
 		</div>
 
-		<div id="customersPager" class="customers-pager">
-			<div id="customersSummary" class="customers-summary">Клиентов: <?= number_format($total, 0, '.', ' ') ?></div>
-			<div class="customers-pager__controls">
+		<div id="customersPager" class="table-pagination customers-pager">
+			<div id="customersSummary" class="table-pagination__summary customers-summary">Клиентов: <?= number_format($total, 0, '.', ' ') ?></div>
+			<div class="table-pagination__controls customers-pager__controls">
 				<button id="customersPrevPage" type="button" class="btn btn-ghost" aria-label="Предыдущая страница" <?= $page <= 1 ? 'disabled' : '' ?>>←</button>
 				<span id="customersCurrentPage"><?= $page ?> / <?= $pages ?></span>
 								<button id="customersNextPage" type="button" class="btn btn-ghost" aria-label="Следующая страница" <?= $page >= $pages ? 'disabled' : '' ?>>→</button>

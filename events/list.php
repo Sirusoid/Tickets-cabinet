@@ -21,6 +21,10 @@ $panel_actions = [
     ['href' => '/events/add.php', 'label' => 'Создать спектакль', 'class' => 'btn btn-primary btn-sm']
 ];
 
+$requestedPage = max(1, (int)($_GET['page'] ?? 1));
+$requestedPerPage = (int)($_GET['per_page'] ?? 25);
+$perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
+
 require __DIR__ . '/../includes/header.php';
 
 // Хелперы
@@ -53,6 +57,20 @@ if (!function_exists('contrast_text_color')) {
 }
 
 // Получаем данные для таблицы (добавлен join по языкам)
+$totalEvents = 0;
+$page = 1;
+$totalPages = 1;
+$offset = 0;
+$countSql = 'SELECT COUNT(*) FROM events';
+try {
+    $totalEvents = (int)db_fetch_one($countSql)['COUNT(*)'];
+    $totalPages = max(1, (int)ceil($totalEvents / $perPage));
+    $page = min($requestedPage, $totalPages);
+    $offset = ($page - 1) * $perPage;
+} catch (Throwable $e) {
+    error_log('events/list.php count SQL error: ' . $e->getMessage());
+}
+
 $sql = "
     SELECT
         e.id,
@@ -71,7 +89,7 @@ $sql = "
     LEFT JOIN event_statuses es ON es.code = e.status
     LEFT JOIN event_languages el ON el.id = e.language_id
     ORDER BY e.title ASC
-    LIMIT 500
+    LIMIT " . (int)$perPage . " OFFSET " . (int)$offset . "
 ";
 
 $events = [];
@@ -91,7 +109,7 @@ require_once __DIR__ . '/../includes/panel.php';
 <!-- Панель таблицы (контейнер) -->
 <div class="panel panel--content">
   <div class="panel__inner">
-    <div class="table-container events-list">
+    <div class="table-container table-shell events-list">
       <table class="table admin-table table--compact" aria-describedby="events-table">
         <thead>
           <tr>
@@ -107,7 +125,7 @@ require_once __DIR__ . '/../includes/panel.php';
           </tr>
         </thead>
         <tbody>
-          <?php $i = 1; foreach ($events as $ev): ?>
+          <?php $i = $offset + 1; foreach ($events as $ev): ?>
             <tr class="event-row" data-id="<?= h($ev['id']) ?>">
               <td><?= $i++ ?></td>
               <td class="col-poster">
@@ -144,6 +162,22 @@ require_once __DIR__ . '/../includes/panel.php';
           <?php endforeach; ?>
         </tbody>
       </table>
+            <nav class="table-pagination" aria-label="Страницы спектаклей">
+                <div class="table-pagination__summary">Найдено: <strong><?= number_format($totalEvents, 0, '.', ' ') ?></strong></div>
+                <label class="table-pagination__size">На странице
+                    <select class="form-control" data-list-per-page data-list-path="/events/list.php" aria-label="Количество спектаклей на странице">
+                        <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
+                            <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="table-pagination__controls">
+                    <?php $previousPage = max(1, $page - 1); $nextPage = min($totalPages, $page + 1); ?>
+                    <a class="btn btn-ghost btn-sm" href="/events/list.php?page=<?= $previousPage ?>&per_page=<?= $perPage ?>" aria-label="Предыдущая страница" <?= $page <= 1 ? 'aria-disabled="true" tabindex="-1"' : '' ?>>←</a>
+                    <span><?= (int)$page ?> / <?= (int)$totalPages ?></span>
+                    <a class="btn btn-ghost btn-sm" href="/events/list.php?page=<?= $nextPage ?>&per_page=<?= $perPage ?>" aria-label="Следующая страница" <?= $page >= $totalPages ? 'aria-disabled="true" tabindex="-1"' : '' ?>>→</a>
+                </div>
+            </nav>
     </div> <!-- .table-container -->
   </div>
 </div>
