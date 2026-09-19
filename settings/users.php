@@ -19,6 +19,8 @@ $pageConfig = $settingsPages[$settingsPageKey] ?? [
 $page_styles = $page_styles ?? [];
 $page_styles[] = '/assets/css/forms.css';
 $page_styles[] = '/assets/css/settings.css';
+$page_scripts = $page_scripts ?? [];
+$page_scripts[] = '/assets/js/settings_users.js';
 
 $use_sidebar = true;
 $active_menu = 'settings';
@@ -269,57 +271,24 @@ require __DIR__ . '/../includes/panel.php';
 						<th>Email</th>
 						<th>Роль</th>
 						<th>Активен</th>
-						<th>Последний вход</th>
 						<th>Действия</th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if (empty($users)): ?>
 						<tr>
-							<td colspan="8">Пользователи не найдены.</td>
+									<td colspan="7">Пользователи не найдены.</td>
 						</tr>
 					<?php endif; ?>
 					<?php foreach ($users as $userRow): ?>
-						<tr>
+								<tr class="settings-user-row" data-user-id="<?= (int)$userRow['id'] ?>" data-user-username="<?= h($userRow['username']) ?>" data-user-full-name="<?= h($userRow['full_name']) ?>" data-user-email="<?= h((string)$userRow['email']) ?>" data-user-role="<?= h($userRow['role']) ?>" data-user-active="<?= (int)$userRow['is_active'] ?>">
 							<td><?= (int)$userRow['id'] ?></td>
 							<td><?= h($userRow['username']) ?></td>
+									<td><?= h($userRow['full_name']) ?></td>
+									<td><?= h((string)$userRow['email']) ?: '—' ?></td>
+									<td><?= h($roles[$userRow['role']] ?? $userRow['role']) ?></td>
+									<td><span class="settings-user-status <?= (int)$userRow['is_active'] === 1 ? 'is-active' : 'is-inactive' ?>"><?= (int)$userRow['is_active'] === 1 ? 'Да' : 'Нет' ?></span></td>
 							<td>
-									<input form="update_user_<?= (int)$userRow['id'] ?>" type="text" name="full_name" value="<?= h($userRow['full_name']) ?>" required>
-							</td>
-							<td>
-									<input form="update_user_<?= (int)$userRow['id'] ?>" type="email" name="email" value="<?= h((string)$userRow['email']) ?>">
-							</td>
-							<td>
-									<select form="update_user_<?= (int)$userRow['id'] ?>" name="role">
-										<?php foreach ($roles as $roleCode => $roleLabel): ?>
-											<option value="<?= h($roleCode) ?>" <?= $roleCode === $userRow['role'] ? 'selected' : '' ?>><?= h($roleLabel) ?></option>
-										<?php endforeach; ?>
-									</select>
-							</td>
-							<td>
-									<label class="settings-bool settings-bool--compact">
-											<input form="update_user_<?= (int)$userRow['id'] ?>" type="checkbox" name="is_active" value="1" <?= (int)$userRow['is_active'] === 1 ? 'checked' : '' ?>>
-										<span><?= (int)$userRow['is_active'] === 1 ? 'Да' : 'Нет' ?></span>
-									</label>
-							</td>
-							<td>
-								<?= h((string)($userRow['last_login_at'] ?? '')) !== '' ? h((string)$userRow['last_login_at']) : '—' ?>
-							</td>
-							<td>
-								<form id="update_user_<?= (int)$userRow['id'] ?>" method="post" class="settings-inline-form">
-									<input type="hidden" name="action" value="update_user">
-									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
-									<div class="settings-inline-actions">
-										<button type="submit" class="btn btn-secondary btn-sm">Сохранить</button>
-									</div>
-								</form>
-
-								<form method="post" class="settings-inline-form settings-inline-form--reset">
-									<input type="hidden" name="action" value="reset_password">
-									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
-									<input type="password" name="new_password" minlength="8" placeholder="Новый пароль" required>
-									<button type="submit" class="btn btn-ghost btn-sm">Сброс пароля</button>
-								</form>
 								<form method="post" class="settings-inline-form settings-inline-form--delete" data-confirm-submit="Удалить пользователя?">
 									<input type="hidden" name="action" value="delete_user">
 									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
@@ -347,6 +316,36 @@ require __DIR__ . '/../includes/panel.php';
 				</div>
 			</nav>
 		</div>
+	</section>
+</div>
+
+<div id="settingsUserModal" class="settings-user-modal" aria-hidden="true">
+	<div class="settings-user-modal__backdrop" data-user-modal-close></div>
+	<section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsUserModalTitle">
+		<div class="settings-user-modal__header">
+			<div>
+				<h2 id="settingsUserModalTitle">Настройки пользователя</h2>
+				<div id="settingsUserModalUsername" class="settings-user-modal__username"></div>
+			</div>
+			<button type="button" class="btn btn-ghost btn-sm" data-user-modal-close aria-label="Закрыть">✕</button>
+		</div>
+		<form method="post" class="settings-user-modal__form">
+			<input type="hidden" name="action" value="update_user">
+			<input type="hidden" name="user_id" id="settingsUserId">
+			<div class="settings-user-modal__grid">
+				<div class="form-group"><label for="settingsUserFullName">ФИО</label><input id="settingsUserFullName" type="text" name="full_name" required></div>
+				<div class="form-group"><label for="settingsUserEmail">Email</label><input id="settingsUserEmail" type="email" name="email"></div>
+				<div class="form-group"><label for="settingsUserRole">Роль</label><select id="settingsUserRole" name="role"><?php foreach ($roles as $roleCode => $roleLabel): ?><option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option><?php endforeach; ?></select></div>
+				<div class="form-group settings-user-modal__active"><label class="settings-bool"><input id="settingsUserActive" type="checkbox" name="is_active" value="1"><span>Активная учетная запись</span></label></div>
+			</div>
+			<div class="settings-user-modal__actions"><button type="button" class="btn btn-ghost" data-user-modal-close>Отмена</button><button type="submit" class="btn btn-primary">Сохранить изменения</button></div>
+		</form>
+		<form method="post" class="settings-user-modal__password-form">
+			<input type="hidden" name="action" value="reset_password">
+			<input type="hidden" name="user_id" id="settingsPasswordUserId">
+			<div class="settings-user-modal__password-title">Сброс пароля</div>
+			<div class="settings-user-modal__password-row"><input type="password" name="new_password" minlength="8" placeholder="Новый пароль" required><button type="submit" class="btn btn-secondary">Обновить пароль</button></div>
+		</form>
 	</section>
 </div>
 
