@@ -50,6 +50,7 @@ if (!function_exists('audit_log_event')) {
             $labels = [
                 'auth.login' => 'Вход в систему',
                 'auth.logout' => 'Выход из системы',
+                'auth.password_changed' => 'Изменение пароля',
                 'sale:create' => 'Продажа в кассе',
                 'hold:create' => 'Резервирование мест',
                 'ticket.create' => 'Создание билета',

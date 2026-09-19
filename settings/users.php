@@ -134,11 +134,17 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						$saveErrors = array_merge($saveErrors, password_policy_errors($newPassword));
 
 						if (empty($saveErrors)) {
+								$targetUser = db_fetch_one('SELECT username FROM users WHERE id = ? LIMIT 1', [$userId]);
 								$stmt = $pdo->prepare('UPDATE users SET password_hash = :password_hash, password_changed_at = NOW(), failed_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = :id');
 								$stmt->execute([
 										':password_hash' => password_hash($newPassword, PASSWORD_DEFAULT),
 										':id' => $userId,
 								]);
+									if (function_exists('audit_log_event')) {
+											audit_log_event($pdo, 'auth.password_changed', 'user', $userId, (string)($targetUser['username'] ?? $userId), [], [
+											'password_changed' => true,
+										]);
+									}
 								$saveSuccess = 'Пароль обновлен.';
 						}
 				}
