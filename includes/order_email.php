@@ -301,18 +301,17 @@ if (!function_exists('order_email_build_order_message')) {
             . '<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px">'
             . '<tr style="background:#f1f5f9"><th align="left" style="padding:9px 8px">№</th><th align="left" style="padding:9px 8px">Ряд / Место</th><th align="left" style="padding:9px 8px">Цена</th><th align="left" style="padding:9px 8px">Файл</th></tr>'
             . $ticketRows . '</table>'
-            . '<p style="margin:20px 0 0;color:#475569">PDF-файлы билетов также прикреплены к этому письму. На странице заказа их можно скачать повторно.</p>'
+            . '<p style="margin:20px 0 0;color:#475569">PDF-файлы билетов доступны по ссылкам выше и на странице заказа. Их можно скачать повторно в любое время.</p>'
             . '<p style="margin:18px 0 0"><a href="' . $safeOrderUrl . '" target="_blank" style="color:#b42318;font-weight:700">Оформить возврат</a> (если возврат доступен по правилам и срок ещё не истёк).</p>'
             . '<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">С уважением,<br>' . $safeFromName . '</p>'
             . '</td></tr></table></td></tr></table></body></html>';
 
-        $sent = order_email_send_message((string)$email, $subject, $html, $settings, $assets['attachments']);
+        // PDF tickets remain available through the order/PDF links, but are not attached to email.
+        $sent = order_email_send_message((string)$email, $subject, $html, $settings, []);
         return [
             'success' => $sent,
             'message' => $sent ? 'Письмо передано почтовой службе хостинга. Доставка может занять несколько минут; проверьте также папку «Спам».' : 'PHP mail() не принял письмо. Проверьте настройки хостинга.',
-            'attachments' => count(array_filter($assets['attachments'], static function (array $attachment): bool {
-                return empty($attachment['inline']);
-            })),
+            'attachments' => 0,
         ];
     }
 }
