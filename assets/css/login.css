@@ -107,22 +107,6 @@ body::before{
 
 .login-link:hover{ text-decoration: underline; }
 
-.login-link-button{
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-  font: inherit;
-}
-
-.login-link-button:hover{
-  transform: none;
-  box-shadow: none;
-}
-
-.recovery-form{ margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--card-border); }
-
 /* Form */
 form{
   display: flex;
