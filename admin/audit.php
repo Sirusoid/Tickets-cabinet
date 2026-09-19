@@ -29,6 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         $cleanupError = 'Неверный CSRF-токен. Обновите страницу и повторите действие.';
     } else {
         $cleanupPeriod = (string)($_POST['cleanup_period'] ?? '');
+        $cleanupDateFrom = trim((string)($_POST['cleanup_date_from'] ?? ''));
+        $cleanupDateTo = trim((string)($_POST['cleanup_date_to'] ?? ''));
         $cleanupDays = [
             '1' => 1,
             '3' => 3,
@@ -50,14 +52,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
                     $pdo->exec('DELETE FROM `' . $table . '`');
                 } elseif ($cleanupDays !== null) {
                     $pdo->exec('DELETE FROM `' . $table . '` WHERE created_at < DATE_SUB(NOW(), INTERVAL ' . (int)$cleanupDays . ' DAY)');
+                } elseif ($cleanupPeriod === 'range'
+                    && preg_match('/^\d{4}-\d{2}-\d{2}$/', $cleanupDateFrom)
+                    && preg_match('/^\d{4}-\d{2}-\d{2}$/', $cleanupDateTo)
+                    && $cleanupDateFrom <= $cleanupDateTo) {
+                    $rangeStmt = $pdo->prepare('DELETE FROM `' . $table . '` WHERE created_at BETWEEN :date_from AND :date_to');
+                    $rangeStmt->execute([
+                        ':date_from' => $cleanupDateFrom . ' 00:00:00',
+                        ':date_to' => $cleanupDateTo . ' 23:59:59',
+                    ]);
                 } else {
-                    throw new InvalidArgumentException('Не выбран период очистки.');
+                    throw new InvalidArgumentException('Укажите корректный выбранный период.');
                 }
             }
             $pdo->commit();
-            $cleanupSuccess = $cleanupPeriod === 'all'
-                ? 'Журнал действий полностью очищен.'
-                : 'Удалены записи журнала старше ' . (int)$cleanupDays . ' ' . ($cleanupDays === 1 ? 'суток' : 'суток') . '.';
+            if ($cleanupPeriod === 'all') {
+                $cleanupSuccess = 'Журнал действий полностью очищен.';
+            } elseif ($cleanupPeriod === 'range') {
+                $cleanupSuccess = 'Удалены записи журнала за период ' . $cleanupDateFrom . ' — ' . $cleanupDateTo . '.';
+            } else {
+                $cleanupSuccess = 'Удалены записи журнала старше ' . (int)$cleanupDays . ' суток.';
+            }
         } catch (Throwable $exception) {
             if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -227,6 +242,14 @@ require __DIR__ . '/../includes/panel.php';
                     <button class="btn btn-ghost btn-sm" type="submit"><?= h($cleanupOption[1]) ?></button>
                 </form>
             <?php endforeach; ?>
+            <form method="post" onsubmit="return confirm('Удалить записи журнала за выбранный период?');">
+                <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
+                <input type="hidden" name="action" value="cleanup_audit">
+                <input type="hidden" name="cleanup_period" value="range">
+                <input type="hidden" name="cleanup_date_from" value="<?= h($dateFrom) ?>">
+                <input type="hidden" name="cleanup_date_to" value="<?= h($dateTo) ?>">
+                <button class="btn btn-secondary btn-sm" type="submit">За выбранный период</button>
+            </form>
             <form method="post" onsubmit="return confirm('Полностью очистить журнал действий? Это действие нельзя отменить.');">
                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token'] ?? '') ?>">
                 <input type="hidden" name="action" value="cleanup_audit">
