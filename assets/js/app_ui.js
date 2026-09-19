@@ -124,7 +124,30 @@
 
   // Универсальная обёртка: если jQuery доступен — используем его для создания тоста,
   // иначе — DOM-реализацию. Это позволяет безопасно подключать app_ui.js до/после jQuery.
+  var recentToastMessages = {};
+
+  function normalizeToastText(text) {
+    return String(text === null || typeof text === 'undefined' ? '' : text).replace(/\s+/g, ' ').trim();
+  }
+
+  function markToastMessage(text) {
+    var normalized = normalizeToastText(text);
+    if (!normalized) return;
+    recentToastMessages[normalized] = Date.now();
+    setTimeout(function(){
+      if (recentToastMessages[normalized] && Date.now() - recentToastMessages[normalized] >= 2000) {
+        delete recentToastMessages[normalized];
+      }
+    }, 2100);
+  }
+
+  function wasRecentlyToasted(text) {
+    var normalized = normalizeToastText(text);
+    return !!normalized && recentToastMessages[normalized] && Date.now() - recentToastMessages[normalized] < 2000;
+  }
+
   function showToast(text, type, options) {
+    markToastMessage(text);
     // prefer jQuery implementation if available and $ is ready
     if (typeof window.jQuery !== 'undefined' && window.jQuery) {
       try {
@@ -168,6 +191,79 @@
   // Экспорт в глобальную область
   window.showToast = showToast;
   window.appAlert = function(msg){ showToast(msg, 'info'); };
+
+  // Все служебные сообщения проекта проходят через toast, включая старые
+  // вызовы alert() и сообщения, добавленные в DOM после загрузки страницы.
+  window.alert = function(message) {
+    var text = normalizeToastText(message);
+    if (text) showToast(text, 'error', { duration: 4500 });
+  };
+
+  function alertType(element) {
+    var className = String(element.className || '').toLowerCase();
+    if (className.indexOf('success') !== -1) return 'success';
+    if (className.indexOf('danger') !== -1 || className.indexOf('error') !== -1) return 'error';
+    return 'info';
+  }
+
+  function toastVisibleAlert(element) {
+    if (!element || element.nodeType !== 1) return;
+    if (!element.matches('.alert, .settings-alert, .reports-alert, .customers-message')) return;
+    if (element.closest('#toast-wrap')) return;
+
+    var text = normalizeToastText(element.textContent || '');
+    if (!text || (element.dataset.toastHandled === 'true' && element.dataset.toastText === text)) return;
+
+    var style = window.getComputedStyle(element);
+    var isHidden = style.display === 'none' || style.visibility === 'hidden';
+    if (isHidden && element.dataset.toastHandled !== 'true') return;
+
+    element.dataset.toastHandled = 'true';
+    element.dataset.toastText = text;
+    element.style.display = 'none';
+    element.setAttribute('aria-hidden', 'true');
+    if (!wasRecentlyToasted(text)) showToast(text, alertType(element), { duration: 4500 });
+  }
+
+  function toastLegacyAlerts(root) {
+    if (!root || root.nodeType !== 1) return;
+    toastVisibleAlert(root);
+    var alerts = root.querySelectorAll('.alert, .settings-alert, .reports-alert, .customers-message');
+    for (var i = 0; i < alerts.length; i++) toastVisibleAlert(alerts[i]);
+  }
+
+  function installLegacyMessageBridge() {
+    toastLegacyAlerts(document.body);
+    if (window.serverErrorMessage) {
+      showToast(window.serverErrorMessage, 'error', { duration: 4500 });
+      window.serverErrorMessage = null;
+    }
+    if (typeof MutationObserver === 'undefined' || !document.body) return;
+    var observer = new MutationObserver(function(mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        var added = mutations[i].addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          if (added[j].nodeType === 1) toastLegacyAlerts(added[j]);
+        }
+        if (mutations[i].target && mutations[i].target.nodeType === 1) {
+          toastVisibleAlert(mutations[i].target);
+        }
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installLegacyMessageBridge, false);
+  } else {
+    installLegacyMessageBridge();
+  }
 
   var bccResponseMap = {
     '-1': ['Не заполнено обязательное поле запроса.', 'Проверьте данные операции и повторите запрос.'],
