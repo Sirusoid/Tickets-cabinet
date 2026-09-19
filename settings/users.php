@@ -78,12 +78,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 												':email' => $email !== '' ? $email : null,
 										]);
 										if (function_exists('audit_log_event')) {
-											audit_log_event($pdo, 'user.create', 'user', (int)$pdo->lastInsertId(), $username, [], [
-												'username' => $username,
-												'full_name' => $fullName,
-												'role' => $role,
-												'is_active' => $isActive,
-											]);
+											audit_log_event($pdo, 'user.create', 'user', (int)$pdo->lastInsertId(), $username, [], ['role' => $role, 'is_active' => $isActive]);
 										}
 										$saveSuccess = 'Пользователь создан.';
 								}
@@ -126,11 +121,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 												':id' => $userId,
 										]);
 										if (function_exists('audit_log_event')) {
-											audit_log_event($pdo, 'user.update', 'user', $userId, (string)($userId), [], [
-												'full_name' => $fullName,
-												'role' => $role,
-												'is_active' => $isActive,
-											]);
+											audit_log_event($pdo, 'user.update', 'user', $userId, $fullName, [], ['role' => $role, 'is_active' => $isActive]);
 										}
 										if ($userId === $currentUserId && isset($_SESSION['user']) && is_array($_SESSION['user'])) {
 												$_SESSION['user']['full_name'] = $fullName;
@@ -161,6 +152,26 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 										]);
 									}
 								$saveSuccess = 'Пароль обновлен.';
+				} elseif ($action === 'delete_user') {
+						$userId = (int)($_POST['user_id'] ?? 0);
+						$currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+						if ($userId <= 0) {
+							$saveErrors[] = 'Некорректный идентификатор пользователя.';
+						} elseif ($userId === $currentUserId) {
+							$saveErrors[] = 'Нельзя удалить собственную учетную запись.';
+						} else {
+							$targetUser = db_fetch_one('SELECT username, full_name FROM users WHERE id = ? LIMIT 1', [$userId]);
+							if (!$targetUser) {
+								$saveErrors[] = 'Пользователь не найден.';
+							} else {
+								$stmt = $pdo->prepare('DELETE FROM users WHERE id = :id');
+								$stmt->execute([':id' => $userId]);
+								if (function_exists('audit_log_event')) {
+									audit_log_event($pdo, 'user.delete', 'user', $userId, (string)$targetUser['username'], [], ['full_name_removed' => true]);
+								}
+								$saveSuccess = 'Пользователь удален.';
+							}
+						}
 						}
 				}
 		} catch (Throwable $e) {
@@ -297,6 +308,11 @@ require __DIR__ . '/../includes/panel.php';
 									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
 									<input type="password" name="new_password" minlength="8" placeholder="Новый пароль" required>
 									<button type="submit" class="btn btn-ghost btn-sm">Сброс пароля</button>
+								</form>
+								<form method="post" class="settings-inline-form settings-inline-form--delete" onsubmit="return confirm('Удалить пользователя?');">
+									<input type="hidden" name="action" value="delete_user">
+									<input type="hidden" name="user_id" value="<?= (int)$userRow['id'] ?>">
+									<button type="submit" class="btn btn-danger btn-sm">Удалить</button>
 								</form>
 							</td>
 						</tr>

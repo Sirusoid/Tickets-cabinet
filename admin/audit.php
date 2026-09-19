@@ -56,8 +56,10 @@ $rows = [];
 $total = 0;
 $actions = [];
 $errorText = '';
-/** @var PDO $pdo */
 try {
+    if (!isset($pdo) || !($pdo instanceof PDO)) {
+        throw new RuntimeException('Database connection unavailable.');
+    }
     $unionSql = "SELECT
             'audit' AS source,
             a.id,
@@ -118,6 +120,35 @@ try {
 }
 
 $totalPages = max(1, (int)ceil($total / $perPage));
+$jsonRows = [];
+foreach ($rows as $row) {
+    $details = [];
+    if (!empty($row['before_data'])) $details['До'] = json_decode((string)$row['before_data'], true) ?: $row['before_data'];
+    if (!empty($row['after_data'])) $details['После'] = json_decode((string)$row['after_data'], true) ?: $row['after_data'];
+    $jsonRows[] = [
+        'created_at' => $row['created_at'],
+        'source' => $row['source'] === 'cash' ? 'Касса' : 'Система',
+        'actor_name' => $row['actor_name'] ?? 'Система',
+        'action' => $row['action'],
+        'action_label' => audit_action_label($row['action']),
+        'entity' => trim((string)($row['entity_type'] ?? '') . ($row['entity_name'] ? ': ' . $row['entity_name'] : '') . ($row['entity_id'] ? ' #' . $row['entity_id'] : '')) ?: '—',
+        'ip_address' => $row['ip_address'] ?? '—',
+        'details' => $details,
+    ];
+}
+if (isset($_GET['format']) && $_GET['format'] === 'json') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => $errorText === '',
+        'message' => $errorText,
+        'rows' => $jsonRows,
+        'total' => $total,
+        'page' => $page,
+        'per_page' => $perPage,
+        'total_pages' => $totalPages,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 $queryParams = [
     'date_from' => $dateFrom,
     'date_to' => $dateTo,
@@ -125,6 +156,7 @@ $queryParams = [
     'search' => $search,
     'per_page' => $perPage,
 ];
+$page_scripts = ['/assets/js/audit.js'];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
@@ -172,7 +204,7 @@ require __DIR__ . '/../includes/panel.php';
     <?php if ($errorText !== ''): ?>
         <div class="card alert alert--danger"><?= h($errorText) ?></div>
     <?php else: ?>
-        <div class="audit-summary">Найдено записей: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
+        <div id="auditSummary" class="audit-summary">Найдено записей: <strong><?= number_format($total, 0, '.', ' ') ?></strong></div>
         <div class="card audit-table-wrap">
             <table class="admin-table audit-table">
                 <thead>
@@ -186,7 +218,7 @@ require __DIR__ . '/../includes/panel.php';
                         <th>Детали</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="auditTbody">
                     <?php if (!$rows): ?>
                         <tr><td colspan="7" class="audit-empty">Записей за выбранный период нет.</td></tr>
                     <?php else: ?>
@@ -223,19 +255,12 @@ require __DIR__ . '/../includes/panel.php';
             </table>
         </div>
 
-        <?php if ($totalPages > 1): ?>
-            <nav class="audit-pagination" aria-label="Страницы журнала">
-                <?php if ($page > 1): $queryParams['page'] = $page - 1; ?>
-                    <a class="btn btn-ghost btn-sm" href="/admin/audit.php?<?= h(http_build_query($queryParams)) ?>">Назад</a>
-                <?php endif; ?>
-                <span>Страница <?= $page ?> из <?= $totalPages ?></span>
-                <?php if ($page < $totalPages): $queryParams['page'] = $page + 1; ?>
-                    <a class="btn btn-ghost btn-sm" href="/admin/audit.php?<?= h(http_build_query($queryParams)) ?>">Вперёд</a>
-                <?php endif; ?>
-            </nav>
-        <?php endif; ?>
+        <nav id="auditPagination" class="audit-pagination" aria-label="Страницы журнала<?= $totalPages <= 1 ? ' is-empty' : '' ?>">
+                <button id="auditPrev" type="button" class="btn btn-ghost btn-sm" <?= $page <= 1 ? 'disabled' : '' ?>>←</button>
+                <span id="auditPageLabel">Страница <?= $page ?> из <?= $totalPages ?></span>
+                <button id="auditNext" type="button" class="btn btn-ghost btn-sm" <?= $page >= $totalPages ? 'disabled' : '' ?>>→</button>
+        </nav>
     <?php endif; ?>
 </div>
 
-<script src="/assets/js/audit.js"></script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

@@ -2,28 +2,82 @@
   'use strict';
 
   var form = document.getElementById('auditFilters');
-  if (!form) return;
-  var searchTimer = null;
-  var search = document.getElementById('audit-search');
-  var dateFrom = document.getElementById('audit-date-from');
-  var dateTo = document.getElementById('audit-date-to');
-  var action = document.getElementById('audit-action');
-  var perPage = document.getElementById('audit-per-page');
+  var tbody = document.getElementById('auditTbody');
+  var summary = document.getElementById('auditSummary');
+  var pageLabel = document.getElementById('auditPageLabel');
+  var prev = document.getElementById('auditPrev');
+  var next = document.getElementById('auditNext');
+  var timer = null;
+  var page = 1;
+  var totalPages = 1;
 
-  function submitLive() {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(function () {
-      var page = form.querySelector('input[name="page"]');
-      if (page) page.value = '1';
-      form.submit();
-    }, 250);
+  if (!form || !tbody) return;
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+    });
   }
 
-  if (search) search.addEventListener('input', submitLive);
-  [dateFrom, dateTo].forEach(function (field) {
-    if (field) field.addEventListener('change', submitLive);
+  function formatDate(value) {
+    var date = new Date(String(value || '').replace(' ', 'T'));
+    if (isNaN(date.getTime())) return value || '—';
+    return date.toLocaleString('ru-RU');
+  }
+
+  function detailsHtml(details) {
+    if (!details || !Object.keys(details).length) return '—';
+    return '<details><summary>Показать</summary><pre>' + escapeHtml(JSON.stringify(details, null, 2)) + '</pre></details>';
+  }
+
+  function renderRows(rows) {
+    if (!rows || !rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="audit-empty">Записей за выбранный период нет.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function (row) {
+      return '<tr>' +
+        '<td>' + escapeHtml(formatDate(row.created_at)) + '</td>' +
+        '<td>' + escapeHtml(row.source) + '</td>' +
+        '<td>' + escapeHtml(row.actor_name) + '</td>' +
+        '<td><span class="audit-action">' + escapeHtml(row.action_label) + '</span><small class="audit-action-code">' + escapeHtml(row.action) + '</small></td>' +
+        '<td>' + escapeHtml(row.entity) + '</td>' +
+        '<td>' + escapeHtml(row.ip_address) + '</td>' +
+        '<td>' + detailsHtml(row.details) + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function loadAudit() {
+    var data = new FormData(form);
+    data.set('format', 'json');
+    data.set('page', String(page));
+    var params = new URLSearchParams();
+    data.forEach(function (value, key) { params.set(key, value); });
+    tbody.classList.add('is-loading');
+    fetch('/admin/audit.php?' + params.toString(), { credentials: 'same-origin' })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (!payload || !payload.success) throw new Error(payload && payload.message ? payload.message : 'Ошибка загрузки журнала');
+        page = Number(payload.page || 1);
+        totalPages = Number(payload.total_pages || 1);
+        renderRows(payload.rows || []);
+        if (summary) summary.innerHTML = 'Найдено записей: <strong>' + Number(payload.total || 0).toLocaleString('ru-RU') + '</strong>';
+        if (pageLabel) pageLabel.textContent = 'Страница ' + page + ' из ' + totalPages;
+        var pagination = document.getElementById('auditPagination');
+        if (pagination) pagination.classList.toggle('is-empty', totalPages <= 1);
+        if (prev) prev.disabled = page <= 1;
+        if (next) next.disabled = page >= totalPages;
+      })
+      .catch(function (error) { tbody.innerHTML = '<tr><td colspan="7" class="audit-empty">' + escapeHtml(error.message) + '</td></tr>'; })
+      .finally(function () { tbody.classList.remove('is-loading'); });
+  }
+
+  form.addEventListener('submit', function (event) { event.preventDefault(); page = 1; loadAudit(); });
+  Array.prototype.forEach.call(form.querySelectorAll('input, select'), function (field) {
+    field.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { page = 1; loadAudit(); }, 300); });
+    field.addEventListener('change', function () { page = 1; loadAudit(); });
   });
-  [action, perPage].forEach(function (field) {
-    if (field) field.addEventListener('change', function () { form.submit(); });
-  });
+  if (prev) prev.addEventListener('click', function () { if (page > 1) { page--; loadAudit(); } });
+  if (next) next.addEventListener('click', function () { if (page < totalPages) { page++; loadAudit(); } });
 })();

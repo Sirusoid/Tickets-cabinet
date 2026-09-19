@@ -110,12 +110,7 @@ if ($action === 'create') {
 
         $newId = (int)$pdo->lastInsertId();
         if (function_exists('audit_log_event')) {
-            audit_log_event($pdo, 'schedule.create', 'schedule', $newId, 'Сеанс #' . $newId, [], [
-                'event_id' => $event_id,
-                'hall_id' => $hall_id,
-                'start_time' => $start_time,
-                'status' => $status,
-            ]);
+            audit_log_event($pdo, 'schedule.create', 'schedule', $newId, null, [], ['event_id' => $event_id, 'hall_id' => $hall_id, 'start_time' => $start_time]);
         }
         json_resp(true, 'Сеанс создан', ['id' => $newId]);
     } catch (Throwable $e) {
@@ -204,14 +199,8 @@ if ($action === 'update') {
         ]);
 
         if (function_exists('audit_log_event')) {
-            audit_log_event($pdo, 'schedule.update', 'schedule', $id, 'Сеанс #' . $id, [], [
-                'event_id' => $event_id,
-                'hall_id' => $hall_id,
-                'start_time' => $start_time,
-                'status' => $status,
-            ]);
+            audit_log_event($pdo, 'schedule.update', 'schedule', $id, null, [], ['event_id' => $event_id, 'hall_id' => $hall_id, 'start_time' => $start_time]);
         }
-
         json_resp(true, 'Сеанс сохранён', ['id' => $id]);
     } catch (Throwable $e) {
         error_log('Schedule update error: ' . $e->getMessage());
@@ -269,11 +258,10 @@ if ($action === 'delete') {
         if (!isset($pdo) || !$pdo) {
             if (function_exists('db_connect')) $pdo = db_connect();
         }
-        $existing = db_fetch_one('SELECT id, event_id, hall_id, start_time, status FROM schedules WHERE id = ? LIMIT 1', [$id]);
         $stmt = $pdo->prepare('DELETE FROM schedules WHERE id = ?');
         $stmt->execute([$id]);
         if (function_exists('audit_log_event')) {
-            audit_log_event($pdo, 'schedule.delete', 'schedule', $id, 'Сеанс #' . $id, $existing ?: [], []);
+            audit_log_event($pdo, 'schedule.delete', 'schedule', $id, null);
         }
         json_resp(true, 'Сеанс удалён');
     } catch (Throwable $e) {
@@ -350,15 +338,6 @@ if ($action === 'duplicate') {
         ]);
         $newId = (int)$pdo->lastInsertId();
         $pdo->commit();
-
-        if (function_exists('audit_log_event')) {
-            audit_log_event($pdo, 'schedule.create', 'schedule', $newId, 'Сеанс #' . $newId, ['duplicated_from' => $id], [
-                'event_id' => $new_event_id,
-                'hall_id' => $new_hall_id,
-                'start_time' => $new_start,
-                'status' => $new_status,
-            ]);
-        }
 
         json_resp(true, 'Сеанс дублирован', ['id' => $newId]);
     } catch (Throwable $e) {

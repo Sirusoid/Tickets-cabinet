@@ -362,6 +362,14 @@ if (!function_exists('settings_save_rows')) {
         $pdo->beginTransaction();
         try {
             foreach ($updates as $update) {
+                $rowById = null;
+                foreach ($rows as $row) {
+                    if ((int)($row['id'] ?? 0) === (int)$update['id']) {
+                        $rowById = $row;
+                        break;
+                    }
+                }
+                $beforeValue = $rowById['value'] ?? null;
                 if ($update['value'] === null || $update['value'] === '') {
                     $stmt->bindValue(':value', $update['value'] === '' ? '' : null, $update['value'] === '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
                 } else {
@@ -369,22 +377,12 @@ if (!function_exists('settings_save_rows')) {
                 }
                 $stmt->bindValue(':id', (int)$update['id'], PDO::PARAM_INT);
                 $stmt->execute();
+                if (function_exists('audit_log_event')) {
+                    audit_log_event($pdo, 'settings.update', 'setting', (int)$update['id'], (string)($rowById['key'] ?? $update['id']),
+                        ['value_changed' => true], ['value_changed' => true]);
+                }
             }
             $pdo->commit();
-            if (function_exists('audit_log_event')) {
-                $rowsById = [];
-                foreach ($rows as $row) {
-                    $rowsById[(int)$row['id']] = (string)($row['key'] ?? $row['id']);
-                }
-                $changedKeys = [];
-                foreach ($updates as $update) {
-                    $changedKeys[] = $rowsById[(int)$update['id']] ?? (string)$update['id'];
-                }
-                audit_log_event($pdo, 'settings.update', 'settings', null, 'Настройки', [], [
-                    'keys' => $changedKeys,
-                    'count' => count($changedKeys),
-                ]);
-            }
             return [true, [], count($updates)];
         } catch (Throwable $e) {
             $pdo->rollBack();
