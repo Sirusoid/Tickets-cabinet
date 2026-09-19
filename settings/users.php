@@ -77,6 +77,14 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 												':is_active' => $isActive,
 												':email' => $email !== '' ? $email : null,
 										]);
+										if (function_exists('audit_log_event')) {
+											audit_log_event($pdo, 'user.create', 'user', (int)$pdo->lastInsertId(), $username, [], [
+												'username' => $username,
+												'full_name' => $fullName,
+												'role' => $role,
+												'is_active' => $isActive,
+											]);
+										}
 										$saveSuccess = 'Пользователь создан.';
 								}
 						}
@@ -117,6 +125,13 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 												':is_active' => $isActive,
 												':id' => $userId,
 										]);
+										if (function_exists('audit_log_event')) {
+											audit_log_event($pdo, 'user.update', 'user', $userId, (string)($userId), [], [
+												'full_name' => $fullName,
+												'role' => $role,
+												'is_active' => $isActive,
+											]);
+										}
 										if ($userId === $currentUserId && isset($_SESSION['user']) && is_array($_SESSION['user'])) {
 												$_SESSION['user']['full_name'] = $fullName;
 												$_SESSION['user']['role'] = $role;

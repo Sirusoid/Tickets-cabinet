@@ -19,7 +19,8 @@ $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $action = trim((string)($_GET['action'] ?? ''));
 $search = trim((string)($_GET['search'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 50;
+$requestedPerPage = (int)($_GET['per_page'] ?? 50);
+$perPage = in_array($requestedPerPage, [50, 100, 250, 500], true) ? $requestedPerPage : 50;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
     $dateFrom = date('Y-m-01');
@@ -55,6 +56,7 @@ $rows = [];
 $total = 0;
 $actions = [];
 $errorText = '';
+/** @var PDO $pdo */
 try {
     $unionSql = "SELECT
             'audit' AS source,
@@ -121,6 +123,7 @@ $queryParams = [
     'date_to' => $dateTo,
     'action' => $action,
     'search' => $search,
+    'per_page' => $perPage,
 ];
 
 require __DIR__ . '/../includes/header.php';
@@ -129,7 +132,7 @@ require __DIR__ . '/../includes/panel.php';
 
 <div class="page container-full audit-page">
     <div class="card audit-filters">
-        <form method="get" class="audit-filters__form">
+        <form id="auditFilters" method="get" class="audit-filters__form">
             <div>
                 <label for="audit-date-from">Дата от</label>
                 <input id="audit-date-from" type="date" name="date_from" class="form-control" value="<?= h($dateFrom) ?>">
@@ -150,6 +153,14 @@ require __DIR__ . '/../includes/panel.php';
             <div>
                 <label for="audit-search">Поиск</label>
                 <input id="audit-search" type="search" name="search" class="form-control" value="<?= h($search) ?>" placeholder="Пользователь, объект, ID, IP">
+            </div>
+            <div>
+                <label for="audit-per-page">Записей на странице</label>
+                <select id="audit-per-page" name="per_page" class="form-control">
+                    <?php foreach ([50, 100, 250, 500] as $pageSize): ?>
+                        <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="audit-filters__actions">
                 <a class="btn btn-ghost" href="/admin/audit.php">Сбросить</a>
@@ -226,4 +237,5 @@ require __DIR__ . '/../includes/panel.php';
     <?php endif; ?>
 </div>
 
+<script src="/assets/js/audit.js"></script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

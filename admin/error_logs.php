@@ -426,7 +426,6 @@ require __DIR__ . '/../includes/panel.php';
     <section class="error-log-modal__dialog error-log-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="errorLogConfirmTitle">
         <div class="error-log-modal__header">
             <h2 id="errorLogConfirmTitle">Подтвердите действие</h2>
-            <button type="button" class="btn btn-ghost btn-sm" data-error-confirm-close aria-label="Закрыть">Нет</button>
         </div>
         <div class="error-log-modal__body">
             <p id="errorLogConfirmMessage" class="error-log-modal__message"></p>

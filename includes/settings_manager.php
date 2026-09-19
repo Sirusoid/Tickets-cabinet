@@ -371,6 +371,20 @@ if (!function_exists('settings_save_rows')) {
                 $stmt->execute();
             }
             $pdo->commit();
+            if (function_exists('audit_log_event')) {
+                $rowsById = [];
+                foreach ($rows as $row) {
+                    $rowsById[(int)$row['id']] = (string)($row['key'] ?? $row['id']);
+                }
+                $changedKeys = [];
+                foreach ($updates as $update) {
+                    $changedKeys[] = $rowsById[(int)$update['id']] ?? (string)$update['id'];
+                }
+                audit_log_event($pdo, 'settings.update', 'settings', null, 'Настройки', [], [
+                    'keys' => $changedKeys,
+                    'count' => count($changedKeys),
+                ]);
+            }
             return [true, [], count($updates)];
         } catch (Throwable $e) {
             $pdo->rollBack();

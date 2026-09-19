@@ -112,6 +112,11 @@ switch ($action) {
 
         $customerId = db_connect()->lastInsertId();
         $customer = db_fetch_one('SELECT id, full_name, email, phone, note, created_at FROM customers WHERE id = ? LIMIT 1', [$customerId]);
+        if (function_exists('audit_log_event')) {
+            audit_log_event(db_connect(), 'customer.create', 'customer', (int)$customerId, (string)$fullName, [], [
+                'fields' => ['full_name'],
+            ]);
+        }
         respond(['success' => true, 'message' => 'Клиент создан.', 'data' => $customer]);
         break;
 
@@ -133,7 +138,7 @@ switch ($action) {
             respond(['success' => false, 'message' => 'Укажите имя клиента.'], 400);
         }
 
-        $existing = db_fetch_one('SELECT id FROM customers WHERE id = ? LIMIT 1', [$customerId]);
+        $existing = db_fetch_one('SELECT id, full_name, email, phone, city, birth_date, gender, note FROM customers WHERE id = ? LIMIT 1', [$customerId]);
         if (!$existing) {
             respond(['success' => false, 'message' => 'Клиент не найден.'], 404);
         }
@@ -151,6 +156,13 @@ switch ($action) {
         );
 
         $customer = db_fetch_one('SELECT id, full_name, email, phone, city, birth_date, gender, note, created_at FROM customers WHERE id = ? LIMIT 1', [$customerId]);
+        if (function_exists('audit_log_event')) {
+            audit_log_event(db_connect(), 'customer.update', 'customer', $customerId, (string)$fullName, [
+                'fields' => ['full_name'],
+            ], [
+                'fields' => ['full_name', 'phone', 'email', 'city', 'birth_date', 'gender', 'note'],
+            ]);
+        }
         respond(['success' => true, 'message' => 'Клиент обновлён.', 'data' => $customer]);
         break;
 
@@ -161,12 +173,17 @@ switch ($action) {
             respond(['success' => false, 'message' => 'Неверный ID клиента.'], 400);
         }
 
-        $existing = db_fetch_one('SELECT id FROM customers WHERE id = ? LIMIT 1', [$customerId]);
+        $existing = db_fetch_one('SELECT id, full_name, email, phone FROM customers WHERE id = ? LIMIT 1', [$customerId]);
         if (!$existing) {
             respond(['success' => false, 'message' => 'Клиент не найден.'], 404);
         }
 
         db_query('DELETE FROM customers WHERE id = ?', [$customerId]);
+        if (function_exists('audit_log_event')) {
+            audit_log_event(db_connect(), 'customer.delete', 'customer', $customerId, (string)($existing['full_name'] ?? $customerId), [
+                'fields' => ['full_name', 'phone', 'email'],
+            ], []);
+        }
         respond(['success' => true, 'message' => 'Клиент удалён.']);
         break;
 

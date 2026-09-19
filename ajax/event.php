@@ -3,6 +3,8 @@
 require_once __DIR__ . '/../init.php';
 if (function_exists('require_login')) require_login();
 
+/** @var PDO $pdo */
+
 header('Content-Type: application/json; charset=utf-8');
 
 function respond($data, $status = 200) {
@@ -51,8 +53,11 @@ if ($action === 'delete') {
 
     try {
         // Optionally: check permissions here (require admin, etc.)
-        // Remove event row
+        $existing = db_fetch_one('SELECT id, title, status FROM events WHERE id = ? LIMIT 1', [$id]);
         db_query('DELETE FROM events WHERE id = ?', [$id]);
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'event.delete', 'event', $id, (string)($existing['title'] ?? $id), $existing ?: [], []);
+        }
         respond(['success' => true, 'message' => 'Мероприятие удалено']);
     } catch (Throwable $e) {
         error_log('ajax/event.php delete error: ' . $e->getMessage());
@@ -166,6 +171,14 @@ try {
             $page_url ?: null
         ]);
 
+        $newId = (int)db_connect()->lastInsertId();
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'event.create', 'event', $newId, $title, [], [
+                'status' => $status,
+                'duration_minutes' => $duration_minutes,
+            ]);
+        }
+
         respond(['success' => true, 'message' => 'Мероприятие создано']);
     }
 
@@ -178,7 +191,7 @@ try {
         // Ensure event exists
         $existing = null;
         if (function_exists('db_fetch_one')) {
-            $existing = db_fetch_one('SELECT id, image FROM events WHERE id = ? LIMIT 1', [$id]);
+            $existing = db_fetch_one('SELECT id, title, status, image FROM events WHERE id = ? LIMIT 1', [$id]);
         } else {
             $rows = function_exists('db_fetch_all') ? db_fetch_all('SELECT id, image FROM events WHERE id = ? LIMIT 1', [$id]) : [];
             $existing = !empty($rows) ? $rows[0] : null;
@@ -227,6 +240,13 @@ try {
 
         $sql = 'UPDATE events SET ' . implode(', ', $setParts) . ' WHERE id = ?';
         db_query($sql, $params);
+
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'event.update', 'event', $id, $title, $existing ?: [], [
+                'status' => $status,
+                'duration_minutes' => $duration_minutes,
+            ]);
+        }
 
         respond(['success' => true, 'message' => 'Мероприятие обновлено']);
     }

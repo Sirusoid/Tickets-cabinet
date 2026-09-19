@@ -1,6 +1,6 @@
 .audit-page { padding-bottom: 28px; }
 .audit-filters { margin-bottom: 14px; padding: 16px; }
-.audit-filters__form { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)) auto; gap: 10px; align-items: end; }
+.audit-filters__form { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)) auto; gap: 10px; align-items: end; }
 .audit-filters label { display: block; margin-bottom: 5px; color: #52647e; font-size: 12px; font-weight: 600; }
 .audit-filters__actions { display: flex; gap: 8px; }
 .audit-summary { margin: 0 0 8px; color: #64748b; font-size: 13px; }
