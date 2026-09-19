@@ -70,7 +70,6 @@ try {
 }
 
 require __DIR__ . '/includes/header.php';
-require __DIR__ . '/includes/panel.php';
 ?>
 
 <div class="reports-page page container-full">
