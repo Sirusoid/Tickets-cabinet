@@ -14,6 +14,11 @@ $roles = [
     'cashier' => 'Кассир',
     'scanner' => 'Сканер',
 ];
+$initialSearch = trim((string)($_GET['search'] ?? ''));
+$initialRole = trim((string)($_GET['role'] ?? ''));
+$initialActive = trim((string)($_GET['active'] ?? ''));
+$initialPerPage = (int)($_GET['per_page'] ?? 25);
+$initialPerPage = in_array($initialPerPage, [25, 50, 100, 500], true) ? $initialPerPage : 25;
 
 $use_sidebar = true;
 $active_menu = 'settings';
@@ -63,7 +68,7 @@ require __DIR__ . '/../includes/panel.php';
         <form id="settingsUsersFilters" class="compact-grid customers-filters" method="get">
             <div>
                 <div class="customers-field-wrap">
-                    <input id="settings-users-search" name="search" type="search" class="form-control" placeholder="Логин, ФИО или Email" aria-label="Поиск пользователя" autocomplete="off">
+                    <input id="settings-users-search" name="search" type="search" class="form-control" value="<?= h($initialSearch) ?>" placeholder="Логин, ФИО или Email" aria-label="Поиск пользователя" autocomplete="off">
                     <div id="settings-users-suggestions" class="typeahead-dropdown customers-suggestions" role="listbox"></div>
                 </div>
             </div>
@@ -71,15 +76,15 @@ require __DIR__ . '/../includes/panel.php';
                 <select id="settings-users-role-filter" name="role" class="form-control" aria-label="Роль">
                     <option value="">Все роли</option>
                     <?php foreach ($roles as $roleCode => $roleLabel): ?>
-                        <option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option>
+                        <option value="<?= h($roleCode) ?>" <?= $initialRole === $roleCode ? 'selected' : '' ?>><?= h($roleLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
             <div>
                 <select id="settings-users-active-filter" name="active" class="form-control" aria-label="Статус">
                     <option value="">Все статусы</option>
-                    <option value="1">Активные</option>
-                    <option value="0">Неактивные</option>
+                    <option value="1" <?= $initialActive === '1' ? 'selected' : '' ?>>Активные</option>
+                    <option value="0" <?= $initialActive === '0' ? 'selected' : '' ?>>Неактивные</option>
                 </select>
             </div>
             <div class="customers-filter-bottom">
@@ -87,7 +92,7 @@ require __DIR__ . '/../includes/panel.php';
                     <label for="settingsUsersPerPage">На странице</label>
                     <select id="settingsUsersPerPage" name="per_page" class="form-control">
                         <?php foreach ([25, 50, 100, 500] as $pageSize): ?>
-                            <option value="<?= $pageSize ?>"><?= $pageSize ?></option>
+                            <option value="<?= $pageSize ?>" <?= $initialPerPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

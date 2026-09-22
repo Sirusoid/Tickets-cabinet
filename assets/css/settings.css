@@ -183,6 +183,7 @@
 
 .settings-users-create-compact {
     display: block;
+    padding: 12px 14px;
 }
 
 .settings-users-create-compact .settings-hint {
@@ -193,7 +194,7 @@
     display: grid;
     grid-template-columns: minmax(130px, .85fr) minmax(180px, 1.2fr) minmax(180px, 1.1fr) minmax(150px, .95fr);
     align-items: end;
-    gap: 8px 10px;
+    gap: 7px 9px;
     width: 100%;
 }
 
@@ -208,8 +209,8 @@
 }
 
 .settings-user-create-inline .form-control {
-    min-height: 34px;
-    padding: 6px 8px;
+    min-height: 32px;
+    padding: 5px 8px;
     font-size: 12px;
     font-weight: 400;
 }
@@ -222,7 +223,8 @@
 
 .settings-user-create-inline > button {
     align-self: end;
-    min-height: 34px;
+    min-height: 32px;
+    padding: 6px 10px;
     white-space: nowrap;
 }
 
@@ -234,6 +236,10 @@
 .settings-users-page .form-block {
     padding: 14px 16px;
     border-radius: 8px;
+}
+
+.settings-users-page .settings-users-create-compact {
+    padding: 12px 14px;
 }
 
 .settings-users-page .settings-block__title {
