@@ -30,9 +30,9 @@ $page_scripts = $page_scripts ?? [];
   </div>
 
   <?php if (!empty($render_settings_user_modal) && !empty($settings_user_roles) && is_array($settings_user_roles)): ?>
-      <div id="settingsUserModal" class="settings-user-modal" aria-hidden="true" style="display:none;">
-        <div class="settings-user-modal__backdrop" data-user-modal-close></div>
-        <section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsUserModalTitle">
+      <div id="settingsUserModal" class="settings-user-modal" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:5000;align-items:center;justify-content:center;padding:18px;">
+        <div class="settings-user-modal__backdrop" data-user-modal-close style="position:absolute;inset:0;background:rgba(15,23,42,.52);"></div>
+        <section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsUserModalTitle" style="position:relative;z-index:1;width:620px;max-width:100%;max-height:calc(100vh - 36px);overflow-y:auto;padding:20px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;box-shadow:0 18px 50px rgba(15,23,42,.2);">
           <div class="settings-user-modal__header">
             <div>
               <h2 id="settingsUserModalTitle">Редактирование пользователя</h2>

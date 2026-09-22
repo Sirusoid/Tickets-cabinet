@@ -23,7 +23,10 @@
   var perPage = perPageSelect ? Number(perPageSelect.value || 25) : 25;
   var totalPages = 1;
 
-  if (!filterForm || !tbody) return;
+  if (editModal && editModal.parentNode !== document.body) {
+    document.body.appendChild(editModal);
+  }
+  if (!filterForm || !tbody || !editModal || !editForm) return;
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
@@ -186,6 +189,13 @@
 
   function openEditModal(id) {
     if (!editModal) return;
+    editModal.style.position = 'fixed';
+    editModal.style.inset = '0';
+    editModal.style.zIndex = '5000';
+    editModal.style.alignItems = 'center';
+    editModal.style.justifyContent = 'center';
+    editModal.style.display = 'flex';
+    editModal.setAttribute('aria-hidden', 'false');
     fetch('/ajax/users.php?action=get&id=' + encodeURIComponent(id), { credentials: 'same-origin' })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
@@ -198,11 +208,12 @@
         document.getElementById('settingsUserRole').value = user.role || 'manager';
         document.getElementById('settingsUserActive').checked = Number(user.is_active) === 1;
         document.getElementById('settingsUserNewPassword').value = '';
-        editModal.style.display = 'flex';
-        editModal.setAttribute('aria-hidden', 'false');
         document.getElementById('settingsUserFullName').focus();
       })
-      .catch(function (error) { showToast(error.message || 'Ошибка загрузки пользователя', 'error'); });
+      .catch(function (error) {
+        closeEditModal();
+        showToast(error.message || 'Ошибка загрузки пользователя', 'error');
+      });
   }
 
   function submitCreate(event) {
