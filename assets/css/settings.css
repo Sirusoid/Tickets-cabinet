@@ -181,6 +181,17 @@
     align-items: flex-end;
 }
 
+.settings-users-create-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.settings-users-create-compact .settings-hint {
+    margin-bottom: 0;
+}
+
 /* Dense layout for the staff directory: many users should fit in one viewport. */
 .settings-users-page {
     gap: 12px;
@@ -307,8 +318,11 @@
 .settings-user-modal__password-title { margin-bottom: 8px; color: #334155; font-size: 13px; font-weight: 600; }
 .settings-user-modal__password-row { display: flex; gap: 8px; }
 .settings-user-modal__password-row input { flex: 1; min-width: 0; }
+.settings-user-modal__password-field { grid-column: 1 / -1; }
+.settings-user-modal__password-field small { display: block; margin-top: 5px; color: #64748b; font-size: 12px; }
 
 @media (max-width: 640px) {
+    .settings-users-create-compact { align-items: flex-start; flex-direction: column; }
     .settings-user-modal__grid { grid-template-columns: 1fr; }
     .settings-user-modal__password-row { flex-direction: column; }
 }

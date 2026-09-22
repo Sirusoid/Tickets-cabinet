@@ -91,6 +91,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						$email = trim((string)($_POST['email'] ?? ''));
 						$role = trim((string)($_POST['role'] ?? 'manager'));
 						$isActive = !empty($_POST['is_active']) ? 1 : 0;
+						$newPassword = (string)($_POST['new_password'] ?? '');
 						$currentUserId = (int)($_SESSION['user']['id'] ?? 0);
 
 						if ($userId <= 0) {
@@ -108,22 +109,34 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						if ($userId === $currentUserId && $isActive === 0) {
 								$saveErrors[] = 'Нельзя деактивировать собственную учетную запись.';
 						}
+						if ($newPassword !== '') {
+								$saveErrors = array_merge($saveErrors, password_policy_errors($newPassword));
+						}
 
 						if (empty($saveErrors)) {
 								$dup = db_fetch_one('SELECT id FROM users WHERE id <> ? AND email = ? LIMIT 1', [$userId, $email]);
 								if ($email !== '' && $dup) {
 										$saveErrors[] = 'Этот email уже используется другим пользователем.';
 								} else {
-										$stmt = $pdo->prepare('UPDATE users SET full_name = :full_name, email = :email, role = :role, is_active = :is_active, updated_at = NOW() WHERE id = :id');
-										$stmt->execute([
+										$updateFields = 'full_name = :full_name, email = :email, role = :role, is_active = :is_active, updated_at = NOW()';
+										$updateParams = [
 												':full_name' => $fullName,
 												':email' => $email !== '' ? $email : null,
 												':role' => $role,
 												':is_active' => $isActive,
 												':id' => $userId,
-										]);
+										];
+										if ($newPassword !== '') {
+												$updateFields .= ', password_hash = :password_hash, password_changed_at = NOW(), failed_attempts = 0, locked_until = NULL';
+												$updateParams[':password_hash'] = password_hash($newPassword, PASSWORD_DEFAULT);
+										}
+										$stmt = $pdo->prepare('UPDATE users SET ' . $updateFields . ' WHERE id = :id');
+										$stmt->execute($updateParams);
 										if (function_exists('audit_log_event')) {
 											audit_log_event($pdo, 'user.update', 'user', $userId, $fullName, [], ['role' => $role, 'is_active' => $isActive]);
+											if ($newPassword !== '') {
+												audit_log_event($pdo, 'auth.password_changed', 'user', $userId, $fullName, [], ['password_changed' => true]);
+											}
 										}
 										if ($userId === $currentUserId && isset($_SESSION['user']) && is_array($_SESSION['user'])) {
 												$_SESSION['user']['full_name'] = $fullName;
@@ -143,37 +156,41 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 
 						if (empty($saveErrors)) {
 								$targetUser = db_fetch_one('SELECT username FROM users WHERE id = ? LIMIT 1', [$userId]);
-								$stmt = $pdo->prepare('UPDATE users SET password_hash = :password_hash, password_changed_at = NOW(), failed_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = :id');
-								$stmt->execute([
-										':password_hash' => password_hash($newPassword, PASSWORD_DEFAULT),
-										':id' => $userId,
-								]);
-									if (function_exists('audit_log_event')) {
-											audit_log_event($pdo, 'auth.password_changed', 'user', $userId, (string)($targetUser['username'] ?? $userId), [], [
-											'password_changed' => true,
+								if (!$targetUser) {
+										$saveErrors[] = 'Пользователь не найден.';
+								} else {
+										$stmt = $pdo->prepare('UPDATE users SET password_hash = :password_hash, password_changed_at = NOW(), failed_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = :id');
+										$stmt->execute([
+												':password_hash' => password_hash($newPassword, PASSWORD_DEFAULT),
+												':id' => $userId,
 										]);
-									}
-								$saveSuccess = 'Пароль обновлен.';
+										if (function_exists('audit_log_event')) {
+												audit_log_event($pdo, 'auth.password_changed', 'user', $userId, (string)$targetUser['username'], [], [
+														'password_changed' => true,
+												]);
+										}
+										$saveSuccess = 'Пароль обновлен.';
+								}
+						}
 				} elseif ($action === 'delete_user') {
 						$userId = (int)($_POST['user_id'] ?? 0);
 						$currentUserId = (int)($_SESSION['user']['id'] ?? 0);
 						if ($userId <= 0) {
-							$saveErrors[] = 'Некорректный идентификатор пользователя.';
+								$saveErrors[] = 'Некорректный идентификатор пользователя.';
 						} elseif ($userId === $currentUserId) {
-							$saveErrors[] = 'Нельзя удалить собственную учетную запись.';
+								$saveErrors[] = 'Нельзя удалить собственную учетную запись.';
 						} else {
-							$targetUser = db_fetch_one('SELECT username, full_name FROM users WHERE id = ? LIMIT 1', [$userId]);
-							if (!$targetUser) {
-								$saveErrors[] = 'Пользователь не найден.';
-							} else {
-								$stmt = $pdo->prepare('DELETE FROM users WHERE id = :id');
-								$stmt->execute([':id' => $userId]);
-								if (function_exists('audit_log_event')) {
-									audit_log_event($pdo, 'user.delete', 'user', $userId, (string)$targetUser['username'], [], ['full_name_removed' => true]);
+								$targetUser = db_fetch_one('SELECT username, full_name FROM users WHERE id = ? LIMIT 1', [$userId]);
+								if (!$targetUser) {
+										$saveErrors[] = 'Пользователь не найден.';
+								} else {
+										$stmt = $pdo->prepare('DELETE FROM users WHERE id = :id');
+										$stmt->execute([':id' => $userId]);
+										if (function_exists('audit_log_event')) {
+												audit_log_event($pdo, 'user.delete', 'user', $userId, (string)$targetUser['username'], [], ['full_name_removed' => true]);
+										}
+										$saveSuccess = 'Пользователь удален.';
 								}
-								$saveSuccess = 'Пользователь удален.';
-							}
-						}
 						}
 				}
 		} catch (Throwable $e) {
@@ -217,46 +234,12 @@ require __DIR__ . '/../includes/panel.php';
 		<div class="alert alert--danger"><?= h(implode(' ', $saveErrors)) ?></div>
 	<?php endif; ?>
 
-	<section class="form-block">
-		<h2 class="settings-block__title">Добавить пользователя</h2>
-		<form method="post" class="settings-users-create">
-			<input type="hidden" name="action" value="create_user">
-			<div class="settings-users-create__grid">
-				<div class="form-group">
-					<label for="create_username">Логин</label>
-					<input id="create_username" type="text" name="username" required>
-				</div>
-				<div class="form-group">
-					<label for="create_full_name">ФИО</label>
-					<input id="create_full_name" type="text" name="full_name" required>
-				</div>
-				<div class="form-group">
-					<label for="create_email">Email</label>
-					<input id="create_email" type="email" name="email" placeholder="user@example.com">
-				</div>
-				<div class="form-group">
-					<label for="create_role">Роль</label>
-					<select id="create_role" name="role">
-						<?php foreach ($roles as $roleCode => $roleLabel): ?>
-							<option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
-				<div class="form-group">
-					<label for="create_password">Пароль</label>
-					<input id="create_password" type="password" name="password" minlength="8" required>
-				</div>
-				<div class="form-group settings-users-create__check">
-					<label class="settings-bool">
-						<input type="checkbox" name="is_active" value="1" checked>
-						<span>Активный пользователь</span>
-					</label>
-				</div>
-			</div>
-			<div class="form-actions-bottom">
-				<button type="submit" class="btn btn-primary">Создать пользователя</button>
-			</div>
-		</form>
+	<section class="form-block settings-users-create-compact">
+		<div>
+			<h2 class="settings-block__title">Добавить пользователя</h2>
+			<p class="settings-hint">Создайте учётную запись сотрудника в отдельном окне.</p>
+		</div>
+		<button type="button" class="btn btn-primary" data-create-user-open>Добавить пользователя</button>
 	</section>
 
 	<section class="form-block">
@@ -337,14 +320,34 @@ require __DIR__ . '/../includes/panel.php';
 				<div class="form-group"><label for="settingsUserEmail">Email</label><input id="settingsUserEmail" type="email" name="email"></div>
 				<div class="form-group"><label for="settingsUserRole">Роль</label><select id="settingsUserRole" name="role"><?php foreach ($roles as $roleCode => $roleLabel): ?><option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option><?php endforeach; ?></select></div>
 				<div class="form-group settings-user-modal__active"><label class="settings-bool"><input id="settingsUserActive" type="checkbox" name="is_active" value="1"><span>Активная учетная запись</span></label></div>
+				<div class="form-group settings-user-modal__password-field"><label for="settingsUserNewPassword">Новый пароль (необязательно)</label><input id="settingsUserNewPassword" type="password" name="new_password" minlength="8" autocomplete="new-password" placeholder="Оставьте пустым, если менять не нужно"><small>Пароль обновится вместе с кнопкой «Сохранить изменения».</small></div>
 			</div>
 			<div class="settings-user-modal__actions"><button type="button" class="btn btn-ghost" data-user-modal-close>Отмена</button><button type="submit" class="btn btn-primary">Сохранить изменения</button></div>
 		</form>
-		<form method="post" class="settings-user-modal__password-form">
-			<input type="hidden" name="action" value="reset_password">
-			<input type="hidden" name="user_id" id="settingsPasswordUserId">
-			<div class="settings-user-modal__password-title">Сброс пароля</div>
-			<div class="settings-user-modal__password-row"><input type="password" name="new_password" minlength="8" placeholder="Новый пароль" required><button type="submit" class="btn btn-secondary">Обновить пароль</button></div>
+	</section>
+</div>
+
+<div id="settingsCreateUserModal" class="settings-user-modal" aria-hidden="true">
+	<div class="settings-user-modal__backdrop" data-create-user-close></div>
+	<section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsCreateUserModalTitle">
+		<div class="settings-user-modal__header">
+			<div>
+				<h2 id="settingsCreateUserModalTitle">Добавить пользователя</h2>
+				<div class="settings-user-modal__username">Новая учётная запись сотрудника</div>
+			</div>
+			<button type="button" class="btn btn-ghost btn-sm" data-create-user-close aria-label="Закрыть">✕</button>
+		</div>
+		<form method="post" class="settings-user-modal__form">
+			<input type="hidden" name="action" value="create_user">
+			<div class="settings-user-modal__grid">
+				<div class="form-group"><label for="create_username">Логин</label><input id="create_username" type="text" name="username" required></div>
+				<div class="form-group"><label for="create_full_name">ФИО</label><input id="create_full_name" type="text" name="full_name" required></div>
+				<div class="form-group"><label for="create_email">Email</label><input id="create_email" type="email" name="email" placeholder="user@example.com"></div>
+				<div class="form-group"><label for="create_role">Роль</label><select id="create_role" name="role"><?php foreach ($roles as $roleCode => $roleLabel): ?><option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option><?php endforeach; ?></select></div>
+				<div class="form-group"><label for="create_password">Пароль</label><input id="create_password" type="password" name="password" minlength="8" autocomplete="new-password" required></div>
+				<div class="form-group settings-user-modal__active"><label class="settings-bool"><input type="checkbox" name="is_active" value="1" checked><span>Активный пользователь</span></label></div>
+			</div>
+			<div class="settings-user-modal__actions"><button type="button" class="btn btn-ghost" data-create-user-close>Отмена</button><button type="submit" class="btn btn-primary">Создать пользователя</button></div>
 		</form>
 	</section>
 </div>
