@@ -26,8 +26,10 @@ $page_scripts = $page_scripts ?? [];
         <button id="modal-logout-cancel" type="button" class="btn btn-ghost">Отмена</button>
         <button id="modal-logout-confirm" type="button" class="btn btn-danger">Выйти</button>
       </div>
+    </div>
+  </div>
 
-      <?php if (!empty($render_settings_user_modal) && !empty($settings_user_roles) && is_array($settings_user_roles)): ?>
+  <?php if (!empty($render_settings_user_modal) && !empty($settings_user_roles) && is_array($settings_user_roles)): ?>
       <div id="settingsUserModal" class="settings-user-modal" aria-hidden="true" style="display:none;">
         <div class="settings-user-modal__backdrop" data-user-modal-close></div>
         <section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsUserModalTitle">
@@ -52,9 +54,7 @@ $page_scripts = $page_scripts ?? [];
           </form>
         </section>
       </div>
-      <?php endif; ?>
-    </div>
-  </div>
+  <?php endif; ?>
 
   <!-- Контейнер для тостов (app_ui.js создаёт его при необходимости, но оставляем резервный элемент) -->
   <div id="toast-wrap" aria-live="polite" aria-atomic="true" style="position:fixed; right:16px; bottom:20px; z-index:1200; display:flex; flex-direction:column; gap:8px; pointer-events:none; max-width:360px;"></div>
