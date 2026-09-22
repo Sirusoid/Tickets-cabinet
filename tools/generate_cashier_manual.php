@@ -118,24 +118,6 @@ $refundSvg = <<<'SVG'
 </svg>
 SVG;
 
-$qrSvg = <<<'SVG'
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="210" viewBox="0 0 720 210">
-  <rect width="720" height="210" rx="18" fill="#f8fafc"/>
-  <rect x="34" y="35" width="130" height="130" rx="10" fill="#fff" stroke="#cbd5e1"/>
-  <g fill="#111827">
-    <rect x="50" y="51" width="34" height="34"/><rect x="58" y="59" width="18" height="18" fill="#fff"/>
-    <rect x="114" y="51" width="34" height="34"/><rect x="122" y="59" width="18" height="18" fill="#fff"/>
-    <rect x="50" y="115" width="34" height="34"/><rect x="58" y="123" width="18" height="18" fill="#fff"/>
-    <rect x="99" y="98" width="12" height="12"/><rect x="119" y="101" width="18" height="10"/><rect x="93" y="126" width="15" height="15"/><rect x="119" y="128" width="25" height="13"/>
-  </g>
-  <path d="M188 100h80" stroke="#64748b" stroke-width="3"/><path d="m258 91 10 9-10 9" fill="none" stroke="#64748b" stroke-width="3"/>
-  <rect x="292" y="54" width="374" height="92" rx="12" fill="#173b67"/>
-  <text x="479" y="87" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="16" fill="#fff" font-weight="bold">Проверка входа</text>
-  <text x="479" y="114" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#dbeafe">UID → «Проверить» → результат</text>
-  <text x="360" y="184" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#475569">Повторно использованный билет система должна отметить как уже проверенный.</text>
-</svg>
-SVG;
-
 $html = <<<'HTML'
 <!doctype html>
 <html lang="ru">
@@ -201,7 +183,7 @@ $html = <<<'HTML'
         <img class="cover-logo" src="__LOGO__" alt="Логотип театра">
         <div class="cover-kicker">Tickets Cabinet</div>
         <h1>Касса</h1>
-        <p class="cover-subtitle">Полное пошаговое руководство кассира: продажа, резервы, скидки, возвраты, билеты, QR-проверка и отчёты.</p>
+        <p class="cover-subtitle">Полное пошаговое руководство кассира: продажа, резервы, скидки, возвраты, билеты и отчёты.</p>
         <div class="panel panel-blue" style="margin-top:18mm; max-width:145mm;">
             <strong>Для кого этот документ</strong><br>
             Для кассира, который оформляет продажу билетов, работает с клиентами и контролирует результаты операций.
@@ -251,7 +233,7 @@ $html = <<<'HTML'
     <h3>Что видит кассир</h3>
     <p>Набор разделов зависит от роли и прав. Обычно кассиру доступны:</p>
     <div class="two-col">
-        <div class="panel"><span class="badge badge-blue">Работа</span><br>Панель, Касса, Билеты, Возвраты, Сканер QR.</div>
+        <div class="panel"><span class="badge badge-blue">Работа</span><br>Панель, Касса, Билеты, Возвраты.</div>
         <div class="panel"><span class="badge badge-green">Контроль</span><br>Отчёты и Клиенты. Настройки и логи ошибок обычно доступны администратору.</div>
     </div>
 </section>
@@ -435,22 +417,7 @@ $html = <<<'HTML'
 </section>
 
 <section class="page">
-    <h2>14. QR-сканер и вход зрителя</h2>
-    <div class="figure">__QR__</div>
-    <div class="step"><span class="step-num">1</span><div class="step-body">Откройте <strong>Сканер QR</strong>.</div></div>
-    <div class="step"><span class="step-num">2</span><div class="step-body">Нажмите <strong>Включить камеру</strong>. Для камеры нужен HTTPS.</div></div>
-    <div class="step"><span class="step-num">3</span><div class="step-body">Наведите камеру на QR-код билета или используйте ручной ввод UID.</div></div>
-    <div class="step"><span class="step-num">4</span><div class="step-body">Дождитесь результата проверки.</div></div>
-    <table class="status-table">
-        <tr><th>Результат</th><th>Действие</th></tr>
-        <tr><td>Билет действителен</td><td>Пропустить зрителя и не сканировать тот же билет повторно.</td></tr>
-        <tr><td>Билет уже использован</td><td>Не пропускать автоматически, сообщить ответственному.</td></tr>
-        <tr><td>Билет отменён/возвращён</td><td>Билет недействителен, направить вопрос в кассу.</td></tr>
-    </table>
-</section>
-
-<section class="page">
-    <h2>15. Отчёты</h2>
+    <h2>14. Отчёты</h2>
     <p>Раздел <strong>Отчёты</strong> помогает сверить продажи и возвраты.</p>
     <ul>
         <li>выручка;</li><li>скидки;</li><li>чистая сумма;</li><li>продажи по спектаклям и сеансам;</li><li>возвраты;</li><li>тип клиента и способ оплаты.</li>
@@ -464,7 +431,7 @@ $html = <<<'HTML'
 </section>
 
 <section class="page">
-    <h2>16. Ошибки и порядок действий</h2>
+    <h2>15. Ошибки и порядок действий</h2>
     <table class="check-table">
         <tr><th>Сообщение/ситуация</th><th>Что сделать</th></tr>
         <tr><td>«Корзина пуста»</td><td>Выберите хотя бы одно свободное место.</td></tr>
@@ -479,7 +446,7 @@ $html = <<<'HTML'
 </section>
 
 <section class="page">
-    <h2>17. Чек-лист кассира</h2>
+    <h2>16. Чек-лист кассира</h2>
     <h3>Перед началом смены</h3>
     <ul><li>Войти под своей учётной записью.</li><li>Проверить дату и ближайшие сеансы.</li><li>Убедиться, что схема зала загружается.</li><li>Проверить доступность телефона клиента в форме.</li></ul>
     <h3>При каждой продаже</h3>
@@ -494,8 +461,8 @@ $html = <<<'HTML'
 HTML;
 
 $html = str_replace(
-    ['__LOGO__', '__TODAY__', '__FLOW__', '__SEATS__', '__DISCOUNTS__', '__SALE__', '__REFUND__', '__QR__'],
-    [$logo, $today, $flowSvg, $seatSvg, $discountSvg, $saleSvg, $refundSvg, $qrSvg],
+    ['__LOGO__', '__TODAY__', '__FLOW__', '__SEATS__', '__DISCOUNTS__', '__SALE__', '__REFUND__'],
+    [$logo, $today, $flowSvg, $seatSvg, $discountSvg, $saleSvg, $refundSvg],
     $html
 );
 
