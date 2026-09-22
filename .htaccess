@@ -23,6 +23,17 @@ DirectoryIndex index.php
     </IfModule>
 </FilesMatch>
 
+# Руководство кассира выдаётся только через проверяемую страницу кабинета.
+<FilesMatch "^CASHIER_MANUAL_RU\.pdf$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
 # Do not expose internal application directories through Apache.
 RewriteEngine On
 RewriteRule ^(?:includes|vendor|sql|logs|tools|tests|cgi-bin)(?:/|$) - [F,L,NC]

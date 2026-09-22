@@ -91,6 +91,7 @@ ZHASSAHNA_TICKET_PUBLIC_SECRET=...
 - `settings/email.php` — почта и письма с билетами;
 - `settings/users.php` — сотрудники;
 - `settings/permissions.php` — роли и доступы.
+- `admin/cashier_manual.php` — защищённое руководство кассира; доступ управляется правом `cashier_manual`.
 
 Все стандартные настройки сохраняются в таблице `settings` через `includes/settings_manager.php`.
 

@@ -66,6 +66,7 @@ flowchart TD
 - `cash/sell.php` — кассовая продажа и клиентские данные.
 - `ajax/cash.php` — кассовые операции, поиск клиентов, резервирование и продажа.
 - `tickets/list.php` — список билетов, фильтры, возвраты и экспорт.
+- `admin/cashier_manual.php` — защищённая выдача PDF-руководства кассира по праву `cashier_manual`.
 - `scanner.php` — совместимый вход в приложение QR-сканера.
 - `qr-scanner-app/` — отдельное приложение QR-сканера: экран, JavaScript и мобильные стили.
 - `qr-ticket-scanner-android/` — нативное Android-приложение на Kotlin с CameraX и ML Kit.
