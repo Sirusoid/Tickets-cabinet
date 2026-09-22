@@ -192,6 +192,25 @@
     margin-bottom: 0;
 }
 
+.settings-user-create-inline {
+    display: grid;
+    grid-template-columns: minmax(120px, .9fr) minmax(150px, 1.25fr) minmax(150px, 1.2fr) minmax(130px, 1fr) minmax(130px, 1fr) auto auto;
+    align-items: end;
+    gap: 8px 10px;
+    flex: 1;
+}
+
+.settings-user-create-inline .form-control {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+.settings-user-create-active {
+    min-height: 34px;
+    white-space: nowrap;
+}
+
 /* Dense layout for the staff directory: many users should fit in one viewport. */
 .settings-users-page {
     gap: 12px;
@@ -279,6 +298,7 @@
 .settings-users-page .settings-table-users th:nth-child(5) { width: 13%; }
 .settings-users-page .settings-table-users th:nth-child(6) { width: 80px; }
 .settings-users-page .settings-table-users th:nth-child(7) { width: 110px; }
+.settings-users-page .settings-users-table { min-width: 980px; }
 
 .settings-user-row { cursor: pointer; transition: background .12s ease; }
 .settings-user-row:hover { background: #f6f9ff; }
@@ -323,6 +343,7 @@
 
 @media (max-width: 640px) {
     .settings-users-create-compact { align-items: flex-start; flex-direction: column; }
+    .settings-user-create-inline { width: 100%; grid-template-columns: 1fr; }
     .settings-user-modal__grid { grid-template-columns: 1fr; }
     .settings-user-modal__password-row { flex-direction: column; }
 }
@@ -344,6 +365,10 @@
 }
 
 @media (max-width: 900px) {
+    .settings-user-create-inline {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+
     .settings-users-page .settings-users-create {
         grid-template-columns: 1fr;
     }
