@@ -511,6 +511,10 @@ $dompdf->render();
 
 $outputPath = $projectRoot . DIRECTORY_SEPARATOR . 'CASHIER_MANUAL_RU.pdf';
 file_put_contents($outputPath, $dompdf->output());
+$htmlPath = $projectRoot . DIRECTORY_SEPARATOR . 'CASHIER_MANUAL_RU.html';
+file_put_contents($htmlPath, $html);
 
 echo 'Generated: ' . $outputPath . PHP_EOL;
 echo 'Size: ' . filesize($outputPath) . ' bytes' . PHP_EOL;
+echo 'Generated: ' . $htmlPath . PHP_EOL;
+echo 'Size: ' . filesize($htmlPath) . ' bytes' . PHP_EOL;

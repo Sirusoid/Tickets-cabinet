@@ -24,7 +24,7 @@ DirectoryIndex index.php
 </FilesMatch>
 
 # Руководство кассира выдаётся только через проверяемую страницу кабинета.
-<FilesMatch "^CASHIER_MANUAL_RU\.pdf$">
+<FilesMatch "^CASHIER_MANUAL_RU\.(?:pdf|html)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
