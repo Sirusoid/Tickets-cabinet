@@ -24,10 +24,22 @@ if (!function_exists('user_has_permission')) {
             return $fallback;
         }
         $roleMatrix = $matrix[$role] ?? null;
-        if (!is_array($roleMatrix) || !array_key_exists($permission, $roleMatrix)) {
+        if (!is_array($roleMatrix)) {
+            return $fallback;
+        }
+        if (!array_key_exists($permission, $roleMatrix)) {
+            // Совместимость со старыми сохранёнными матрицами до добавления новых разделов.
+            $defaultPermissions = [
+                'cashier_manual' => [
+                    'manager' => true,
+                    'cashier' => true,
+                ],
+            ];
+            if (isset($defaultPermissions[$permission][$role])) {
+                return (bool)$defaultPermissions[$permission][$role];
+            }
             return $fallback;
         }
         return !empty($roleMatrix[$permission]);
     }
 }
-
