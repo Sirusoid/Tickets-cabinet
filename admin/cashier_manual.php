@@ -33,14 +33,25 @@ if (!is_file($htmlPath) || !is_readable($htmlPath)) {
 
 $manualHtml = (string)file_get_contents($htmlPath);
 $downloadUrl = '/admin/cashier_manual.php?download=1';
-$toolbar = '<div style="position:sticky;top:0;z-index:1000;display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;background:#173b67;box-shadow:0 2px 10px rgba(15,23,42,.18);font-family:Arial,sans-serif;">'
+$viewerStyle = '<style id="cashier-manual-viewer-style">'
+    . 'html,body{margin:0!important;padding:0!important;background:#eef2f7!important;}'
+    . 'body{min-width:320px!important;}'
+    . '.cashier-manual-viewer-bar{position:sticky;top:0;z-index:1000;display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;background:#173b67;box-shadow:0 2px 10px rgba(15,23,42,.18);font-family:Arial,sans-serif;}'
+    . '.cashier-manual-viewer-bar a{display:inline-block;padding:9px 16px;border-radius:7px;color:#fff;text-decoration:none;font-weight:700;font-size:14px;}'
+    . '.cashier-manual-viewer-bar__pdf{background:#18a957;}'
+    . '.cashier-manual-viewer-bar__cabinet{background:#2563eb;}'
+    . '@media(max-width:600px){.cashier-manual-viewer-bar{justify-content:stretch;}.cashier-manual-viewer-bar a{flex:1;text-align:center;padding-left:8px;padding-right:8px;font-size:12px;}}'
+    . '</style>';
+$toolbar = '<div class="cashier-manual-viewer-bar">'
     . '<a href="' . htmlspecialchars($downloadUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:inline-block;padding:9px 16px;border-radius:7px;background:#18a957;color:#fff;text-decoration:none;font-weight:700;font-size:14px;">Скачать PDF</a>'
+    . '<a href="/dashboard.php" class="cashier-manual-viewer-bar__cabinet">В кабинет</a>'
     . '</div>';
 
 if (preg_match('/<body[^>]*>/i', $manualHtml)) {
+    $manualHtml = preg_replace('/(<head[^>]*>)/i', '$1' . $viewerStyle, $manualHtml, 1);
     $manualHtml = preg_replace('/(<body[^>]*>)/i', '$1' . $toolbar, $manualHtml, 1);
 } else {
-    $manualHtml = $toolbar . $manualHtml;
+    $manualHtml = $viewerStyle . $toolbar . $manualHtml;
 }
 
 header('Content-Type: text/html; charset=UTF-8');
