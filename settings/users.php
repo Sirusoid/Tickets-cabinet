@@ -130,7 +130,7 @@ require __DIR__ . '/../includes/panel.php';
     </div>
 </div>
 
-<div id="settingsUserModal" class="settings-user-modal" aria-hidden="true">
+<div id="settingsUserModal" class="settings-user-modal" aria-hidden="true" style="display:none;">
     <div class="settings-user-modal__backdrop" data-user-modal-close></div>
     <section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsUserModalTitle">
         <div class="settings-user-modal__header">

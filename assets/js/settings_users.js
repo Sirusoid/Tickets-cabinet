@@ -74,7 +74,7 @@
     }
     var offset = (page - 1) * perPage;
     tbody.innerHTML = rows.map(function (user, index) {
-      return '<tr data-id="' + escapeHtml(user.id) + '">' +
+      return '<tr class="settings-user-row" data-id="' + escapeHtml(user.id) + '">' +
         '<td>' + (offset + index + 1) + '</td>' +
         '<td>' + escapeHtml(user.id) + '</td>' +
         '<td><strong>' + escapeHtml(user.username) + '</strong></td>' +
@@ -274,6 +274,11 @@
     if (editButton) {
       event.preventDefault();
       openEditModal(editButton.getAttribute('data-id') || '');
+      return;
+    }
+    var userRow = event.target.closest && event.target.closest('.settings-user-row');
+    if (userRow && !event.target.closest('a, button, input, select, label, form')) {
+      openEditModal(userRow.getAttribute('data-id') || '');
       return;
     }
     var deleteButton = event.target.closest && event.target.closest('.js-delete-user');
