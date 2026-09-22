@@ -182,31 +182,46 @@
 }
 
 .settings-users-create-compact {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    display: block;
 }
 
 .settings-users-create-compact .settings-hint {
-    margin-bottom: 0;
+    margin-bottom: 12px;
 }
 
 .settings-user-create-inline {
     display: grid;
-    grid-template-columns: minmax(120px, .9fr) minmax(150px, 1.25fr) minmax(150px, 1.2fr) minmax(130px, 1fr) minmax(130px, 1fr) auto auto;
+    grid-template-columns: minmax(130px, .85fr) minmax(180px, 1.2fr) minmax(180px, 1.1fr) minmax(150px, .95fr);
     align-items: end;
     gap: 8px 10px;
-    flex: 1;
+    width: 100%;
+}
+
+.settings-user-create-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    color: #52647e;
+    font-size: 11px;
+    font-weight: 600;
 }
 
 .settings-user-create-inline .form-control {
     min-height: 34px;
     padding: 6px 8px;
     font-size: 12px;
+    font-weight: 400;
 }
 
 .settings-user-create-active {
+    min-height: 34px;
+    align-self: end;
+    white-space: nowrap;
+}
+
+.settings-user-create-inline > button {
+    align-self: end;
     min-height: 34px;
     white-space: nowrap;
 }
@@ -342,7 +357,6 @@
 .settings-user-modal__password-field small { display: block; margin-top: 5px; color: #64748b; font-size: 12px; }
 
 @media (max-width: 640px) {
-    .settings-users-create-compact { align-items: flex-start; flex-direction: column; }
     .settings-user-create-inline { width: 100%; grid-template-columns: 1fr; }
     .settings-user-modal__grid { grid-template-columns: 1fr; }
     .settings-user-modal__password-row { flex-direction: column; }

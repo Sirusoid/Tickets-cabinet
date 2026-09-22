@@ -31,19 +31,29 @@ require __DIR__ . '/../includes/panel.php';
     <section class="form-block settings-users-create-compact">
         <div>
             <h2 class="settings-block__title">Добавить пользователя</h2>
-            <p class="settings-hint">Заполните поля прямо в этом блоке и нажмите «Создать пользователя».</p>
+            <p class="settings-hint">Заполните поля и нажмите «Создать пользователя».</p>
         </div>
         <form id="settingsUserCreateForm" class="settings-user-create-inline">
-            <input type="text" name="username" class="form-control" placeholder="Логин" aria-label="Логин" required>
-            <input type="text" name="full_name" class="form-control" placeholder="ФИО" aria-label="ФИО" required>
-            <input type="email" name="email" class="form-control" placeholder="Email" aria-label="Email">
-            <select name="role" class="form-control" aria-label="Роль">
-                <?php foreach ($roles as $roleCode => $roleLabel): ?>
-                    <option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <input type="password" name="password" class="form-control" minlength="8" autocomplete="new-password" placeholder="Пароль" aria-label="Пароль" required>
-            <label class="settings-bool settings-user-create-active"><input type="checkbox" name="is_active" value="1" checked><span>Активен</span></label>
+            <label class="settings-user-create-field">Логин
+                <input type="text" name="username" class="form-control" placeholder="Например, kassir_2" aria-label="Логин" required>
+            </label>
+            <label class="settings-user-create-field">ФИО
+                <input type="text" name="full_name" class="form-control" placeholder="Имя и фамилия" aria-label="ФИО" required>
+            </label>
+            <label class="settings-user-create-field">Email
+                <input type="email" name="email" class="form-control" placeholder="user@example.com" aria-label="Email">
+            </label>
+            <label class="settings-user-create-field">Роль
+                <select name="role" class="form-control" aria-label="Роль">
+                    <?php foreach ($roles as $roleCode => $roleLabel): ?>
+                        <option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label class="settings-user-create-field">Пароль
+                <input type="password" name="password" class="form-control" minlength="8" autocomplete="new-password" placeholder="Минимум 8 символов" aria-label="Пароль" required>
+            </label>
+            <label class="settings-bool settings-user-create-active"><input type="checkbox" name="is_active" value="1" checked><span>Активная запись</span></label>
             <button type="submit" class="btn btn-primary">Создать пользователя</button>
         </form>
     </section>
