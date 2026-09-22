@@ -135,29 +135,8 @@ require __DIR__ . '/../includes/panel.php';
     </div>
 </div>
 
-<div id="settingsUserModal" class="settings-user-modal" aria-hidden="true" style="display:none;">
-    <div class="settings-user-modal__backdrop" data-user-modal-close></div>
-    <section class="settings-user-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsUserModalTitle">
-        <div class="settings-user-modal__header">
-            <div>
-                <h2 id="settingsUserModalTitle">Редактирование пользователя</h2>
-                <div id="settingsUserModalUsername" class="settings-user-modal__username"></div>
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm" data-user-modal-close aria-label="Закрыть">✕</button>
-        </div>
-        <form id="settingsUserEditForm" class="settings-user-modal__form">
-            <input type="hidden" name="user_id" id="settingsUserId">
-            <div class="settings-user-modal__grid">
-                <div class="form-group"><label for="settingsUserFullName">ФИО</label><input id="settingsUserFullName" type="text" name="full_name" required></div>
-                <div class="form-group"><label for="settingsUserEmail">Email</label><input id="settingsUserEmail" type="email" name="email"></div>
-                <div class="form-group"><label for="settingsUserRole">Роль</label><select id="settingsUserRole" name="role"><?php foreach ($roles as $roleCode => $roleLabel): ?><option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option><?php endforeach; ?></select></div>
-                <div class="form-group settings-user-modal__active"><label class="settings-bool"><input id="settingsUserActive" type="checkbox" name="is_active" value="1"><span>Активная учетная запись</span></label></div>
-                <div class="form-group settings-user-modal__password-field"><label for="settingsUserNewPassword">Новый пароль (необязательно)</label><input id="settingsUserNewPassword" type="password" name="new_password" minlength="8" autocomplete="new-password" placeholder="Оставьте пустым, если менять не нужно"><small>Пароль обновится при сохранении формы.</small></div>
-            </div>
-            <div id="settingsUserEditError" class="customer-edit-form__error"></div>
-            <div class="settings-user-modal__actions"><button type="button" class="btn btn-ghost" data-user-modal-close>Отмена</button><button type="submit" class="btn btn-primary">Сохранить изменения</button></div>
-        </form>
-    </section>
-</div>
-
+<?php
+$render_settings_user_modal = true;
+$settings_user_roles = $roles;
+?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
