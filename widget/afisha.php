@@ -126,7 +126,7 @@ foreach ($sessions as $session) {
 
     $priceBlock = '';
     if ($priceText !== '') {
-        $priceBlock = '<div style="font-family:TildaSans,Arial,sans-serif;color:#ffffff;font-weight:500;font-size:32px;margin-bottom:62px;">'
+        $priceBlock = '<div style="font-family:TildaSans,Arial,sans-serif;color:#ffffff;font-weight:500;font-size:32px;margin-bottom:12px;">'
                     . htmlspecialchars($priceText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
                     . '</div>';
     }
@@ -161,7 +161,7 @@ foreach ($sessions as $session) {
                     </div>
                 </div>
 
-                <div style="display:flex; flex-direction:column; align-items:center;">
+                <div style="display:flex; flex:1; min-height:0; flex-direction:column; align-items:center; justify-content:flex-end;">
                     ' . $priceBlock . '
                     <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                     <div class="t774__btn-wrapper" style="margin-top:0;">
