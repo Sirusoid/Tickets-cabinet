@@ -344,7 +344,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							$netPerformance = max(0.0, (float)$item['paid'] - (float)$refundItem['amount']);
 					?>
 						<tr>
-							<td><strong><?= h($item['event_title']) ?></strong></td>
+							<td><a class="reports-performance-link" href="/reports/performance.php?session_id=<?= (int)$item['schedule_id'] ?>"><strong><?= h($item['event_title']) ?></strong></a></td>
 							<td><?= $item['schedule_start'] !== '' ? h(reporting_format_date($item['schedule_start'], true)) : '—' ?></td>
 							<td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td>
 							<td><?= number_format((float)$item['original'], 2, '.', ' ') ?> тг</td>

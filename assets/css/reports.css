@@ -189,6 +189,91 @@
 .reports-empty { padding: 28px 12px !important; color: #718096 !important; text-align: center; }
 .reports-alert--danger { margin-bottom: 14px; color: #b42318; border-color: #f3c5c0; background: #fff8f7; }
 .reports-table--wide { min-width: 820px; }
+.reports-performance-link { color: #172b4d; text-decoration: none; }
+.reports-performance-link:hover { color: #2563eb; text-decoration: underline; }
+
+.performance-report {
+  --performance-ink: #172b4d;
+  --performance-muted: #718096;
+  --performance-border: #e2e8f0;
+}
+
+.performance-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+  padding: 24px 26px;
+  background: linear-gradient(135deg, #172b4d 0%, #2563eb 100%);
+  border: 0;
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(37, 99, 235, .18);
+}
+
+.performance-back-link {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: rgba(255, 255, 255, .78);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.performance-back-link:hover { color: #fff; text-decoration: underline; }
+.performance-hero h1 { margin: 0; font-size: 28px; line-height: 1.15; }
+.performance-hero__meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; color: rgba(255, 255, 255, .82); font-size: 13px; }
+.performance-hero__meta span { padding: 6px 10px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 999px; }
+.performance-hero__meta .performance-status { background: rgba(255, 255, 255, .14); color: #fff; }
+.performance-hero__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.performance-hero__actions .btn-secondary { border-color: #fff; background: #fff; color: #172b4d; }
+.performance-hero__actions .btn-ghost { border-color: rgba(255, 255, 255, .4); color: #fff; }
+
+.performance-kpi-grid { grid-template-columns: repeat(5, minmax(140px, 1fr)); }
+.performance-insight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+.performance-chart-card, .performance-progress-card, .performance-sales-card { padding: 20px; }
+.performance-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.performance-section-head h2 { margin: 4px 0 0; color: var(--performance-ink); font-size: 18px; }
+.performance-card-kicker { color: #2563eb; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.performance-card-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: #eff6ff; color: #2563eb; font-size: 20px; font-weight: 800; }
+.performance-chart-layout { display: flex; align-items: center; gap: 24px; min-height: 190px; }
+.performance-donut { position: relative; display: flex; flex: 0 0 160px; width: 160px; height: 160px; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; color: var(--performance-ink); }
+.performance-donut::before { position: absolute; width: 112px; height: 112px; border-radius: 50%; background: #fff; content: ''; }
+.performance-donut strong, .performance-donut span { position: relative; z-index: 1; }
+.performance-donut strong { font-size: 27px; }
+.performance-donut span { color: var(--performance-muted); font-size: 11px; }
+.performance-legend { display: grid; flex: 1; gap: 12px; }
+.performance-legend__item { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; color: #40526c; font-size: 13px; }
+.performance-legend__item i { width: 10px; height: 10px; border-radius: 50%; }
+.performance-legend__item strong { color: var(--performance-ink); white-space: nowrap; }
+.performance-legend__item small { color: var(--performance-muted); font-size: 11px; font-weight: 500; }
+
+.performance-progress-card { margin-bottom: 14px; }
+.performance-progress-value { color: #2563eb; font-size: 25px; }
+.performance-progress-track { height: 13px; overflow: hidden; border-radius: 999px; background: #e8eef7; }
+.performance-progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #16a34a); }
+.performance-progress-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; color: var(--performance-muted); font-size: 12px; }
+.performance-sales-card { margin-bottom: 14px; }
+.performance-sales-count { color: var(--performance-muted); font-size: 13px; }
+.performance-sales-table { min-width: 720px; }
+
+@media (max-width: 1100px) {
+  .performance-kpi-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .performance-hero { align-items: flex-start; flex-direction: column; }
+  .performance-hero__actions { justify-content: flex-start; }
+  .performance-insight-grid { grid-template-columns: 1fr; }
+  .performance-chart-layout { justify-content: center; }
+}
+
+@media (max-width: 520px) {
+  .performance-kpi-grid { grid-template-columns: 1fr 1fr; }
+  .performance-hero h1 { font-size: 23px; }
+  .performance-chart-layout { align-items: flex-start; flex-direction: column; }
+  .performance-donut { align-self: center; }
+  .performance-progress-meta { flex-direction: column; }
+}
 
 @media (max-width: 1100px) {
   .reports-toolbar { grid-template-columns: 1fr; gap: 15px; }

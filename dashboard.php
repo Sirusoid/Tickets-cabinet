@@ -143,7 +143,7 @@ require __DIR__ . '/includes/header.php';
                     <?php else: foreach ($todaySessions as $session): ?>
                         <tr>
                             <td><?= h(reporting_format_date($session['start_time'], true)) ?></td>
-                            <td><strong><?= h($session['event_title'] ?? 'Без названия') ?></strong></td>
+                            <td><a class="reports-performance-link" href="/reports/performance.php?session_id=<?= (int)$session['id'] ?>"><strong><?= h($session['event_title'] ?? 'Без названия') ?></strong></a></td>
                             <td><?= h($session['hall_name'] ?? '—') ?></td>
                             <td><?= number_format((int)$session['sold_tickets'], 0, '.', ' ') ?></td>
                             <td><?= number_format((float)$session['sold_amount'], 2, '.', ' ') ?> тг</td>
