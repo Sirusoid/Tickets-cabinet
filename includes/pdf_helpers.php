@@ -444,7 +444,45 @@ if (!function_exists('ticket_pdf_render_html')) {
     function ticket_pdf_render_html(array $ticket) {
         // Basic sanitization
         $event_title = htmlspecialchars($ticket['event_title'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $session_time = !empty($ticket['schedule_start']) ? date('d.m.Y H:i', strtotime($ticket['schedule_start'])) : '';
+        $sessionDateLabel = '';
+        $sessionTimeLabel = '';
+        if (!empty($ticket['schedule_start'])) {
+            $sessionTimestamp = strtotime((string)$ticket['schedule_start']);
+            if ($sessionTimestamp !== false) {
+                $monthsRu = [
+                    1 => 'января',
+                    2 => 'февраля',
+                    3 => 'марта',
+                    4 => 'апреля',
+                    5 => 'мая',
+                    6 => 'июня',
+                    7 => 'июля',
+                    8 => 'августа',
+                    9 => 'сентября',
+                    10 => 'октября',
+                    11 => 'ноября',
+                    12 => 'декабря',
+                ];
+                $weekdaysRu = [
+                    0 => 'воскресенье',
+                    1 => 'понедельник',
+                    2 => 'вторник',
+                    3 => 'среда',
+                    4 => 'четверг',
+                    5 => 'пятница',
+                    6 => 'суббота',
+                ];
+                $monthNumber = (int)date('n', $sessionTimestamp);
+                $weekdayNumber = (int)date('w', $sessionTimestamp);
+                $sessionDateLabel = 'Дата: ' . date('j', $sessionTimestamp) . ' '
+                    . ($monthsRu[$monthNumber] ?? date('F', $sessionTimestamp)) . ' '
+                    . date('Y', $sessionTimestamp) . ' года, '
+                    . ($weekdaysRu[$weekdayNumber] ?? date('l', $sessionTimestamp));
+                $sessionTimeLabel = 'Время: ' . date('H:i', $sessionTimestamp);
+            }
+        }
+        $sessionDateLabelEsc = htmlspecialchars($sessionDateLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $sessionTimeLabelEsc = htmlspecialchars($sessionTimeLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seat_raw = trim((string)($ticket['seat_label'] ?? $ticket['seat_identifier'] ?? ''));
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -690,6 +728,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '.ticket-section{margin-bottom:12px;padding:12px 14px;border:1px solid #e1e8f0;border-radius:10px;background:#fff;}';
         $html .= '.event-title{font-size:24px;line-height:1.2;font-weight:700;color:#1a2f4f;margin-bottom:10px;}';
         $html .= '.event-time{font-size:15px;color:#334862;margin-bottom:8px;}';
+        $html .= '.event-time div + div{margin-top:2px;}';
         $html .= '.inline-meta{font-size:15px;color:#24364f;line-height:1.45;}';
         $html .= '.inline-meta-second{margin-top:6px;}';
         $html .= '.inline-meta strong{color:#173056;}';
@@ -718,7 +757,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         }
         $html .= '<div class="ticket-sub">Электронный билет. Для прохода предъявите QR или UID / Электронды билет. Кіру үшін QR немесе UID көрсетіңіз.</div></div></div></div>';
         $html .= '<div class="ticket-content"><div class="ticket-main"><div class="ticket-main-left">';
-        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time">' . $session_time . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
+        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div>' . $sessionDateLabelEsc . '</div><div>' . $sessionTimeLabelEsc . '</div></div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
         $html .= '<div class="ticket-section">';
         $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
         $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';
