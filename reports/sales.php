@@ -9,7 +9,7 @@ $active_menu = $reportsEmbedded ? 'dashboard' : 'reports';
 $page_title_meta = $reportsEmbedded ? 'Панель' : 'Отчёты — продажи';
 $panel_title = $reportsEmbedded ? 'Панель' : 'Отчёты';
 $panel_subtitle = 'Выручка, скидки и чистая сумма по проданным билетам';
-$page_styles = ['/assets/css/reports.css'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-1'];
 
 if (!$reportsEmbedded) {
 	require __DIR__ . '/../includes/header.php';

@@ -7,7 +7,7 @@ require_login();
 $use_sidebar = true;
 $active_menu = 'dashboard';
 $page_title_meta = 'Панель';
-$page_styles = ['/assets/css/reports.css'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-1'];
 
 $todaySales = ['tickets' => 0, 'amount' => 0.0];
 $todayRefunds = ['tickets' => 0, 'amount' => 0.0];

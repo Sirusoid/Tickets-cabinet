@@ -161,7 +161,7 @@ $panel_title = 'Детальный отчёт';
 $panel_subtitle = 'Продажи по конкретному сеансу';
 $active_menu = 'reports';
 $use_sidebar = true;
-$page_styles = ['/assets/css/reports.css'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-1'];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
