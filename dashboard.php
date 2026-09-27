@@ -7,8 +7,8 @@ require_login();
 $use_sidebar = true;
 $active_menu = 'dashboard';
 $page_title_meta = 'Панель';
-$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-2'];
-$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-2'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-3'];
+$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-3'];
 
 $todaySales = ['tickets' => 0, 'amount' => 0.0];
 $todayRefunds = ['tickets' => 0, 'amount' => 0.0];
@@ -127,7 +127,7 @@ require __DIR__ . '/includes/header.php';
         <div class="reports-table-wrap">
             <table class="admin-table table--compact reports-table reports-table--wide">
                 <thead>
-                    <tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$session['id'] ?>" tabindex="0" role="link">
+                    <tr>
                         <th>Дата и время</th>
                         <th>Спектакль</th>
                         <th>Зал</th>
@@ -141,7 +141,7 @@ require __DIR__ . '/includes/header.php';
                     <?php if (!$todaySessions): ?>
                         <tr><td colspan="7" class="reports-empty">На ближайшие 14 дней сеансов нет.</td></tr>
                     <?php else: foreach ($todaySessions as $session): ?>
-                        <tr>
+                        <tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$session['id'] ?>" tabindex="0" role="link">
                             <td><?= h(reporting_format_date($session['start_time'], true)) ?></td>
                             <td><a class="reports-performance-link" href="/reports/performance.php?session_id=<?= (int)$session['id'] ?>"><strong><?= h($session['event_title'] ?? 'Без названия') ?></strong></a></td>
                             <td><?= h($session['hall_name'] ?? '—') ?></td>

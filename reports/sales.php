@@ -9,8 +9,8 @@ $active_menu = $reportsEmbedded ? 'dashboard' : 'reports';
 $page_title_meta = $reportsEmbedded ? 'Панель' : 'Отчёты — продажи';
 $panel_title = $reportsEmbedded ? 'Панель' : 'Отчёты';
 $panel_subtitle = 'Выручка, скидки и чистая сумма по проданным билетам';
-$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-2'];
-$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-2'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-3'];
+$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-3'];
 
 if (!$reportsEmbedded) {
 	require __DIR__ . '/../includes/header.php';
@@ -313,7 +313,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 			<div class="reports-table-wrap">
 				<table class="admin-table table--compact reports-table reports-table--wide">
 					<thead>
-						<tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$item['schedule_id'] ?>" tabindex="0" role="link">
+						<tr>
 							<th>Спектакль</th>
 							<th>Дата и время</th>
 							<th>Билетов</th>
@@ -344,7 +344,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							$refundItem = $refundByPerformance[$performanceKey] ?? ['tickets' => 0, 'amount' => 0.0];
 							$netPerformance = max(0.0, (float)$item['paid'] - (float)$refundItem['amount']);
 					?>
-						<tr>
+						<tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$item['schedule_id'] ?>" tabindex="0" role="link">
 							<td><a class="reports-performance-link" href="/reports/performance.php?session_id=<?= (int)$item['schedule_id'] ?>"><strong><?= h($item['event_title']) ?></strong></a></td>
 							<td><?= $item['schedule_start'] !== '' ? h(reporting_format_date($item['schedule_start'], true)) : '—' ?></td>
 							<td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td>
