@@ -4,7 +4,11 @@
   var state = {
     scheduleId: '',
     type: 'postponed',
-    lastPreview: false
+    lastPreview: false,
+    defaultTemplate: '',
+    eventTitle: '',
+    hall: '',
+    oldStart: ''
   };
 
   function escapeHtml(value) {
@@ -38,6 +42,48 @@
     var weekday = new Date(year, monthIndex, day).getDay();
     return day + ' ' + (months[monthIndex] || match[2]) + ' ' + year
       + ', ' + (weekdays[weekday] || '');
+  }
+
+  function formatTime(value) {
+    var raw = String(value || '').replace('T', ' ');
+    var match = raw.match(/^\d{4}-\d{2}-\d{2}[ ](\d{2}):(\d{2})/);
+    return match ? match[1] + ':' + match[2] : '';
+  }
+
+  function buildDefaultTemplate(type, title, hall, oldStart, newStart) {
+    var hallLabel = hall ? hall + ' (Абая 117)' : '';
+    var oldDate = formatDateTime(oldStart);
+    var oldTime = formatTime(oldStart);
+    var newDate = formatDateTime(newStart);
+    var newTime = formatTime(newStart);
+    if (type === 'postponed') {
+      return 'Уважаемый клиент!\n\n'
+        + 'Благодарим Вас за выбор театра «Жас сахна». Сообщаем, что сеанс «' + title + '» был перенесён.\n\n'
+        + 'Первоначальные дата и время:\n'
+        + 'ДАТА: ' + oldDate + '\n'
+        + 'ВРЕМЯ: ' + oldTime + '\n\n'
+        + 'Новые дата и время:\n'
+        + 'ДАТА: ' + newDate + '\n'
+        + 'ВРЕМЯ: ' + newTime + '\n'
+        + (hallLabel ? '\nЗАЛ: ' + hallLabel + '\n' : '\n')
+        + '\nВаши билеты остаются действительными на новый сеанс. Если новая дата или время Вам не подходят, пожалуйста, свяжитесь с нашей службой поддержки.\n\n'
+        + 'Причина переноса: Технические обстоятельства.\n\n'
+        + 'Номер заказа: {{ORDER_NUMBERS}}\n\n'
+        + 'Если у Вас возникнут вопросы, пожалуйста, напишите нам или позвоните:\n'
+        + 'info@zhassahna.kz\n+7 727 259 65 98\n+7 776 711 78 78\n\n'
+        + 'С уважением,\nТеатр «Жас сахна»';
+    }
+    return 'Уважаемый клиент!\n\n'
+      + 'К сожалению, вынуждены сообщить, что сеанс «' + title + '» отменён. Приносим искренние извинения за доставленные неудобства.\n\n'
+      + 'ДАТА: ' + oldDate + '\n'
+      + 'ВРЕМЯ: ' + oldTime + '\n'
+      + (hallLabel ? 'ЗАЛ: ' + hallLabel + '\n' : '')
+      + '\nПричина отмены: Технические обстоятельства.\n\n'
+      + 'Для оформления возврата, пожалуйста, обратитесь в службу поддержки театра. Мы обязательно поможем решить вопрос.\n\n'
+      + 'Номер заказа: {{ORDER_NUMBERS}}\n\n'
+      + 'Если у Вас возникнут вопросы, пожалуйста, напишите нам или позвоните:\n'
+      + 'info@zhassahna.kz\n+7 727 259 65 98\n+7 776 711 78 78\n\n'
+      + 'С уважением,\nТеатр «Жас сахна»';
   }
 
   function toDateTimeLocal(value) {
@@ -79,41 +125,16 @@
       + '      </div>'
       + '    </div>'
       + '    <div class="schedule-notification-modal__field">'
-      + '      <label for="scheduleNotificationReason">Причина для письма клиентам</label>'
-      + '      <textarea id="scheduleNotificationReason" class="form-control" maxlength="2000" required placeholder="Например: технические обстоятельства."></textarea>'
+      + '      <label for="scheduleNotificationTemplate">Шаблон письма</label>'
+      + '      <textarea id="scheduleNotificationTemplate" class="form-control schedule-notification-template" maxlength="12000" required></textarea>'
       + '    </div>'
       + '    <div id="scheduleNotificationResult" class="schedule-notification-modal__result" hidden></div>'
       + '    <div class="schedule-notification-modal__actions">'
       + '      <button type="button" class="btn btn-ghost" data-notification-close>Закрыть</button>'
-      + '      <button type="button" class="btn btn-ghost" id="scheduleNotificationTemplate">Шаблон письма</button>'
       + '      <button type="button" class="btn btn-secondary" id="scheduleNotificationPreview">Проверить получателей</button>'
       + '      <button type="submit" class="btn btn-primary" id="scheduleNotificationSend" disabled>Сохранить и отправить</button>'
       + '    </div>'
       + '  </form>'
-      + '</section>';
-    document.body.appendChild(modal);
-    return modal;
-  }
-
-  function ensureTemplateModal() {
-    var existing = document.getElementById('scheduleNotificationTemplateModal');
-    if (existing) return existing;
-
-    var modal = document.createElement('div');
-    modal.id = 'scheduleNotificationTemplateModal';
-    modal.className = 'schedule-notification-modal';
-    modal.hidden = true;
-    modal.innerHTML = ''
-      + '<div class="schedule-notification-modal__backdrop"></div>'
-      + '<section class="schedule-notification-modal__dialog schedule-notification-template-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="scheduleNotificationTemplateTitle">'
-      + '  <div class="schedule-notification-modal__header">'
-      + '    <h2 class="schedule-notification-modal__title" id="scheduleNotificationTemplateTitle">Шаблон письма</h2>'
-      + '    <button type="button" class="schedule-notification-modal__close" data-template-close aria-label="Закрыть">&times;</button>'
-      + '  </div>'
-      + '  <div id="scheduleNotificationTemplateBody" class="schedule-notification-template-modal__body">Загрузка шаблона...</div>'
-      + '  <div class="schedule-notification-modal__actions">'
-      + '    <button type="button" class="btn btn-ghost" data-template-close>Закрыть</button>'
-      + '  </div>'
       + '</section>';
     document.body.appendChild(modal);
     return modal;
@@ -154,7 +175,26 @@
     if (start) start.disabled = !isPostponed;
     if (end) end.disabled = !isPostponed;
     state.type = isPostponed ? 'postponed' : 'cancelled';
+    refreshDefaultTemplate();
     clearPreview();
+  }
+
+  function refreshDefaultTemplate() {
+    var templateField = getField('scheduleNotificationTemplate');
+    if (!templateField) return;
+    if (templateField.value !== '' && templateField.value !== state.defaultTemplate) return;
+    var newStart = state.type === 'postponed'
+      ? (getField('scheduleNotificationNewStart').value || '')
+      : '';
+    var template = buildDefaultTemplate(
+      state.type,
+      state.eventTitle,
+      state.hall,
+      state.oldStart,
+      newStart
+    );
+    templateField.value = template;
+    state.defaultTemplate = template;
   }
 
   function openModal(button) {
@@ -165,15 +205,28 @@
     var hall = button.getAttribute('data-hall') || '';
     var start = button.getAttribute('data-start') || '';
     var end = button.getAttribute('data-end') || '';
+    state.eventTitle = title;
+    state.hall = hall;
+    state.oldStart = start;
     var type = getField('scheduleNotificationType');
     var newStart = getField('scheduleNotificationNewStart');
     var newEnd = getField('scheduleNotificationNewEnd');
-    var reason = getField('scheduleNotificationReason');
     var info = getField('scheduleNotificationInfo');
     if (type) type.value = state.type;
     if (newStart) newStart.value = toDateTimeLocal(start);
     if (newEnd) newEnd.value = toDateTimeLocal(end);
-    if (reason) reason.value = '';
+    var template = buildDefaultTemplate(
+      state.type,
+      title,
+      hall,
+      start,
+      state.type === 'postponed' ? toDateTimeLocal(start) : ''
+    );
+    var templateField = getField('scheduleNotificationTemplate');
+    if (templateField) {
+      templateField.value = template;
+      state.defaultTemplate = template;
+    }
     if (info) {
       info.innerHTML = '<strong>' + escapeHtml(title) + '</strong><br>'
         + 'Текущий сеанс: ' + escapeHtml(formatDateTime(start))
@@ -181,16 +234,11 @@
     }
     updateTypeFields();
     modal.hidden = false;
-    if (reason) reason.focus();
+    if (templateField) templateField.focus();
   }
 
   function closeModal() {
     var modal = document.getElementById('scheduleNotificationModal');
-    if (modal) modal.hidden = true;
-  }
-
-  function closeTemplateModal() {
-    var modal = document.getElementById('scheduleNotificationTemplateModal');
     if (modal) modal.hidden = true;
   }
 
@@ -201,7 +249,7 @@
     body.append('notification_type', state.type);
     body.append('new_start_time', getField('scheduleNotificationNewStart').value || '');
     body.append('new_end_time', getField('scheduleNotificationNewEnd').value || '');
-    body.append('reason', getField('scheduleNotificationReason').value || '');
+    body.append('template_text', getField('scheduleNotificationTemplate').value || '');
     body.append('csrf_token', window.APP_CSRF_TOKEN || '');
     return body;
   }
@@ -252,48 +300,6 @@
       if (previewButton) {
         previewButton.disabled = false;
         previewButton.textContent = 'Проверить получателей';
-      }
-    });
-  }
-
-  function showTemplate() {
-    var modal = ensureTemplateModal();
-    var body = getField('scheduleNotificationTemplateBody');
-    if (body) body.innerHTML = 'Загрузка шаблона...';
-    modal.hidden = false;
-
-    var request = buildRequest('preview');
-    if (!getField('scheduleNotificationReason').value.trim()) {
-      request.set('reason', 'Технические обстоятельства.');
-    }
-
-    fetch('/ajax/schedule_notifications.php', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: request.toString()
-    }).then(function (response) {
-      return response.text().then(function (text) {
-        var payload = null;
-        try {
-          payload = JSON.parse(text);
-        } catch (error) {
-          throw new Error('Сервер вернул некорректный ответ (HTTP ' + response.status + ').');
-        }
-        if (!response.ok || !payload.success) {
-          throw new Error(payload.message || ('Сервер вернул HTTP ' + response.status + '.'));
-        }
-        return payload;
-      });
-    }).then(function (payload) {
-      if (!body) return;
-      body.innerHTML = '<div class="schedule-notification-template-modal__subject"><strong>Тема:</strong> '
-        + escapeHtml(payload.subject || '') + '</div>'
-        + '<div class="schedule-notification-template-modal__preview">' + (payload.preview_html || '') + '</div>';
-    }).catch(function (error) {
-      if (body) {
-        body.innerHTML = '<div class="schedule-notification-modal__result is-error">'
-          + escapeHtml(error.message || 'Не удалось открыть шаблон письма.') + '</div>';
       }
     });
   }
@@ -368,12 +374,6 @@
       openModal(notifyButton);
       return;
     }
-    var templateButton = event.target.closest && event.target.closest('#scheduleNotificationTemplate');
-    if (templateButton) {
-      event.preventDefault();
-      showTemplate();
-      return;
-    }
     var previewButton = event.target.closest && event.target.closest('#scheduleNotificationPreview');
     if (previewButton) {
       event.preventDefault();
@@ -384,9 +384,6 @@
       closeModal();
       return;
     }
-    if (event.target.closest && event.target.closest('[data-template-close]')) {
-      closeTemplateModal();
-    }
   });
 
   document.addEventListener('change', function (event) {
@@ -396,12 +393,13 @@
       event.target.id === 'scheduleNotificationNewStart'
       || event.target.id === 'scheduleNotificationNewEnd'
     )) {
+      refreshDefaultTemplate();
       clearPreview();
     }
   });
 
   document.addEventListener('input', function (event) {
-    if (event.target && event.target.id === 'scheduleNotificationReason') {
+    if (event.target && event.target.id === 'scheduleNotificationTemplate') {
       clearPreview();
     }
   });

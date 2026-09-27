@@ -109,12 +109,12 @@ if (!function_exists('schedule_notification_validate_payload')) {
             throw new InvalidArgumentException('Выберите перенос или отмену сеанса.');
         }
 
-        $reason = trim((string)($payload['reason'] ?? ''));
-        if ($reason === '') {
-            throw new InvalidArgumentException('Укажите уважительную причину для письма клиентам.');
+        $templateText = trim((string)($payload['template_text'] ?? $payload['reason'] ?? ''));
+        if ($templateText === '') {
+            throw new InvalidArgumentException('Заполните шаблон письма.');
         }
-        if (mb_strlen($reason, 'UTF-8') > 2000) {
-            throw new InvalidArgumentException('Причина не должна превышать 2000 символов.');
+        if (mb_strlen($templateText, 'UTF-8') > 12000) {
+            throw new InvalidArgumentException('Шаблон письма не должен превышать 12000 символов.');
         }
 
         $newStart = trim((string)($payload['new_start_time'] ?? ''));
@@ -135,7 +135,7 @@ if (!function_exists('schedule_notification_validate_payload')) {
 
         return [
             'notification_type' => $type,
-            'reason' => $reason,
+            'template_text' => $templateText,
             'new_start_time' => $newStart,
             'new_end_time' => $newEnd,
         ];
@@ -164,6 +164,18 @@ if (!function_exists('schedule_notification_change_key')) {
     }
 }
 
+if (!function_exists('schedule_notification_render_template')) {
+    function schedule_notification_render_template(string $templateText, array $recipient): string
+    {
+        $orderNumbers = array_values(array_filter(array_map('trim', (array)($recipient['order_numbers'] ?? []))));
+        $customerName = trim((string)($recipient['customer_name'] ?? '')) ?: 'клиент';
+        return strtr($templateText, [
+            '{{CUSTOMER_NAME}}' => $customerName,
+            '{{ORDER_NUMBERS}}' => !empty($orderNumbers) ? implode(', ', $orderNumbers) : '—',
+        ]);
+    }
+}
+
 if (!function_exists('schedule_notification_build_message')) {
     function schedule_notification_build_message(
         array $schedule,
@@ -173,57 +185,14 @@ if (!function_exists('schedule_notification_build_message')) {
         string $oldEnd,
         string $newStart,
         string $newEnd,
-        string $reason
+        string $templateText
     ): array {
         $eventTitle = trim((string)($schedule['event_title'] ?? 'Спектакль'));
-        $hallName = trim((string)($schedule['hall_name'] ?? ''));
-        $hallLabel = $hallName !== '' ? $hallName . ' (Абая 117)' : '';
-        $oldDateTime = order_email_format_datetime($oldStart);
-        $newDateTime = order_email_format_datetime($newStart);
-        $safeEvent = order_email_escape('«' . $eventTitle . '»');
-        $safeHall = order_email_escape($hallLabel);
-        $safeReason = nl2br(order_email_escape($reason));
-        $safeOldDate = order_email_escape($oldDateTime['date'] ?: 'Дата уточняется');
-        $safeOldTime = order_email_escape($oldDateTime['time'] ?: 'Время уточняется');
-        $safeNewDate = order_email_escape($newDateTime['date'] ?: 'Дата уточняется');
-        $safeNewTime = order_email_escape($newDateTime['time'] ?: 'Время уточняется');
-
-        $orderNumbers = array_values(array_filter(array_map('trim', (array)($recipient['order_numbers'] ?? []))));
-        $orderBlock = '';
-        if (!empty($orderNumbers)) {
-            $orderBlock = '<p style="margin:18px 0 0;color:#475569"><strong>Номер заказа:</strong> '
-                . order_email_escape(implode(', ', $orderNumbers)) . '</p>';
-        }
-
-        if ($type === 'postponed') {
-            $subject = 'Важное уведомление о переносе сеанса — ' . $eventTitle;
-            $message = '<p style="margin:0 0 14px">Уважаемый клиент!</p>'
-                . '<p style="margin:0 0 14px">Благодарим Вас за выбор театра «Жас сахна». Сообщаем, что сеанс '
-                . $safeEvent . ' был перенесён.</p>'
-                . '<p style="margin:0 0 6px"><strong>Первоначальные дата и время:</strong></p>'
-                . '<p style="margin:0 0 4px"><strong>ДАТА:</strong> ' . $safeOldDate . '</p>'
-                . '<p style="margin:0 0 12px"><strong>ВРЕМЯ:</strong> ' . $safeOldTime . '</p>'
-                . '<p style="margin:0 0 6px"><strong>Новые дата и время:</strong></p>'
-                . '<p style="margin:0 0 4px"><strong>ДАТА:</strong> ' . $safeNewDate . '</p>'
-                . '<p style="margin:0 0 12px"><strong>ВРЕМЯ:</strong> ' . $safeNewTime . '</p>'
-                . ($safeHall !== '' ? '<p style="margin:0 0 14px"><strong>ЗАЛ:</strong> ' . $safeHall . '</p>' : '')
-                . '<p style="margin:0 0 14px">Ваши билеты остаются действительными на новый сеанс. '
-                . 'Если новая дата или время Вам не подходят, пожалуйста, свяжитесь с нашей службой поддержки.</p>'
-                . '<p style="margin:0 0 14px"><strong>Причина переноса:</strong><br>' . $safeReason . '</p>'
-                . $orderBlock;
-        } else {
-            $subject = 'Важное уведомление об отмене сеанса — ' . $eventTitle;
-            $message = '<p style="margin:0 0 14px">Уважаемый клиент!</p>'
-                . '<p style="margin:0 0 14px">К сожалению, вынуждены сообщить, что сеанс '
-                . $safeEvent . ' отменён. Приносим искренние извинения за доставленные неудобства.</p>'
-                . '<p style="margin:0 0 4px"><strong>ДАТА:</strong> ' . $safeOldDate . '</p>'
-                . '<p style="margin:0 0 4px"><strong>ВРЕМЯ:</strong> ' . $safeOldTime . '</p>'
-                . ($safeHall !== '' ? '<p style="margin:0 0 14px"><strong>ЗАЛ:</strong> ' . $safeHall . '</p>' : '')
-                . '<p style="margin:0 0 14px"><strong>Причина отмены:</strong><br>' . $safeReason . '</p>'
-                . '<p style="margin:0 0 14px">Для оформления возврата, пожалуйста, обратитесь в службу поддержки театра. '
-                . 'Мы обязательно поможем решить вопрос.</p>'
-                . $orderBlock;
-        }
+        $subject = ($type === 'postponed'
+            ? 'Важное уведомление о переносе сеанса — '
+            : 'Важное уведомление об отмене сеанса — ') . $eventTitle;
+        $renderedTemplate = schedule_notification_render_template($templateText, $recipient);
+        $message = '<div style="white-space:normal;">' . nl2br(order_email_escape($renderedTemplate)) . '</div>';
 
         $html = '<!doctype html><html lang="ru"><head><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"></head>'
             . '<body bgcolor="#ffffff" style="margin:0;background:#ffffff!important;font-family:Arial,sans-serif;color:#172b4d;line-height:1.5">'
@@ -232,9 +201,6 @@ if (!function_exists('schedule_notification_build_message')) {
             . '<table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:680px;background:#ffffff!important;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">'
             . '<tr><td bgcolor="#ffffff" style="padding:28px;background:#ffffff!important;color:#172b4d">'
             . $message
-            . '<p style="margin:24px 0 0;color:#64748b">Если у Вас возникнут вопросы, пожалуйста, напишите нам или позвоните:</p>'
-            . '<p style="margin:6px 0 0;color:#475569">info@zhassahna.kz<br>+7 727 259 65 98<br>+7 776 711 78 78</p>'
-            . '<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">С уважением,<br>Театр «Жас сахна»</p>'
             . '</td></tr></table></td></tr></table></body></html>';
 
         return ['subject' => $subject, 'html' => $html];

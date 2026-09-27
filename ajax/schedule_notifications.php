@@ -55,7 +55,7 @@ try {
             (string)$schedule['end_time'],
             $payload['new_start_time'],
             $payload['new_end_time'],
-            $payload['reason']
+            $payload['template_text']
         );
 
         schedule_notification_json_response(true, 'Предпросмотр подготовлен.', [
@@ -94,7 +94,7 @@ try {
         $oldEnd,
         $payload['new_start_time'],
         $payload['new_end_time'],
-        $payload['reason']
+        $payload['template_text']
     );
 
     $pdo->beginTransaction();
@@ -123,7 +123,7 @@ try {
             ':old_end_time' => $oldEnd,
             ':new_start_time' => $payload['new_start_time'] !== '' ? $payload['new_start_time'] : null,
             ':new_end_time' => $payload['new_end_time'] !== '' ? $payload['new_end_time'] : null,
-            ':reason' => $payload['reason'],
+            ':reason' => $payload['template_text'],
             ':status' => 'sending',
             ':total_tickets' => $lockedRecipients['total_tickets'],
             ':total_recipients' => $lockedRecipients['total_recipients'],
@@ -215,7 +215,7 @@ try {
                 $oldEnd,
                 $payload['new_start_time'],
                 $payload['new_end_time'],
-                $payload['reason']
+                $payload['template_text']
             );
             $sent = order_email_send_message(
                 $recipient['email'],
