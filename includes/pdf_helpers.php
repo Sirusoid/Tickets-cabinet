@@ -629,9 +629,10 @@ if (!function_exists('ticket_pdf_render_html')) {
         $rowValueEsc = htmlspecialchars((string)$rowValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seatValueEsc = htmlspecialchars((string)$seatValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        // Rules and texts (unchanged)
+        // Rules and texts
         $rulesIntroRu = 'Вход на спектакль возможен только один раз и по одному билету. Не допускайте копирования электронного билета. При посещении мероприятия администрация вправе потребовать любой удостоверяющий документ для проверки возможности посещения и принадлежности билета.';
         $rulesIntroKz = 'Спектакльге кіру бір рет қана және бір билет бойынша мүмкін. Электрондық билетті көшіруге болмайды. Іс-шараға келген кезде әкімшілік келуге мүмкіндік бар-жоғын және билеттің тиесілігін тексеру үшін кез келген жеке басын куәландыратын құжатты талап етуге құқылы.';
+        $rulesIntroEn = 'Admission to the performance is allowed only once and with one ticket. Do not copy the electronic ticket. When attending the event, the theatre administration may request any identity document to verify your right to attend and that the ticket belongs to you.';
         $rulesRu = [
             'Настоящий электронный билет является документом, подтверждающим ваше право на посещение указанного спектакля. Пожалуйста, храните его в безопасности и не передавайте его посторонним лицам и не публикуйте фотографии с видимым штрих-кодом билета в социальных сетях.',
             'Электронный билет является действительным на одного предъявителя.',
@@ -655,6 +656,18 @@ if (!function_exists('ticket_pdf_render_html')) {
             'Театр әкімшілігі жасы бойынша шектеулерге сәйкес келмейтін билет ұстаушысының спектакльге кіруін билет құнын қайтармай шектеуге құқылы.',
             'Билеттерді қайтару және айырбастау, сондай-ақ кез келген басқа сұрақтар бойынша кеңес алу үшін клиенттерді қолдау қызметіне хабарласыңыз: info@zhassahna.kz немесе +7 727 259 65 98, +7 776 711 78 78.',
             'Толық қағидалар, қайтару және айырбастау мерзімдеріне қатысты шектеулер біздің сайтта және жария офертада да көрсетілген: https://zhassahna.kz/agreement.'
+        ];
+        $rulesEn = [
+            'This electronic ticket is a document confirming your right to attend the specified performance. Please keep it safe, do not transfer it to third parties, and do not publish photos with the ticket barcode visible on social media.',
+            'The electronic ticket is valid for one holder only.',
+            'Printing the electronic ticket is not required.',
+            'When attending the performance, you must comply with all rules and regulations established by the theatre administration. This includes following safety rules, not bringing alcohol or drugs, and refraining from violence, discrimination, and any other unacceptable behaviour.',
+            'The theatre administration reserves the right to make changes to the programme, date, or start time of the performance without prior notice. In case of such changes, the administration undertakes to provide you with information about the new attendance conditions.',
+            'In case of cancellation, replacement, or postponement of the performance, the theatre administration decides whether a refund will be issued. In case of such changes, the administration undertakes to provide you with all necessary information as soon as possible.',
+            'The theatre administration has the right to prohibit filming during the event or confiscate equipment if this rule is violated.',
+            'The theatre administration may restrict admission to the performance without refunding the ticket price if the ticket holder does not meet the applicable age requirements.',
+            'For advice on any questions, including ticket refunds and exchanges, please contact customer support: info@zhassahna.kz or +7 727 259 65 98, +7 776 711 78 78.',
+            'Detailed rules and time limits for ticket refunds and exchanges are also set out on our website and in the public offer: https://zhassahna.kz/agreement.'
         ];
 
         // Build HTML (same layout as before, using pdf_price_label, pdf_discount_percent, pdf_payment_label)
@@ -689,8 +702,9 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '.ticket-rules{margin-top:8px;padding-top:6px;font-size:8px;line-height:1.22;color:#111;}';
         $html .= '.ticket-rules-title{margin:0 0 6px 0;padding:4px 0;border-top:2px solid #222;border-bottom:2px solid #222;font-size:9px;font-weight:700;color:#111;letter-spacing:.04em;text-transform:uppercase;text-align:center;}';
         $html .= '.ticket-rules-table{width:100%;border-collapse:collapse;table-layout:fixed;}';
-        $html .= '.ticket-rules-table td{vertical-align:top;padding:0 6px 0 0;word-wrap:break-word;text-align:justify;}';
-        $html .= '.ticket-rules-table td:last-child{padding-right:0;padding-left:6px;border-left:1px solid #bfc7d1;}';
+        $html .= '.ticket-rules-table td{width:33.333%;vertical-align:top;padding:0 4px 0 0;word-wrap:break-word;text-align:justify;}';
+        $html .= '.ticket-rules-table td + td{padding-left:4px;border-left:1px solid #bfc7d1;}';
+        $html .= '.ticket-rules-table td:last-child{padding-right:0;}';
         $html .= '.ticket-rules-row td{padding-top:2px;padding-bottom:2px;}';
         $html .= '.ticket-rules-block{margin-bottom:4px;}';
         $html .= '.ticket-rules-intro{margin:0 0 4px 0;font-weight:700;text-align:justify;}';
@@ -731,12 +745,12 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '</div></div></div>';
         $html .= '<div class="ticket-bottom-line"></div>';
         $html .= '<div class="ticket-rules">';
-        $html .= '<div class="ticket-rules-title">Правила пользования билетом / Билетті пайдалану ережелері</div>';
+        $html .= '<div class="ticket-rules-title">Правила пользования билетом / Билетті пайдалану ережелері / Ticket Terms of Use</div>';
         $html .= '<table class="ticket-rules-table" role="presentation">';
-        $html .= '<tr class="ticket-rules-row"><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroRu, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroKz, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td></tr>';
+        $html .= '<tr class="ticket-rules-row"><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroRu, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroKz, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroEn, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td></tr>';
         for ($i = 0; $i < count($rulesRu); $i++) {
             $ruleNumber = $i + 1;
-            $html .= '<tr class="ticket-rules-row"><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesRu[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesKz[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td></tr>';
+            $html .= '<tr class="ticket-rules-row"><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesRu[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesKz[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesEn[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td></tr>';
         }
         $html .= '</table>';
         $html .= '</div>';
