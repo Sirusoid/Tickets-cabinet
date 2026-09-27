@@ -24,7 +24,20 @@
     var raw = String(value || '').replace('T', ' ');
     var match = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ ](\d{2}):(\d{2})/);
     if (!match) return raw;
-    return match[3] + '.' + match[2] + '.' + match[1] + ' ' + match[4] + ':' + match[5];
+    var months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    ];
+    var weekdays = [
+      'воскресенье', 'понедельник', 'вторник', 'среда',
+      'четверг', 'пятница', 'суббота'
+    ];
+    var year = Number(match[1]);
+    var monthIndex = Number(match[2]) - 1;
+    var day = Number(match[3]);
+    var weekday = new Date(year, monthIndex, day).getDay();
+    return day + ' ' + (months[monthIndex] || match[2]) + ' ' + year
+      + ', ' + (weekdays[weekday] || '');
   }
 
   function toDateTimeLocal(value) {
