@@ -80,6 +80,12 @@
   resize: vertical;
 }
 
+.schedule-notification-modal__field input:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+  background: #f1f5f9;
+}
+
 .schedule-notification-modal__info,
 .schedule-notification-modal__result {
   margin: 0 0 14px;

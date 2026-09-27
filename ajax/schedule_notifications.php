@@ -24,6 +24,12 @@ if (!user_has_permission($pdo, 'schedule_notifications', false)) {
     schedule_notification_json_response(false, 'Недостаточно прав для уведомления клиентов.');
 }
 
+$csrfToken = (string)($_REQUEST['csrf_token'] ?? '');
+if (!function_exists('validate_csrf') || !validate_csrf($csrfToken)) {
+    http_response_code(403);
+    schedule_notification_json_response(false, 'Сессия истекла. Обновите страницу и повторите действие.');
+}
+
 $action = trim((string)($_REQUEST['action'] ?? ''));
 $scheduleId = (int)($_REQUEST['schedule_id'] ?? 0);
 if ($scheduleId <= 0) {

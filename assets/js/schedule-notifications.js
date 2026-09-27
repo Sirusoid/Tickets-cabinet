@@ -110,9 +110,11 @@
     var start = getField('scheduleNotificationNewStart');
     var end = getField('scheduleNotificationNewEnd');
     var isPostponed = type && type.value === 'postponed';
-    if (fields) fields.hidden = !isPostponed;
+    if (fields) fields.hidden = false;
     if (start) start.required = isPostponed;
     if (end) end.required = isPostponed;
+    if (start) start.disabled = !isPostponed;
+    if (end) end.disabled = !isPostponed;
     state.type = isPostponed ? 'postponed' : 'cancelled';
     clearPreview();
   }
@@ -163,6 +165,7 @@
 
   function preview() {
     var previewButton = getField('scheduleNotificationPreview');
+    setResult('Проверяем получателей и готовим письмо...', false);
     if (previewButton) {
       previewButton.disabled = true;
       previewButton.textContent = 'Проверка...';
@@ -173,7 +176,18 @@
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
       body: buildRequest('preview').toString()
     }).then(function (response) {
-      return response.json();
+      return response.text().then(function (text) {
+        var payload = null;
+        try {
+          payload = JSON.parse(text);
+        } catch (error) {
+          throw new Error('Сервер вернул некорректный ответ (HTTP ' + response.status + ').');
+        }
+        if (!response.ok) {
+          throw new Error(payload.message || ('Сервер вернул HTTP ' + response.status + '.'));
+        }
+        return payload;
+      });
     }).then(function (payload) {
       if (!payload || !payload.success) {
         throw new Error((payload && payload.message) || 'Не удалось подготовить предпросмотр.');
@@ -218,7 +232,18 @@
         headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
         body: buildRequest('notify').toString()
       }).then(function (response) {
-        return response.json();
+        return response.text().then(function (text) {
+          var payload = null;
+          try {
+            payload = JSON.parse(text);
+          } catch (error) {
+            throw new Error('Сервер вернул некорректный ответ (HTTP ' + response.status + ').');
+          }
+          if (!response.ok) {
+            throw new Error(payload.message || ('Сервер вернул HTTP ' + response.status + '.'));
+          }
+          return payload;
+        });
       }).then(function (payload) {
         if (!payload || !payload.success) {
           throw new Error((payload && payload.message) || 'Не удалось отправить уведомления.');
