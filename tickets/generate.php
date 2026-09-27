@@ -35,17 +35,19 @@ try {
     }
 
     if ($id > 0) {
-        $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, e.title AS event_title, c.full_name AS customer_name
+        $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, h.name AS hall_name, e.title AS event_title, c.full_name AS customer_name
             FROM tickets t
             LEFT JOIN schedules s ON s.id = t.schedule_id
+            LEFT JOIN halls h ON h.id = s.hall_id
             LEFT JOIN events e ON e.id = t.event_id
             LEFT JOIN customers c ON c.id = t.customer_id
             WHERE t.id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
     } else {
-        $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, e.title AS event_title, c.full_name AS customer_name
+        $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, h.name AS hall_name, e.title AS event_title, c.full_name AS customer_name
             FROM tickets t
             LEFT JOIN schedules s ON s.id = t.schedule_id
+            LEFT JOIN halls h ON h.id = s.hall_id
             LEFT JOIN events e ON e.id = t.event_id
             LEFT JOIN customers c ON c.id = t.customer_id
             WHERE t.ticket_uid = :uid LIMIT 1");
