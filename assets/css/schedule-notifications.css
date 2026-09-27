@@ -81,6 +81,9 @@
 }
 
 .schedule-notification-template {
+  height: min(58vh, 620px);
+  min-height: 360px;
+  max-height: calc(100vh - 280px);
   font-family: Arial, sans-serif;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -128,6 +131,12 @@
 }
 
 @media (max-width: 640px) {
+  .schedule-notification-template {
+    height: 360px;
+    min-height: 280px;
+    max-height: calc(100vh - 300px);
+  }
+
   .schedule-notification-modal__grid {
     grid-template-columns: 1fr;
   }

@@ -32,6 +32,7 @@ if (!function_exists('schedule_notification_collect_recipients')) {
                 t.ticket_uid,
                 t.customer_name AS ticket_customer_name,
                 t.customer_email AS ticket_email,
+                t.channel AS ticket_channel,
                 ps.order_number,
                 ps.customer_name AS session_customer_name,
                 ps.customer_email AS session_email,
@@ -83,8 +84,10 @@ if (!function_exists('schedule_notification_collect_recipients')) {
             }
 
             $orderNumber = trim((string)($row['order_number'] ?? ''));
+            $ticketChannel = strtolower(trim((string)($row['ticket_channel'] ?? '')));
             $ticketUid = trim((string)($row['ticket_uid'] ?? ''));
-            if ($orderNumber !== '' && !in_array($orderNumber, $recipients[$email]['order_numbers'], true)) {
+            $isOnlineTicket = in_array($ticketChannel, ['web', 'mobile'], true);
+            if ($isOnlineTicket && $orderNumber !== '' && !in_array($orderNumber, $recipients[$email]['order_numbers'], true)) {
                 $recipients[$email]['order_numbers'][] = $orderNumber;
             }
             if ($ticketUid !== '' && !in_array($ticketUid, $recipients[$email]['ticket_uids'], true)) {
@@ -169,10 +172,17 @@ if (!function_exists('schedule_notification_render_template')) {
     {
         $orderNumbers = array_values(array_filter(array_map('trim', (array)($recipient['order_numbers'] ?? []))));
         $customerName = trim((string)($recipient['customer_name'] ?? '')) ?: 'клиент';
-        return strtr($templateText, [
-            '{{CUSTOMER_NAME}}' => $customerName,
-            '{{ORDER_NUMBERS}}' => !empty($orderNumbers) ? implode(', ', $orderNumbers) : '—',
-        ]);
+        $templateText = str_replace('{{CUSTOMER_NAME}}', $customerName, $templateText);
+        if (empty($orderNumbers)) {
+            $templateText = preg_replace(
+                '/^[ \t]*[^\r\n]*\{\{ORDER_NUMBERS\}\}[^\r\n]*(?:\r\n|\r|\n)?/m',
+                '',
+                $templateText
+            );
+        } else {
+            $templateText = str_replace('{{ORDER_NUMBERS}}', implode(', ', $orderNumbers), $templateText);
+        }
+        return $templateText;
     }
 }
 

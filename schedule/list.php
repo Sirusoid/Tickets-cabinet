@@ -5,9 +5,9 @@ require_login();
 
 $page_scripts = $page_scripts ?? [];
 $page_scripts[] = '';
-$page_scripts[] = '/assets/js/schedule-notifications.js?v=20260927-2';
+$page_scripts[] = '/assets/js/schedule-notifications.js?v=20260927-3';
 $page_styles = $page_styles ?? [];
-$page_styles[] = '/assets/css/schedule-notifications.css?v=20260927-2';
+$page_styles[] = '/assets/css/schedule-notifications.css?v=20260927-3';
 
 $halls = db_fetch_all('SELECT id, name FROM halls ORDER BY name');
 $events = db_fetch_all('SELECT id, title FROM events ORDER BY title');
