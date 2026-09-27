@@ -25,15 +25,13 @@ $active_menu = 'settings';
 $page_title_meta = 'Пользователи';
 $panel_title = 'Пользователи';
 $panel_subtitle = 'Управление учётными записями сотрудников';
-$settingsCssPath = __DIR__ . '/../assets/css/settings.css';
-$settingsUsersJsPath = __DIR__ . '/../assets/js/settings_users.js';
 $page_styles = [
     '/assets/css/forms.css',
-    '/assets/css/settings.css?v=' . (is_file($settingsCssPath) ? (string)filemtime($settingsCssPath) : '1'),
+    '/assets/css/settings.css?v=users-ui-20260927-1',
     '/assets/css/customers.css',
 ];
 $page_scripts = [
-    '/assets/js/settings_users.js?v=' . (is_file($settingsUsersJsPath) ? (string)filemtime($settingsUsersJsPath) : '1'),
+    '/assets/js/settings_users.js?v=users-ui-20260927-1',
 ];
 
 require __DIR__ . '/../includes/header.php';
