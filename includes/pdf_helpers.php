@@ -483,6 +483,8 @@ if (!function_exists('ticket_pdf_render_html')) {
         }
         $sessionDateValueEsc = htmlspecialchars($sessionDateValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $sessionTimeValueEsc = htmlspecialchars($sessionTimeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $hallNameRaw = trim((string)($ticket['hall_name'] ?? ''));
+        $hallNameEsc = htmlspecialchars($hallNameRaw !== '' ? $hallNameRaw : '—', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seat_raw = trim((string)($ticket['seat_label'] ?? $ticket['seat_identifier'] ?? ''));
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -731,6 +733,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '.event-time div + div{margin-top:6px;}';
         $html .= '.event-time strong{font-weight:700;}';
         $html .= '.inline-meta{font-size:15px;color:#24364f;line-height:1.45;}';
+        $html .= '.inline-meta-hall{margin-bottom:6px;}';
         $html .= '.inline-meta-second{margin-top:6px;}';
         $html .= '.inline-meta strong{color:#173056;}';
         $html .= '.customer-line{font-size:15px;color:#24364f;line-height:1.5;}';
@@ -758,7 +761,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         }
         $html .= '<div class="ticket-sub">Электронный билет. Для прохода предъявите QR или UID / Электронды билет. Кіру үшін QR немесе UID көрсетіңіз.</div></div></div></div>';
         $html .= '<div class="ticket-content"><div class="ticket-main"><div class="ticket-main-left">';
-        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА:</strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ:</strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
+        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА:</strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ:</strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
         $html .= '<div class="ticket-section">';
         $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
         $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';
@@ -889,9 +892,10 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
         }
 
         try {
-            $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, e.title AS event_title, c.full_name AS customer_name
+            $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, h.name AS hall_name, e.title AS event_title, c.full_name AS customer_name
                 FROM tickets t
                 LEFT JOIN schedules s ON s.id = t.schedule_id
+                LEFT JOIN halls h ON h.id = t.hall_id
                 LEFT JOIN events e ON e.id = t.event_id
                 LEFT JOIN customers c ON c.id = t.customer_id
                 WHERE t.ticket_uid = :uid LIMIT 1");
