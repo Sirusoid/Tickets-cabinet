@@ -34,6 +34,9 @@ if (!function_exists('user_has_permission')) {
                     'manager' => true,
                     'cashier' => true,
                 ],
+                'schedule_notifications' => [
+                    'manager' => true,
+                ],
             ];
             if (isset($defaultPermissions[$permission][$role])) {
                 return (bool)$defaultPermissions[$permission][$role];

@@ -1,0 +1,130 @@
+.schedule-notification-modal[hidden] {
+  display: none;
+}
+
+.schedule-notification-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+}
+
+.schedule-notification-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .52);
+}
+
+.schedule-notification-modal__dialog {
+  position: relative;
+  width: min(720px, calc(100% - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  margin: 16px auto;
+  padding: 22px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, .24);
+}
+
+.schedule-notification-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.schedule-notification-modal__title {
+  margin: 0;
+  color: #172b4d;
+  font-size: 21px;
+}
+
+.schedule-notification-modal__close {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.schedule-notification-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.schedule-notification-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.schedule-notification-modal__field label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedule-notification-modal__field input,
+.schedule-notification-modal__field select,
+.schedule-notification-modal__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.schedule-notification-modal__field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.schedule-notification-modal__info,
+.schedule-notification-modal__result {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #dbe5f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.schedule-notification-modal__result.is-error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+.schedule-notification-modal__preview {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.schedule-notification-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+@media (max-width: 640px) {
+  .schedule-notification-modal__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-notification-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .schedule-notification-modal__actions .btn {
+    width: 100%;
+  }
+}
