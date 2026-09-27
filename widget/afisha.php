@@ -37,7 +37,7 @@ $widgetBaseUrl = rtrim($widgetBaseUrl, '/');
 
 $now = (new DateTime())->format('Y-m-d H:i:s');
 $stmt = $pdo->prepare("SELECT s.id AS session_id, s.start_time, s.base_price, s.price_ranges,
-        e.id AS event_id, e.title AS event_title, e.image AS event_image,
+        e.id AS event_id, e.title AS event_title, e.image AS event_image, e.age_limit,
         h.name AS hall_name
     FROM schedules s
     LEFT JOIN events e ON s.event_id = e.id
@@ -56,6 +56,7 @@ foreach ($sessions as $session) {
     $name = trim((string)$session['event_title']);
     $hall = trim((string)$session['hall_name']);
     $image = trim((string)$session['event_image']);
+    $ageLimit = (int)($session['age_limit'] ?? 0);
 
     $dt = strtotime($session['start_time']);
     $day = date('d', $dt);
@@ -93,15 +94,21 @@ foreach ($sessions as $session) {
 
     $widgetUrl = $widgetBaseUrl . '/tickets/widget.php?session_id=' . $sessionId;
 
-    $imgWrapper = '<div style="background-color:hsl(0,0%,90%); height:365px; border-top-left-radius:30px; border-top-right-radius:30px;"></div>';
+    $ageBadge = $ageLimit > 0
+        ? '<div aria-label="Возрастное ограничение ' . $ageLimit . '+" style="position:absolute; top:14px; left:14px; z-index:2; width:52px; height:52px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border-radius:50%; background-color:#00adb5; color:#ffffff; font-family:TildaSans,Arial,sans-serif; font-size:18px; font-weight:700; line-height:1;">'
+            . $ageLimit . '+'
+            . '</div>'
+        : '';
+    $imgWrapper = '<div style="position:relative; background-color:hsl(0,0%,90%); height:365px; border-top-left-radius:30px; border-top-right-radius:30px; overflow:hidden;">' . $ageBadge . '</div>';
     if ($image !== '') {
         if (strncasecmp($image, 'http://', 7) === 0 || strncasecmp($image, 'https://', 8) === 0) {
             $imgUrl = htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         } else {
             $imgUrl = $widgetBaseUrl . '/uploads/images/' . htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
-        $imgWrapper = '<div style="background-color:hsl(0,0%,90%); height:365px; border-top-left-radius:30px; border-top-right-radius:30px; overflow:hidden;">'
+        $imgWrapper = '<div style="position:relative; background-color:hsl(0,0%,90%); height:365px; border-top-left-radius:30px; border-top-right-radius:30px; overflow:hidden;">'
                     . '<img alt="' . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" src="' . $imgUrl . '" style="display:block; width:100%; height:365px; object-fit:cover; border-top-left-radius:30px; border-top-right-radius:30px;" loading="lazy" />'
+                    . $ageBadge
                     . '</div>';
     }
 
