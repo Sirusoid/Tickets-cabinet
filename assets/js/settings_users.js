@@ -159,13 +159,22 @@
         payload.data.forEach(function (user) {
           var item = document.createElement('div');
           item.className = 'typeahead-item';
+          item.setAttribute('role', 'option');
+          item.setAttribute('tabindex', '0');
           item.innerHTML = '<strong>' + escapeHtml(user.username) + '</strong> — ' + escapeHtml(user.full_name || '') + (user.email ? ' <span>' + escapeHtml(user.email) + '</span>' : '');
           item.addEventListener('mousedown', function (event) { event.preventDefault(); });
-          item.addEventListener('click', function () {
+          var selectSuggestion = function () {
             searchInput.value = user.username || user.full_name || '';
             hideSuggestions();
             page = 1;
             loadUsers();
+          };
+          item.addEventListener('click', selectSuggestion);
+          item.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              selectSuggestion();
+            }
           });
           suggestions.appendChild(item);
         });

@@ -28,7 +28,7 @@ $panel_subtitle = 'Управление учётными записями сот
 $page_styles = [
     '/assets/css/forms.css',
     '/assets/css/settings.css?v=users-ui-20260927-1',
-    '/assets/css/customers.css',
+    '/assets/css/customers.css?v=users-ui-20260927-2',
 ];
 $page_scripts = [
     '/assets/js/settings_users.js?v=users-ui-20260927-1',
