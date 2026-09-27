@@ -85,10 +85,35 @@
       + '    <div id="scheduleNotificationResult" class="schedule-notification-modal__result" hidden></div>'
       + '    <div class="schedule-notification-modal__actions">'
       + '      <button type="button" class="btn btn-ghost" data-notification-close>Закрыть</button>'
+      + '      <button type="button" class="btn btn-ghost" id="scheduleNotificationTemplate">Шаблон письма</button>'
       + '      <button type="button" class="btn btn-secondary" id="scheduleNotificationPreview">Проверить получателей</button>'
       + '      <button type="submit" class="btn btn-primary" id="scheduleNotificationSend" disabled>Сохранить и отправить</button>'
       + '    </div>'
       + '  </form>'
+      + '</section>';
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function ensureTemplateModal() {
+    var existing = document.getElementById('scheduleNotificationTemplateModal');
+    if (existing) return existing;
+
+    var modal = document.createElement('div');
+    modal.id = 'scheduleNotificationTemplateModal';
+    modal.className = 'schedule-notification-modal';
+    modal.hidden = true;
+    modal.innerHTML = ''
+      + '<div class="schedule-notification-modal__backdrop"></div>'
+      + '<section class="schedule-notification-modal__dialog schedule-notification-template-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="scheduleNotificationTemplateTitle">'
+      + '  <div class="schedule-notification-modal__header">'
+      + '    <h2 class="schedule-notification-modal__title" id="scheduleNotificationTemplateTitle">Шаблон письма</h2>'
+      + '    <button type="button" class="schedule-notification-modal__close" data-template-close aria-label="Закрыть">&times;</button>'
+      + '  </div>'
+      + '  <div id="scheduleNotificationTemplateBody" class="schedule-notification-template-modal__body">Загрузка шаблона...</div>'
+      + '  <div class="schedule-notification-modal__actions">'
+      + '    <button type="button" class="btn btn-ghost" data-template-close>Закрыть</button>'
+      + '  </div>'
       + '</section>';
     document.body.appendChild(modal);
     return modal;
@@ -164,6 +189,11 @@
     if (modal) modal.hidden = true;
   }
 
+  function closeTemplateModal() {
+    var modal = document.getElementById('scheduleNotificationTemplateModal');
+    if (modal) modal.hidden = true;
+  }
+
   function buildRequest(action) {
     var body = new URLSearchParams();
     body.append('action', action);
@@ -222,6 +252,48 @@
       if (previewButton) {
         previewButton.disabled = false;
         previewButton.textContent = 'Проверить получателей';
+      }
+    });
+  }
+
+  function showTemplate() {
+    var modal = ensureTemplateModal();
+    var body = getField('scheduleNotificationTemplateBody');
+    if (body) body.innerHTML = 'Загрузка шаблона...';
+    modal.hidden = false;
+
+    var request = buildRequest('preview');
+    if (!getField('scheduleNotificationReason').value.trim()) {
+      request.set('reason', 'Технические обстоятельства.');
+    }
+
+    fetch('/ajax/schedule_notifications.php', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: request.toString()
+    }).then(function (response) {
+      return response.text().then(function (text) {
+        var payload = null;
+        try {
+          payload = JSON.parse(text);
+        } catch (error) {
+          throw new Error('Сервер вернул некорректный ответ (HTTP ' + response.status + ').');
+        }
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.message || ('Сервер вернул HTTP ' + response.status + '.'));
+        }
+        return payload;
+      });
+    }).then(function (payload) {
+      if (!body) return;
+      body.innerHTML = '<div class="schedule-notification-template-modal__subject"><strong>Тема:</strong> '
+        + escapeHtml(payload.subject || '') + '</div>'
+        + '<div class="schedule-notification-template-modal__preview">' + (payload.preview_html || '') + '</div>';
+    }).catch(function (error) {
+      if (body) {
+        body.innerHTML = '<div class="schedule-notification-modal__result is-error">'
+          + escapeHtml(error.message || 'Не удалось открыть шаблон письма.') + '</div>';
       }
     });
   }
@@ -296,6 +368,12 @@
       openModal(notifyButton);
       return;
     }
+    var templateButton = event.target.closest && event.target.closest('#scheduleNotificationTemplate');
+    if (templateButton) {
+      event.preventDefault();
+      showTemplate();
+      return;
+    }
     var previewButton = event.target.closest && event.target.closest('#scheduleNotificationPreview');
     if (previewButton) {
       event.preventDefault();
@@ -304,6 +382,10 @@
     }
     if (event.target.closest && event.target.closest('[data-notification-close]')) {
       closeModal();
+      return;
+    }
+    if (event.target.closest && event.target.closest('[data-template-close]')) {
+      closeTemplateModal();
     }
   });
 

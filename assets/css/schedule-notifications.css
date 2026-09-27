@@ -114,6 +114,31 @@
   font-size: 13px;
 }
 
+.schedule-notification-template-modal__dialog {
+  width: min(780px, calc(100% - 32px));
+}
+
+.schedule-notification-template-modal__body {
+  color: #334155;
+  line-height: 1.5;
+}
+
+.schedule-notification-template-modal__subject {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbe5f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.schedule-notification-template-modal__preview {
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
 .schedule-notification-modal__actions {
   display: flex;
   justify-content: flex-end;
