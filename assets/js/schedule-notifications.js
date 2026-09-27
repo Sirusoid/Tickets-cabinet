@@ -283,6 +283,12 @@
       openModal(notifyButton);
       return;
     }
+    var previewButton = event.target.closest && event.target.closest('#scheduleNotificationPreview');
+    if (previewButton) {
+      event.preventDefault();
+      preview();
+      return;
+    }
     if (event.target.closest && event.target.closest('[data-notification-close]')) {
       closeModal();
     }
