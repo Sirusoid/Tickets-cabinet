@@ -133,7 +133,7 @@ foreach ($sessions as $session) {
 
     $detailsButton = '';
     if ($eventPageUrl !== '') {
-        $detailsButton = '<div class="t774__btn-wrapper" style="margin-top:0;">'
+        $detailsButton = '<div class="t774__btn-wrapper" style="position:static !important; width:auto !important; height:auto !important; margin-top:0;">'
             . '<a href="' . htmlspecialchars($eventPageUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="zhassahna-details-btn" style="display:inline-block;text-decoration:none;">'
             . '<div class="t774__btn t-btn t-btn_sm" style="color:#222831;background-color:#00adb5;border-radius:30px;font-family:TildaSans,Arial,sans-serif;font-weight:700;text-transform:uppercase;padding:10px 20px;">'
             . 'ПОДРОБНЕЕ'
@@ -163,8 +163,8 @@ foreach ($sessions as $session) {
 
                 <div style="display:flex; flex:1; min-height:0; flex-direction:column; align-items:center; justify-content:flex-end;">
                     ' . $priceBlock . '
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
-                    <div class="t774__btn-wrapper" style="margin-top:0;">
+                    <div class="zhassahna-btn-stack" style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                    <div class="t774__btn-wrapper" style="position:static !important; width:auto !important; height:auto !important; margin-top:0;">
                         <a href="#" class="zhassahna-buy-btn" data-session-id="' . $sessionId . '" data-widget-url="' . htmlspecialchars($widgetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">
                             <div class="t774__btn t-btn t-btn_sm" style="color:#222831;background-color:#00adb5;border-radius:30px;font-family:TildaSans,Arial,sans-serif;font-weight:700;text-transform:uppercase;padding:10px 20px;">
                                 КУПИТЬ БИЛЕТ
