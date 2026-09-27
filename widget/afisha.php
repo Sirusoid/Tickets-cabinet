@@ -37,7 +37,7 @@ $widgetBaseUrl = rtrim($widgetBaseUrl, '/');
 
 $now = (new DateTime())->format('Y-m-d H:i:s');
 $stmt = $pdo->prepare("SELECT s.id AS session_id, s.start_time, s.base_price, s.price_ranges,
-        e.id AS event_id, e.title AS event_title, e.image AS event_image, e.age_limit,
+        e.id AS event_id, e.title AS event_title, e.image AS event_image, e.age_limit, e.page_url AS event_page_url,
         h.name AS hall_name
     FROM schedules s
     LEFT JOIN events e ON s.event_id = e.id
@@ -57,6 +57,18 @@ foreach ($sessions as $session) {
     $hall = trim((string)$session['hall_name']);
     $image = trim((string)$session['event_image']);
     $ageLimit = (int)($session['age_limit'] ?? 0);
+    $eventPageUrlRaw = trim((string)($session['event_page_url'] ?? ''));
+    $eventPageUrl = '';
+    if ($eventPageUrlRaw !== '') {
+        if (preg_match('/^https?:\/\//i', $eventPageUrlRaw)) {
+            $eventPageUrl = $eventPageUrlRaw;
+        } else {
+            $publicSiteUrl = defined('TILDA_WIDGET_ORIGIN')
+                ? rtrim((string)constant('TILDA_WIDGET_ORIGIN'), '/')
+                : 'https://zhassahna.kz';
+            $eventPageUrl = $publicSiteUrl . '/' . ltrim($eventPageUrlRaw, '/');
+        }
+    }
 
     $dt = strtotime($session['start_time']);
     $day = date('d', $dt);
@@ -114,9 +126,18 @@ foreach ($sessions as $session) {
 
     $priceBlock = '';
     if ($priceText !== '') {
-        $priceBlock = '<div style="font-family:TildaSans,Arial,sans-serif;color:#ffffff;font-weight:500;font-size:32px;margin-bottom:100px;">'
+        $priceBlock = '<div style="font-family:TildaSans,Arial,sans-serif;color:#ffffff;font-weight:500;font-size:32px;margin-bottom:62px;">'
                     . htmlspecialchars($priceText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
                     . '</div>';
+    }
+
+    $detailsButton = '';
+    if ($eventPageUrl !== '') {
+        $detailsButton = '<div class="t774__btn-wrapper" style="margin-top:0;">'
+            . '<a href="' . htmlspecialchars($eventPageUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="zhassahna-details-btn" style="display:inline-block;text-decoration:none;">'
+            . '<div class="t774__btn t-btn t-btn_sm" style="color:#222831;background-color:#00adb5;border-radius:30px;font-family:TildaSans,Arial,sans-serif;font-weight:700;text-transform:uppercase;padding:10px 20px;">'
+            . 'ПОДРОБНЕЕ'
+            . '</div></a></div>';
     }
 
     $html .= '
@@ -142,12 +163,15 @@ foreach ($sessions as $session) {
 
                 <div style="display:flex; flex-direction:column; align-items:center;">
                     ' . $priceBlock . '
-                    <div class="t774__btn-wrapper" style="margin-top:8px;">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                    <div class="t774__btn-wrapper" style="margin-top:0;">
                         <a href="#" class="zhassahna-buy-btn" data-session-id="' . $sessionId . '" data-widget-url="' . htmlspecialchars($widgetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">
                             <div class="t774__btn t-btn t-btn_sm" style="color:#222831;background-color:#00adb5;border-radius:30px;font-family:TildaSans,Arial,sans-serif;font-weight:700;text-transform:uppercase;padding:10px 20px;">
                                 КУПИТЬ БИЛЕТ
                             </div>
                         </a>
+                    </div>
+                    ' . $detailsButton . '
                     </div>
                 </div>
             </div>
