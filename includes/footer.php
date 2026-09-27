@@ -47,8 +47,16 @@ $page_scripts = $page_scripts ?? [];
               <div class="form-group"><label for="settingsUserEmail">Email</label><input id="settingsUserEmail" type="email" name="email"></div>
               <div class="form-group"><label for="settingsUserRole">Роль</label><select id="settingsUserRole" name="role"><?php foreach ($settings_user_roles as $roleCode => $roleLabel): ?><option value="<?= h($roleCode) ?>"><?= h($roleLabel) ?></option><?php endforeach; ?></select></div>
               <div class="form-group settings-user-modal__active"><label class="settings-bool"><input id="settingsUserActive" type="checkbox" name="is_active" value="1"><span>Активная учетная запись</span></label></div>
-              <div class="form-group settings-user-modal__password-field"><label for="settingsUserNewPassword">Новый пароль (необязательно)</label><input id="settingsUserNewPassword" type="password" name="new_password" minlength="8" autocomplete="new-password" placeholder="Оставьте пустым, если менять не нужно"><small>Пароль обновится при сохранении формы.</small></div>
+              <div class="form-group settings-user-modal__password-field">
+                <label for="settingsUserNewPassword">Новый пароль (необязательно)</label>
+                <div class="settings-user-modal__password-row">
+                  <input id="settingsUserNewPassword" type="password" name="new_password" minlength="8" autocomplete="new-password" placeholder="Оставьте пустым, если менять не нужно">
+                  <button type="button" class="btn btn-ghost" id="settingsUserNewPasswordToggle">Показать пароль</button>
+                </div>
+                <small>Можно показать пароль, который вводится для замены. Текущий пароль нельзя восстановить: он хранится только в виде необратимого хеша.</small>
+              </div>
             </div>
+            <div class="settings-user-modal__current-password-note"><strong>Текущий пароль:</strong> недоступен для просмотра по соображениям безопасности. При необходимости задайте новый пароль выше.</div>
             <div id="settingsUserEditError" class="customer-edit-form__error"></div>
             <div class="settings-user-modal__actions"><button type="button" class="btn btn-ghost" data-user-modal-close>Отмена</button><button type="submit" class="btn btn-primary">Сохранить изменения</button></div>
           </form>

@@ -16,6 +16,8 @@
   var editModal = document.getElementById('settingsUserModal');
   var editForm = document.getElementById('settingsUserEditForm');
   var editError = document.getElementById('settingsUserEditError');
+  var newPasswordInput = document.getElementById('settingsUserNewPassword');
+  var newPasswordToggle = document.getElementById('settingsUserNewPasswordToggle');
   var resetButton = document.getElementById('settingsUsersReset');
   var debounceTimer = null;
   var suggestionTimer = null;
@@ -185,6 +187,8 @@
     editModal.style.display = 'none';
     editModal.setAttribute('aria-hidden', 'true');
     if (editError) editError.textContent = '';
+    if (newPasswordInput) newPasswordInput.type = 'password';
+    if (newPasswordToggle) newPasswordToggle.textContent = 'Показать пароль';
   }
 
   function openEditModal(id) {
@@ -208,6 +212,8 @@
         document.getElementById('settingsUserRole').value = user.role || 'manager';
         document.getElementById('settingsUserActive').checked = Number(user.is_active) === 1;
         document.getElementById('settingsUserNewPassword').value = '';
+        if (newPasswordInput) newPasswordInput.type = 'password';
+        if (newPasswordToggle) newPasswordToggle.textContent = 'Показать пароль';
         document.getElementById('settingsUserFullName').focus();
       })
       .catch(function (error) {
@@ -279,6 +285,13 @@
   if (nextButton) nextButton.addEventListener('click', function () { if (page < totalPages) { page += 1; loadUsers(); } });
   if (createForm) createForm.addEventListener('submit', submitCreate);
   if (editForm) editForm.addEventListener('submit', submitEdit);
+  if (newPasswordToggle && newPasswordInput) {
+    newPasswordToggle.addEventListener('click', function () {
+      var isVisible = newPasswordInput.type === 'text';
+      newPasswordInput.type = isVisible ? 'password' : 'text';
+      newPasswordToggle.textContent = isVisible ? 'Показать пароль' : 'Скрыть пароль';
+    });
+  }
 
   document.addEventListener('click', function (event) {
     var editButton = event.target.closest && event.target.closest('.js-edit-user');

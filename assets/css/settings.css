@@ -192,9 +192,9 @@
 
 .settings-user-create-inline {
     display: grid;
-    grid-template-columns: minmax(130px, .85fr) minmax(180px, 1.2fr) minmax(180px, 1.1fr) minmax(150px, .95fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: end;
-    gap: 7px 9px;
+    gap: 10px 12px;
     width: 100%;
 }
 
@@ -226,6 +226,7 @@
     min-height: 32px;
     padding: 6px 10px;
     white-space: nowrap;
+    grid-column: 2;
 }
 
 /* Dense layout for the staff directory: many users should fit in one viewport. */
@@ -240,6 +241,54 @@
 
 .settings-users-page .settings-users-create-compact {
     padding: 12px 14px;
+}
+
+.settings-users-page .settings-user-create-inline {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: end;
+    gap: 10px 12px;
+}
+
+.settings-users-page .customers-filter-panel {
+    padding: 14px 16px;
+    border: 1px solid #dbe5f0;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(23, 43, 77, .06);
+}
+
+.settings-users-page .customers-filter-panel .card-title {
+    margin-bottom: 12px;
+    color: #243b5a;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.settings-users-page .customers-filters {
+    display: grid !important;
+    grid-template-columns: minmax(240px, 2fr) minmax(150px, 1fr) minmax(150px, 1fr) auto auto !important;
+    align-items: end;
+    gap: 10px 12px;
+}
+
+.settings-users-page .customers-filter-bottom {
+    display: contents !important;
+}
+
+.settings-users-page .customers-per-page,
+.settings-users-page .customers-filters__actions {
+    min-width: 0;
+}
+
+.settings-users-page .customers-per-page {
+    height: 40px;
+    justify-content: flex-start;
+}
+
+.settings-users-page .customers-filters__actions {
+    height: 40px;
+    padding-bottom: 0;
 }
 
 .settings-users-page .settings-block__title {
@@ -361,9 +410,26 @@
 .settings-user-modal__password-row input { flex: 1; min-width: 0; }
 .settings-user-modal__password-field { grid-column: 1 / -1; }
 .settings-user-modal__password-field small { display: block; margin-top: 5px; color: #64748b; font-size: 12px; }
+.settings-user-modal__current-password-note {
+    margin: 16px 0 0;
+    padding: 10px 12px;
+    border: 1px solid #dbe5f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #52647e;
+    font-size: 12px;
+    line-height: 1.45;
+}
 
 @media (max-width: 640px) {
     .settings-user-create-inline { width: 100%; grid-template-columns: 1fr; }
+    .settings-users-page .settings-user-create-inline { grid-template-columns: 1fr !important; }
+    .settings-users-page .settings-user-create-inline > button { grid-column: auto; }
+    .settings-users-page .customers-filters { grid-template-columns: 1fr !important; }
+    .settings-users-page .customers-filter-bottom { display: flex !important; flex-direction: column; align-items: stretch; }
+    .settings-users-page .customers-per-page,
+    .settings-users-page .customers-filters__actions { width: 100%; }
+    .settings-users-page .customers-filters__actions { height: auto; }
     .settings-user-modal__grid { grid-template-columns: 1fr; }
     .settings-user-modal__password-row { flex-direction: column; }
 }
