@@ -161,7 +161,8 @@ $panel_title = 'Детальный отчёт';
 $panel_subtitle = 'Продажи по конкретному сеансу';
 $active_menu = 'reports';
 $use_sidebar = true;
-$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-1'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-2'];
+$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-2'];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
@@ -249,7 +250,7 @@ require __DIR__ . '/../includes/panel.php';
                     <tr><td colspan="6" class="reports-empty">Проданных билетов пока нет.</td></tr>
                 <?php else: foreach ($soldTickets as $ticket): ?>
                     <?php $ticketFinancials = reporting_ticket_financials($ticket); ?>
-                    <tr>
+                    <tr class="performance-ticket-row" data-ticket-url="/tickets/view.php?id=<?= (int)$ticket['id'] ?>" tabindex="0" role="link">
                         <td><strong><?= h($ticket['seat_identifier'] ?? '—') ?></strong></td>
                         <td><?= h(reporting_segment_label($ticket['customer_segment'] ?? '')) ?></td>
                         <td><?= h(reporting_payment_label($ticket['payment_method'] ?? '', $ticket['channel'] ?? '')) ?></td>

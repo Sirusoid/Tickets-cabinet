@@ -7,7 +7,8 @@ require_login();
 $use_sidebar = true;
 $active_menu = 'dashboard';
 $page_title_meta = 'Панель';
-$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-1'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-2'];
+$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-2'];
 
 $todaySales = ['tickets' => 0, 'amount' => 0.0];
 $todayRefunds = ['tickets' => 0, 'amount' => 0.0];
@@ -59,7 +60,6 @@ try {
         LEFT JOIN tickets t ON t.schedule_id = s.id
             AND t.payment_status = 'paid'
             AND t.status <> 'cancelled'
-            AND COALESCE(t.refund_status, 'none') <> 'refunded'
         WHERE s.start_time >= NOW()
             AND s.start_time < DATE_ADD(NOW(), INTERVAL 14 DAY)
             AND s.status IN ('upcoming', 'active')
@@ -127,7 +127,7 @@ require __DIR__ . '/includes/header.php';
         <div class="reports-table-wrap">
             <table class="admin-table table--compact reports-table reports-table--wide">
                 <thead>
-                    <tr>
+                    <tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$session['id'] ?>" tabindex="0" role="link">
                         <th>Дата и время</th>
                         <th>Спектакль</th>
                         <th>Зал</th>

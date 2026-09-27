@@ -183,6 +183,14 @@
 .reports-table td:first-child { color: #243b5a; }
 .reports-table td, .reports-table th { padding: 11px 10px; }
 .reports-table tbody tr:last-child td { border-bottom: 0; }
+.performance-ticket-row,
+.reports-session-row { cursor: pointer; transition: background-color .14s ease, box-shadow .14s ease; }
+.performance-ticket-row:hover,
+.performance-ticket-row:focus-visible,
+.reports-session-row:hover,
+.reports-session-row:focus-visible { background: #f2f7ff; outline: none; }
+.performance-ticket-row:focus-visible,
+.reports-session-row:focus-visible { box-shadow: inset 3px 0 0 #2563eb; }
 .reports-number--success { color: #15803d !important; }
 .reports-number--discount { color: #b45309 !important; }
 .reports-number--refund { color: #b42318 !important; }
