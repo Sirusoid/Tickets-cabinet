@@ -484,7 +484,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         $sessionDateValueEsc = htmlspecialchars($sessionDateValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $sessionTimeValueEsc = htmlspecialchars($sessionTimeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $hallNameRaw = trim((string)($ticket['hall_name'] ?? ''));
-        $hallNameEsc = htmlspecialchars($hallNameRaw !== '' ? $hallNameRaw : '—', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $hallNameEsc = htmlspecialchars($hallNameRaw !== '' ? $hallNameRaw . ' (Абая 117)' : '—', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seat_raw = trim((string)($ticket['seat_label'] ?? $ticket['seat_identifier'] ?? ''));
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
