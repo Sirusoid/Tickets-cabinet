@@ -262,7 +262,9 @@
 .performance-progress-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; color: var(--performance-muted); font-size: 12px; }
 .performance-sales-card { margin-bottom: 14px; }
 .performance-sales-count { color: var(--performance-muted); font-size: 13px; }
-.performance-sales-table { min-width: 720px; }
+.performance-sales-table { min-width: 2400px; }
+.performance-sales-table th,
+.performance-sales-table td { white-space: nowrap; }
 
 @media (max-width: 1100px) {
   .performance-kpi-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); }

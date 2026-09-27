@@ -26,13 +26,19 @@ if (!$session) {
 
 $tickets = db_fetch_all(
     "SELECT
-        t.id, t.ticket_uid, t.seat_identifier, t.customer_name, t.customer_segment,
-        t.original_price, t.final_price, t.discount_amount, t.channel,
+        t.id, t.ticket_uid, t.seat_identifier, t.customer_name, t.customer_email, t.customer_phone,
+        t.customer_segment, t.channel, t.payment_transaction_id,
+        t.original_price, t.final_price, t.discount_amount,
         t.payment_status, t.status, t.refund_status, t.is_checked_in,
         t.purchased_at,
+        seat.zone_name AS seat_zone, seat.seat_group, seat.seat_type,
         COALESCE(tx.payment_method, CASE WHEN t.channel IN ('web', 'mobile') THEN 'card' ELSE 'cash' END) AS payment_method,
         COALESCE(ps.order_number, '') AS order_number
      FROM tickets t
+     LEFT JOIN schedules s ON s.id = t.schedule_id
+     LEFT JOIN seats seat
+        ON seat.hall_id = s.hall_id
+       AND CONCAT(seat.row_number, '-', seat.seat_number) = REPLACE(t.seat_identifier, ':', '-')
      LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
      LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
      WHERE t.schedule_id = ?
@@ -117,6 +123,15 @@ $refundedCount = count($refundedTickets);
 $netAmount = max(0.0, $soldAmount - $refundAmount);
 $occupancy = $capacity > 0 ? min(100, ($soldCount / $capacity) * 100) : null;
 $averageTicket = $soldCount > 0 ? $soldAmount / $soldCount : 0.0;
+
+$saleTypeLabels = [
+    'web' => 'Продажи через афишу',
+    'mobile' => 'Продажи через приложение',
+    'kassa' => 'Продажа через кассу',
+    'agent' => 'Агентская продажа',
+    'admin' => 'Административная продажа',
+    'qr' => 'Продажа по QR',
+];
 
 $chartColors = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#e11d48'];
 $makeGradient = static function (array $items, array $colors): string {
@@ -244,19 +259,76 @@ require __DIR__ . '/../includes/panel.php';
         </div>
         <div class="reports-table-wrap">
             <table class="admin-table table--compact reports-table performance-sales-table">
-                <thead><tr><th>Место</th><th>Категория</th><th>Оплата</th><th>Заказ</th><th>Цена</th><th>Дата покупки</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>№ билета</th>
+                        <th>Место проведения</th>
+                        <th>Событие</th>
+                        <th>Сеанс</th>
+                        <th>Зал</th>
+                        <th>Сектор</th>
+                        <th>Ряд</th>
+                        <th>Место</th>
+                        <th>Цена</th>
+                        <th>Название тарифа</th>
+                        <th>Тип билета</th>
+                        <th>№ продажи</th>
+                        <th>Внешний ID заказа</th>
+                        <th>Дата и время продажи</th>
+                        <th>Тип продажи</th>
+                        <th>№ внешнего билета</th>
+                        <th>Почта клиента</th>
+                        <th>Телефон клиента</th>
+                        <th>Метод оплаты</th>
+                        <th>Статус валидации</th>
+                        <th>Комментарий</th>
+                    </tr>
+                </thead>
                 <tbody>
                 <?php if (!$soldTickets): ?>
-                    <tr><td colspan="6" class="reports-empty">Проданных билетов пока нет.</td></tr>
+                    <tr><td colspan="21" class="reports-empty">Проданных билетов пока нет.</td></tr>
                 <?php else: foreach ($soldTickets as $ticket): ?>
                     <?php $ticketFinancials = reporting_ticket_financials($ticket); ?>
+                    <?php
+                    $seatParts = preg_split('/\s*-\s*/', str_replace(':', '-', (string)($ticket['seat_identifier'] ?? '')), 2);
+                    $seatRow = trim((string)($seatParts[0] ?? ''));
+                    $seatNumber = trim((string)($seatParts[1] ?? ''));
+                    $saleChannel = strtolower(trim((string)($ticket['channel'] ?? '')));
+                    $saleType = $saleTypeLabels[$saleChannel] ?? 'Продажа';
+                    $tariffName = trim((string)($ticket['seat_type'] ?? '')) ?: 'Стандартный';
+                    $sectorName = trim((string)($ticket['seat_zone'] ?? ''));
+                    if ($sectorName === '') {
+                        $sectorName = trim((string)($ticket['seat_group'] ?? ''));
+                    }
+                    $sectorName = $sectorName !== '' ? $sectorName : '—';
+                    $validationStatus = !empty($ticket['is_checked_in'])
+                        ? 'Билет валидирован'
+                        : 'Билет еще не валидирован';
+                    $saleNumber = trim((string)($ticket['payment_transaction_id'] ?? ''));
+                    $orderNumber = trim((string)($ticket['order_number'] ?? ''));
+                    ?>
                     <tr class="performance-ticket-row" data-ticket-url="/tickets/view.php?id=<?= (int)$ticket['id'] ?>" tabindex="0" role="link">
-                        <td><strong><?= h($ticket['seat_identifier'] ?? '—') ?></strong></td>
-                        <td><?= h(reporting_segment_label($ticket['customer_segment'] ?? '')) ?></td>
-                        <td><?= h(reporting_payment_label($ticket['payment_method'] ?? '', $ticket['channel'] ?? '')) ?></td>
-                        <td><?= h($ticket['order_number'] ?? '—') ?></td>
+                        <td><strong><?= h($ticket['ticket_uid'] ?? '—') ?></strong></td>
+                        <td>Театр Жас Сахна</td>
+                        <td><?= h($session['event_title'] ?? '—') ?></td>
+                        <td><?= h(reporting_format_date($session['start_time'] ?? '', true)) ?></td>
+                        <td><?= h($session['hall_name'] ?? '—') ?></td>
+                        <td><?= h($sectorName) ?></td>
+                        <td><?= h($seatRow !== '' ? $seatRow : '—') ?></td>
+                        <td><?= h($seatNumber !== '' ? $seatNumber : '—') ?></td>
                         <td><?= number_format($ticketFinancials['paid'], 2, '.', ' ') ?> тг</td>
+                        <td><?= h($tariffName) ?></td>
+                        <td><?= h(reporting_segment_label($ticket['customer_segment'] ?? '')) ?></td>
+                        <td><?= h($saleNumber !== '' ? $saleNumber : '—') ?></td>
+                        <td><?= h($orderNumber !== '' ? $orderNumber : '—') ?></td>
                         <td><?= h(reporting_format_date($ticket['purchased_at'] ?? '', true)) ?></td>
+                        <td><?= h($saleType) ?></td>
+                        <td><?= h($ticket['ticket_uid'] ?? '—') ?></td>
+                        <td><?= h(trim((string)($ticket['customer_email'] ?? '')) ?: '—') ?></td>
+                        <td><?= h(trim((string)($ticket['customer_phone'] ?? '')) ?: '—') ?></td>
+                        <td><?= h(reporting_payment_label($ticket['payment_method'] ?? '', $ticket['channel'] ?? '')) ?></td>
+                        <td><?= h($validationStatus) ?></td>
+                        <td>—</td>
                     </tr>
                 <?php endforeach; endif; ?>
                 </tbody>
