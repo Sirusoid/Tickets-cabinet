@@ -130,6 +130,7 @@ foreach ($rows as $row) {
         !empty($row['purchased_at']) ? reporting_format_date($row['purchased_at'], true) : '—',
         $saleType,
         (string)($row['ticket_uid'] ?? '—'),
+        trim((string)($row['customer_name'] ?? '')) !== '' ? (string)$row['customer_name'] : '—',
         trim((string)($row['customer_email'] ?? '')) !== '' ? (string)$row['customer_email'] : '—',
         trim((string)($row['customer_phone'] ?? '')) !== '' ? (string)$row['customer_phone'] : '—',
         $paymentMethod,
@@ -168,31 +169,30 @@ $summarySheet->fromArray([
 $detailSheet = $spreadsheet->createSheet();
 $detailSheet->setTitle('Билеты');
 $detailSheet->fromArray([
-    ['Отчет по продажам билетов по системе ticketon.kz: Театр Жас Сахна'],
+    ['Отчет по продажам билетов'],
     ['№ билета', 'Место проведения', 'Событие', 'Сеанс', 'Зал', 'Сектор', 'Ряд', 'Место',
         'Цена', 'Название тарифа', 'Тип билета', '№ продажи', 'Внешний ID заказа',
-        'Дата и время продажи', 'Тип продажи', '№ внешнего билета', 'Почта клиента',
+        'Дата и время продажи', 'Тип продажи', '№ внешнего билета', 'Клиент', 'Почта клиента',
         'Телефон клиента', 'Метод оплаты', 'Статус валидации', 'Комментарий'],
 ], null, 'A1');
 foreach ($details as $index => $detail) {
     $detailSheet->fromArray([$detail], null, 'A' . ($index + 3));
 }
 $sessionDetailTotalRow = count($details) + 3;
-$detailSheet->fromArray([[
-    'ИТОГО', null, null, null, null, null, null, null,
-    round($summary['sales'], 2),
-    null, null, null, null, null, null, null, null, null, null, null, null,
-]], null, 'A' . $sessionDetailTotalRow);
+$detailTotal = array_fill(0, 22, null);
+$detailTotal[0] = 'ИТОГО';
+$detailTotal[8] = round($summary['sales'], 2);
+$detailSheet->fromArray([$detailTotal], null, 'A' . $sessionDetailTotalRow);
 
 $summarySheet->getStyle('A1:B1')->getFont()->setBold(true)->setSize(15);
 $summarySheet->getStyle('A7:B7')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
 $summarySheet->getStyle('A7:B7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
-$detailSheet->getStyle('A1:U1')->getFont()->setBold(true)->setSize(14);
-$detailSheet->getStyle('A2:U2')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$detailSheet->getStyle('A2:U2')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
+$detailSheet->getStyle('A1:V1')->getFont()->setBold(true)->setSize(14);
+$detailSheet->getStyle('A2:V2')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+$detailSheet->getStyle('A2:V2')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
 $summarySheet->getStyle('B9:B14')->getNumberFormat()->setFormatCode('#,##0.00');
 $detailSheet->getStyle('I3:I' . max(3, count($details) + 2))->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':U' . $sessionDetailTotalRow)->getFont()->setBold(true);
+$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':V' . $sessionDetailTotalRow)->getFont()->setBold(true);
 $detailSheet->getStyle('I' . $sessionDetailTotalRow)->getNumberFormat()->setFormatCode('#,##0.00');
 $summarySheet->freezePane('A8');
 $detailSheet->freezePane('A3');
