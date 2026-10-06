@@ -838,6 +838,22 @@ button.btn-secondary[disabled] {
   border:none;
   font-size:18px;
   cursor:pointer;
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  z-index: 1001;
+}
+
+/* Кнопка сайдбара видна только когда сайдбар скрыт */
+.admin-sidebar[aria-hidden="false"] ~ .sidebar-toggle,
+.sidebar-collapsed .sidebar-toggle {
+  display: none;
+}
+
+/* Кнопка сайдбара скрыта когда сайдбар виден */
+.admin-sidebar[aria-hidden="true"] ~ .sidebar-toggle,
+body:not(.sidebar-collapsed) .sidebar-toggle {
+  display: inline-block !important;
 }
 
 /* Sidebar */

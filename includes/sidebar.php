@@ -145,9 +145,13 @@ $isSettingsExpanded = $isSettingsPath ? 'true' : 'false';
 
   if (toggle && sidebar) {
     toggle.addEventListener('click', function(){
-      document.body.classList.toggle('sidebar-collapsed');
+      // Переключаем класс для скрытия/показа сайдбара
       var hidden = sidebar.getAttribute('aria-hidden') === 'true';
       sidebar.setAttribute('aria-hidden', hidden ? 'false' : 'true');
+      document.body.classList.toggle('sidebar-collapsed', hidden);
+
+      // Показываем/скрываем кнопку сайдбара
+      toggle.style.display = hidden ? 'inline-block' : 'none';
     });
   }
 })();
