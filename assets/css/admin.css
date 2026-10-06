@@ -873,8 +873,8 @@ button.btn-secondary[disabled] {
 }
 
  /* Toggle visibility: show when sidebar is collapsed, hide when visible */
- .sidebar-collapsed .sidebar-toggle { display: inline-block; }
- body:not(.sidebar-collapsed) .sidebar-toggle { display: none; }
+  /* Toggle button is always visible; visibility handled by the button element itself */
+  .sidebar-toggle { display: inline-block; }
 
  /* Brand margin adjustment based on sidebar state */
  .admin-header .brand { margin-left: 220px; }

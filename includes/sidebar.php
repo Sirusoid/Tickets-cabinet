@@ -146,12 +146,11 @@ $isSettingsExpanded = $isSettingsPath ? 'true' : 'false';
   if (toggle && sidebar) {
     toggle.addEventListener('click', function(){
       // Переключаем класс для скрытия/показа сайдбара
-      var hidden = sidebar.getAttribute('aria-hidden') === 'true';
-      sidebar.setAttribute('aria-hidden', hidden ? 'false' : 'true');
-      document.body.classList.toggle('sidebar-collapsed', hidden);
-
-      // Показываем/скрываем кнопку сайдбара
-      toggle.style.display = hidden ? 'inline-block' : 'none';
+      var currentlyHidden = sidebar.getAttribute('aria-hidden') === 'true';
+      var newHidden = !currentlyHidden;
+      sidebar.setAttribute('aria-hidden', newHidden ? 'true' : 'false');
+      document.body.classList.toggle('sidebar-collapsed', newHidden);
+      // Кнопка остаётся видимой; её стили задаются через CSS
     });
   }
 })();
