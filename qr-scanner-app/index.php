@@ -16,8 +16,8 @@ if (!$scannerAllowed) {
     exit('Доступ к сканеру запрещён.');
 }
 
-$use_sidebar = false; // Убираем боковую панель для чистого UI
-$hide_admin_header = true; // Убираем заголовок панели
+19 | $use_sidebar = true; // Показываем боковую панель (для роли "Сканер")
+20 | $hide_admin_header = false; // Показываем заголовок панели
 $page_title_meta = 'Сканер билетов';
 $page_styles = ['/qr-scanner-app/assets/css/ticket-scanner.css'];
 $page_scripts = [
