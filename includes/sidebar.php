@@ -153,5 +153,12 @@ $isSettingsExpanded = $isSettingsPath ? 'true' : 'false';
       // Кнопка остаётся видимой; её стили задаются через CSS
     });
   }
+
+  // Инициализация: при загрузке страницы на мобильных устройствах закрываем сайдбар
+  if (window.innerWidth <= 768 && sidebar) {
+    // Устанавливаем aria-hidden в true и добавляем класс collapsed
+    sidebar.setAttribute('aria-hidden', 'true');
+    document.body.classList.add('sidebar-collapsed');
+  }
 })();
 </script>

@@ -1187,3 +1187,12 @@ button.btn-secondary[disabled] {
 .btn:focus { box-shadow: 0 0 0 3px rgba(37,99,235,0.12); outline: none; }
 
 /* --- Конец файла --- */
+/* Mobile‑specific adjustments: keep sidebar collapsed and overlay on small screens */
+@media (max-width: 768px) {
+  /* Sidebar title (brand) should stay left aligned (no margin) */
+  .admin-header .brand { margin-left: 0; }
+  /* When sidebar is open on mobile, do not shift the main content */
+  .admin-sidebar[aria-hidden="false"] + .container { margin-left: 0; }
+  /* When sidebar is collapsed on mobile, keep no margin as well */
+  .sidebar-collapsed .container { margin-left: 0; }
+}
