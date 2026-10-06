@@ -147,6 +147,15 @@ html { box-sizing: border-box; }
   padding: 14px 20px;
   background: linear-gradient(180deg, #fff, #fbfdff);
   border-bottom: 1px solid var(--surface-border);
+/* Adjust container margin when sidebar collapsed */
+.admin-sidebar[aria-hidden="false"] + .container {
+  margin-left: 220px;
+}
+
+.admin-sidebar[aria-hidden="true"] + .container {
+  margin-left: 0;
+}
+
 }
 .admin-header .brand a { font-weight:500; color:var(--accent); text-decoration:none; font-size:16px; }
 .admin-header nav a { margin-left:12px; color:var(--muted); text-decoration:none; font-size:14px; }
