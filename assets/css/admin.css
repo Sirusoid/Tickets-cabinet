@@ -842,18 +842,42 @@ button.btn-secondary[disabled] {
   left: 16px;
   top: 16px;
   z-index: 1001;
+  padding: 8px;
+  color: #475569;
+  transition: color 0.2s;
+}
+
+.sidebar-toggle:hover {
+  color: #0f1724;
 }
 
 /* Кнопка сайдбара видна только когда сайдбар скрыт */
-.admin-sidebar[aria-hidden="false"] ~ .sidebar-toggle,
+.admin-sidebar[aria-hidden="false"] .sidebar-toggle,
 .sidebar-collapsed .sidebar-toggle {
   display: none;
 }
 
 /* Кнопка сайдбара скрыта когда сайдбар виден */
-.admin-sidebar[aria-hidden="true"] ~ .sidebar-toggle,
+.admin-sidebar[aria-hidden="true"] .sidebar-toggle,
 body:not(.sidebar-collapsed) .sidebar-toggle {
   display: inline-block !important;
+}
+
+/* SVG иконка в кнопке сайдбара */
+.sidebar-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Кнопка сайдбара всегда видна при скрытом сайдбаре */
+.admin-sidebar[aria-hidden="true"] ~ .sidebar-toggle,
+.sidebar-collapsed .sidebar-toggle {
+  display: none;
 }
 
 /* Sidebar */
