@@ -8,6 +8,10 @@ if (!function_exists('user_has_permission')) {
         if ($role === 'admin') {
             return true;
         }
+        // Special case for 'scanner' role: allow only scanner permissions
+        if ($role === 'scanner' && $permission === 'scanner') {
+            return true;
+        }
         if ($permission === '') {
             return $fallback;
         }
