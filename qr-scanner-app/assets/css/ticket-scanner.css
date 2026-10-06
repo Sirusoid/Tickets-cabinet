@@ -3,12 +3,13 @@
   max-width: 1100px;
 }
 
-.scanner-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
-  gap: 18px;
-  align-items: start;
-}
+ .scanner-layout {
+   /* Переходим к вертикальному расположению: камера сверху, результат снизу */
+   display: flex;
+   flex-direction: column;
+   gap: 18px;
+   align-items: stretch;
+ }
 
 .scanner-card,
 .scanner-result {
@@ -80,20 +81,13 @@
   color: #b91c1c;
 }
 
-.scanner-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
+ .scanner-actions {
+   display: none; /* скрываем кнопки управления камерой */
+ }
 
-.scanner-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 18px 0 14px;
-  color: #94a3b8;
-  font-size: 12px;
-}
+ .scanner-divider {
+   display: none; /* убираем разделитель «или» */
+ }
 
 .scanner-divider::before,
 .scanner-divider::after {
@@ -103,14 +97,10 @@
   background: #e5e7eb;
 }
 
-.scanner-manual label,
-.scanner-file {
-  display: block;
-  margin-bottom: 6px;
-  color: #40526c;
-  font-size: 12px;
-  font-weight: 600;
-}
+ .scanner-manual label,
+ .scanner-file {
+   display: none; /* скрываем ручной ввод и загрузку изображения */
+ }
 
 .scanner-manual__row {
   display: flex;

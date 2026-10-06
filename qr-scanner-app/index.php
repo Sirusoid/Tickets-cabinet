@@ -8,18 +8,17 @@ require_once __DIR__ . '/../includes/permissions.php';
 require_login();
 
 $scannerAllowed = isset($pdo) && $pdo instanceof PDO
-  ? user_has_permission($pdo, 'scanner', false)
-  : false;
+    ? user_has_permission($pdo, 'scanner', false)
+    : false;
+
 if (!$scannerAllowed) {
     http_response_code(403);
     exit('Доступ к сканеру запрещён.');
 }
 
-$use_sidebar = true;
-$active_menu = 'scanner';
+$use_sidebar = false; // Убираем боковую панель для чистого UI
+$hide_admin_header = true; // Убираем заголовок панели
 $page_title_meta = 'Сканер билетов';
-$panel_title = 'Сканер билетов';
-$panel_subtitle = 'Проверка QR-кода на входе с телефона или планшета';
 $page_styles = ['/qr-scanner-app/assets/css/ticket-scanner.css'];
 $page_scripts = [
     'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
@@ -27,9 +26,7 @@ $page_scripts = [
 ];
 
 require __DIR__ . '/../includes/header.php';
-require __DIR__ . '/../includes/panel.php';
 ?>
-
 <div class="page container-full scanner-page">
   <div class="scanner-layout">
     <section class="card scanner-card" aria-labelledby="scanner-title">
