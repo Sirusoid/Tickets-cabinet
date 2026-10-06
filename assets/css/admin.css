@@ -883,12 +883,13 @@ button.btn-secondary[disabled] {
 
 /* Sidebar */
 /* Sidebar visual update */
-.admin-sidebar {
-  position: fixed;
-  left: 0;
-  top: 56px;
-  bottom: 0;
-  width: 220px;
+  .admin-sidebar {
+    position: fixed;
+    left: 0;
+    /* Sidebar starts below the header – adding a small margin to avoid overlap */
+    top: 64px; /* default desktop width */
+    bottom: 0;
+    width: 220px;
   background: #ffffff; /* белый фон панели */
   color: #0f1724;
   border-right: 1px solid #e6e9ee;
@@ -1035,8 +1036,9 @@ button.btn-secondary[disabled] {
 .sidebar-collapsed .container { margin-left: 16px; }
 
 /* Responsive Sidebar*/
-@media (max-width: 900px) {
-  .admin-sidebar { width: 200px; top: 52px; }
+  @media (max-width: 900px) {
+    /* Adjust sidebar top offset for small screens to maintain margin */
+    .admin-sidebar { width: 200px; top: 60px; }
   .with-sidebar .container { margin-left: 0; padding: 12px; }
   .sidebar-collapsed .container { margin-left: 0; }
 }
