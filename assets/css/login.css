@@ -134,13 +134,13 @@ input[type="text"],
 input[type="password"],
 input[type="email"]{
   width: 100%;
-  min-height: 40px;
-  padding: 9px 12px;
-  border-radius: 6px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 10px;
   border: 1px solid #d5dde8;
   background: #fff;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
   transition: box-shadow 160ms ease, border-color 160ms ease;
   box-sizing: border-box;
@@ -208,4 +208,14 @@ button[type="submit"]:active{
     margin-top: -56px;
   }
   h1{ font-size: 18px; }
+  input[type="text"],
+  input[type="password"],
+  input[type="email"]{
+    min-height: 52px;
+    padding: 14px 16px;
+  }
+  button[type="submit"]{
+    padding: 14px 18px;
+    font-size: 16px;
+  }
 }
