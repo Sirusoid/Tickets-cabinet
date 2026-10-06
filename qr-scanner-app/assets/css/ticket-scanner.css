@@ -82,7 +82,10 @@
 }
 
  .scanner-actions {
-   display: none; /* скрываем кнопки управления камерой */
+    /* Показываем кнопки управления камерой: запуск и остановка */
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
  }
 
  .scanner-divider {
