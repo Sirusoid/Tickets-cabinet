@@ -876,9 +876,10 @@ button.btn-secondary[disabled] {
   /* Toggle button is always visible; visibility handled by the button element itself */
   .sidebar-toggle { display: inline-block; }
 
- /* Brand margin adjustment based on sidebar state */
- .admin-header .brand { margin-left: 220px; }
- .sidebar-collapsed .admin-header .brand { margin-left: 0; }
+  /* Brand margin adjustment based on sidebar state – keep brand left‑aligned
+     with a small margin regardless of sidebar state. */
+  .admin-header .brand { margin-left: 12px; }
+  .sidebar-collapsed .admin-header .brand { margin-left: 12px; }
 
 /* Sidebar */
 /* Sidebar visual update */
@@ -1189,8 +1190,8 @@ button.btn-secondary[disabled] {
 /* --- Конец файла --- */
 /* Mobile‑specific adjustments: keep sidebar collapsed and overlay on small screens */
 @media (max-width: 768px) {
-  /* Sidebar title (brand) should stay left aligned (no margin) */
-  .admin-header .brand { margin-left: 0; }
+  /* Sidebar title (brand) should stay left aligned with a small margin */
+  .admin-header .brand { margin-left: 12px; }
   /* When sidebar is open on mobile, do not shift the main content */
   .admin-sidebar[aria-hidden="false"] + .container { margin-left: 0; }
   /* When sidebar is collapsed on mobile, keep no margin as well */
