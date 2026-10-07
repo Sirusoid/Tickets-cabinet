@@ -50,14 +50,6 @@ require __DIR__ . '/../includes/header.php';
 
       <div class="scanner-divider"><span>или</span></div>
 
-      <form id="manual-scan-form" class="scanner-manual">
-        <label for="manual-code">UID билета</label>
-        <div class="scanner-manual__row">
-          <input id="manual-code" class="form-control" type="text" inputmode="text" autocomplete="off" placeholder="Например, 0d8bebd1c7dba490">
-          <button type="submit" class="btn btn-secondary">Проверить</button>
-        </div>
-        <div class="scanner-help">Можно вставить UID из билета, если камера недоступна.</div>
-      </form>
 
       <label class="scanner-file">
         <span>Сканировать QR с изображения</span>

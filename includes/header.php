@@ -72,7 +72,11 @@ $userName = trim((string)($user['full_name'] ?? $user['name'] ?? $user['username
       <?php if ($use_sidebar): ?>
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle menu">☰</button>
       <?php endif; ?>
-      <a href="/dashboard.php"><?= h($siteTitle) ?></a>
+       <?php if ($userRole === 'scanner'): ?>
+         <a href="/scanner.php"><?= h($siteTitle) ?></a>
+       <?php else: ?>
+         <a href="/dashboard.php"><?= h($siteTitle) ?></a>
+       <?php endif; ?>
     </div>
     <div class="admin-header__user" aria-label="Текущий пользователь">
       <span class="admin-header__user-role"><?= h($userRoleLabel) ?>:</span>

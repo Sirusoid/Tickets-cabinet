@@ -2,7 +2,12 @@
 // Компактная рабочая панель кассира и администратора.
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/includes/reporting.php';
-require_login();
+ require_login();
+ // Redirect scanner role to scanner page
+ $userRole = strtolower(trim((string)($_SESSION['user']['role'] ?? '')));
+ if ($userRole === 'scanner') {
+     redirect('/scanner.php');
+ }
 
 $use_sidebar = true;
 $active_menu = 'dashboard';
