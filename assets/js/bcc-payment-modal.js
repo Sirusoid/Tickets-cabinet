@@ -46,6 +46,11 @@
     const consentData = document.getElementById('bccConsentData');
     const consentPayment = document.getElementById('bccConsentPayment');
 
+    // Customer details inputs
+    const nameInput = document.getElementById('bccCustomerName');
+    const phoneInput = document.getElementById('bccCustomerPhone');
+    const emailInput = document.getElementById('bccCustomerEmail');
+
     function phoneDigits(value) {
         return String(value || '').replace(/\D+/g, '');
     }
@@ -54,11 +59,17 @@
         const consent = consentData && consentPayment && consentData.checked && consentPayment.checked;
         const count = selectedSeats.length;
         const overLimit = count > maxTicketsPerUser;
-        if (payBtn) payBtn.disabled = !consent || count === 0 || overLimit;
+        const nameFilled = nameInput && nameInput.value.trim().length > 0;
+        const phoneFilled = phoneInput && phoneDigits(phoneInput.value).length > 0;
+        const emailFilled = emailInput && emailInput.value.trim().length > 0;
+        if (payBtn) payBtn.disabled = !consent || !nameFilled || !phoneFilled || !emailFilled || count === 0 || overLimit;
     }
 
     if (consentData) consentData.addEventListener('change', updatePayBtnState);
     if (consentPayment) consentPayment.addEventListener('change', updatePayBtnState);
+    if (nameInput) nameInput.addEventListener('input', updatePayBtnState);
+    if (phoneInput) phoneInput.addEventListener('input', updatePayBtnState);
+    if (emailInput) emailInput.addEventListener('input', updatePayBtnState);
 
     function formatCustomerPhone(value) {
         let digits = phoneDigits(value);
