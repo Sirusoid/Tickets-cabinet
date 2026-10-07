@@ -305,7 +305,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script src="/assets/js/schedule-seating-canvas.js"></script>
 <script src="/assets/js/legend-canvas.js"></script>
-<script src="/assets/js/bcc-payment-modal.js"></script>
+<script src="/assets/js/bcc-payment-modal.js?ver=<?php echo filemtime(__DIR__ . '/../assets/js/bcc-payment-modal.js'); ?>"></script>
 <script>
 (function () {
     'use strict';

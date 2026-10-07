@@ -65,6 +65,16 @@
         if (payBtn) payBtn.disabled = !consent || !nameFilled || !phoneFilled || !emailFilled || count === 0 || overLimit;
     }
 
+    function isPaymentFormValid() {
+        const consent = consentData && consentPayment && consentData.checked && consentPayment.checked;
+        const nameFilled = nameInput && nameInput.value.trim().length > 0;
+        const phoneFilled = phoneInput && phoneDigits(phoneInput.value).length > 0;
+        const emailFilled = emailInput && emailInput.value.trim().length > 0;
+        const count = selectedSeats.length;
+        const overLimit = count > maxTicketsPerUser;
+        return consent && nameFilled && phoneFilled && emailFilled && count > 0 && !overLimit;
+    }
+
     if (consentData) consentData.addEventListener('change', updatePayBtnState);
     if (consentPayment) consentPayment.addEventListener('change', updatePayBtnState);
     if (nameInput) nameInput.addEventListener('input', updatePayBtnState);
@@ -618,6 +628,14 @@
     }
 
     function startPayment() {
+        // Guard: block payment if form is not fully valid.
+        // The button should already be disabled via updatePayBtnState(),
+        // but we check here to prevent any edge cases where clicks slip through.
+        if (!isPaymentFormValid()) {
+            showError('Заполните все обязательные поля: Имя, Телефон, Email и отметьте оба чекбокса.');
+            return;
+        }
+
         hideError();
         if (!currentSession) {
             showError('Сеанс не загружен');
