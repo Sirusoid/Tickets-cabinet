@@ -228,7 +228,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <div class="bcc-customer-form">
                         <div class="bcc-form-group">
-                            <label class="bcc-form-label" for="bccCustomerName">Имя<span style="color:#ef4444;">*</span></label>
+                            <label class="bcc-form-label" for="bccCustomerName">Имя <span style="color:#ef4444;">*</span></label>
                             <input type="text" class="bcc-form-input" id="bccCustomerName" placeholder="Введите имя" required>
                         </div>
                         <div class="bcc-form-group">
@@ -236,7 +236,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <input type="tel" class="bcc-form-input" id="bccCustomerPhone" placeholder="+7 (XXX) XXX-XX-XX" required>
                         </div>
                         <div class="bcc-form-group">
-                            <label class="bcc-form-label" for="bccCustomerEmail">Email<span style="color:#ef4444;">*</span></label>
+                            <label class="bcc-form-label" for="bccCustomerEmail">Email <span style="color:#ef4444;">*</span></label>
                             <input type="email" class="bcc-form-input" id="bccCustomerEmail" placeholder="email@example.com" required>
                          </div>
                          <div class="bcc-form-group">
