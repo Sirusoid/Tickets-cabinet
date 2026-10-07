@@ -784,4 +784,11 @@
 
     // Экспортируем для внешних вызовов (например, из iframe-виджета Тильды)
     window.openBccModal = openModal;
-})();
+    // Ensure the Pay button state is correctly set on page load in case the script
+    // runs after the user has already selected seats and set consent states.
+    // The original script only updates the button when seats change or when the
+    // modal is opened, but in some cases those events may not fire before the
+    // user reaches the customer step. Calling `updatePayBtnState()` here
+    // guarantees the button is disabled until both checkboxes are checked.
+    updatePayBtnState();
+ })();
