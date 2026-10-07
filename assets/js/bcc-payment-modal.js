@@ -42,9 +42,23 @@
     let maxTicketsPerUser = 6;
     let clientReserved = false;
 
+    // Consent checkboxes
+    const consentData = document.getElementById('bccConsentData');
+    const consentPayment = document.getElementById('bccConsentPayment');
+
     function phoneDigits(value) {
         return String(value || '').replace(/\D+/g, '');
     }
+
+    function updatePayBtnState() {
+        const consent = consentData && consentPayment && consentData.checked && consentPayment.checked;
+        const count = selectedSeats.length;
+        const overLimit = count > maxTicketsPerUser;
+        if (payBtn) payBtn.disabled = !consent || count === 0 || overLimit;
+    }
+
+    if (consentData) consentData.addEventListener('change', updatePayBtnState);
+    if (consentPayment) consentPayment.addEventListener('change', updatePayBtnState);
 
     function formatCustomerPhone(value) {
         let digits = phoneDigits(value);
@@ -195,7 +209,7 @@
         const overLimit = count > maxTicketsPerUser;
         if (totalEl) totalEl.textContent = formatMoney(total) + ' ' + cfg.currencySymbol;
         if (buyBtn) buyBtn.disabled = count === 0 || overLimit;
-        if (payBtn) payBtn.disabled = count === 0 || overLimit;
+        if (payBtn) updatePayBtnState();
         if (reserveBtn) {
             reserveBtn.disabled = count === 0 || overLimit || clientReserved || !clientReservationEnabled;
             if (clientReserved) reserveBtn.textContent = 'Места зарезервированы';
@@ -611,6 +625,14 @@
         const name = document.getElementById('bccCustomerName').value.trim();
         const email = document.getElementById('bccCustomerEmail').value.trim();
 
+        if (!name) {
+            showError('Введите имя');
+            return;
+        }
+        if (!email) {
+            showError('Введите email');
+            return;
+        }
         if (!validatePhone(phone)) {
             showError('Введите корректный номер телефона');
             return;

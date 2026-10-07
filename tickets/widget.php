@@ -229,7 +229,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="bcc-customer-form">
                         <div class="bcc-form-group">
                             <label class="bcc-form-label" for="bccCustomerName">Имя</label>
-                            <input type="text" class="bcc-form-input" id="bccCustomerName" placeholder="Введите имя">
+                            <input type="text" class="bcc-form-input" id="bccCustomerName" placeholder="Введите имя" required>
                         </div>
                         <div class="bcc-form-group">
                             <label class="bcc-form-label" for="bccCustomerPhone">Телефон <span style="color:#ef4444;">*</span></label>
@@ -237,9 +237,19 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="bcc-form-group">
                             <label class="bcc-form-label" for="bccCustomerEmail">Email</label>
-                            <input type="email" class="bcc-form-input" id="bccCustomerEmail" placeholder="email@example.com">
-                        </div>
-                    </div>
+                            <input type="email" class="bcc-form-input" id="bccCustomerEmail" placeholder="email@example.com" required>
+                         </div>
+                         <div class="bcc-form-group">
+                             <label class="bcc-form-label">
+                                 <input type="checkbox" id="bccConsentData" /> Я согласен(на) с <a href="https://zhassahna.kz/personal-policy" target="_blank" rel="noopener">обработкой персональных данных</a>
+                             </label>
+                         </div>
+                         <div class="bcc-form-group">
+                             <label class="bcc-form-label">
+                                 <input type="checkbox" id="bccConsentPayment" /> Я принимаю <a href="https://zhassahna.kz/payment-agreement" target="_blank" rel="noopener">правила онлайн‑платежей и возврата</a>
+                             </label>
+                         </div>
+                     </div>
 
                     <div class="bcc-cart" style="margin-bottom: 16px;">
                         <h6>Ваши билеты</h6>
