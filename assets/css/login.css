@@ -9,7 +9,9 @@
   --muted: #6b7280;
   --danger: #dc2626;
   --radius: 12px;
-  --max-width: 420px;
+  /* Увеличили максимальную ширину, чтобы логин‑бокс был более заметным на больших экранах, но
+     при этом оставили возможность переопределять её в медиа‑запросах. */
+  --max-width: 480px;
   --shadow: 0 8px 24px rgba(15,23,42,0.06);
   --font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -46,13 +48,15 @@ body::before{
 .login-box{
   position: relative;
   z-index: 1;
-  width: calc(100% - 48px);
+  /* Увеличили внутренний отступ и уменьшили внешние отступы, чтобы блок занимал более
+     заметную часть экрана на мобильных устройствах. */
+  width: calc(100% - 32px);
   max-width: var(--max-width);
-  margin: 32px;
+  margin: 16px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
-  padding: 36px 28px 32px;
+  padding: 48px 32px 48px;
   box-shadow: var(--shadow);
   box-sizing: border-box;
   text-align: center;
@@ -193,13 +197,10 @@ button[type="submit"]:active{
 /* Accessibility focus */
 :focus-visible{
   outline: 3px solid rgba(37,99,235,0.12);
-  outline-offset: 2px;
-}
-
-/* Responsive */
 @media (max-width:420px){
   .login-box{
-    padding: 20px;
+    /* Увеличили внутренний отступ, чтобы блок занимал большую часть экрана */
+    padding: 32px;
     border-radius: 10px;
   }
   .site-logo{
@@ -207,15 +208,15 @@ button[type="submit"]:active{
     height: 72px;
     margin-top: -56px;
   }
-  h1{ font-size: 18px; }
+  h1{ font-size: 20px; }
   input[type="text"],
   input[type="password"],
   input[type="email"]{
-    min-height: 52px;
-    padding: 14px 16px;
+    min-height: 56px;
+    padding: 18px 20px;
   }
   button[type="submit"]{
-    padding: 14px 18px;
-    font-size: 16px;
+    padding: 18px 22px;
+    font-size: 18px;
   }
 }
