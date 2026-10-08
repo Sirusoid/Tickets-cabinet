@@ -296,7 +296,7 @@
     var wrap = document.createElement('div');
     wrap.className = 'action-buttons';
 
-    if (!isRefunded) {
+    if (!isRefunded && t.status !== 'used') {
       var refundBtn = document.createElement('button');
       refundBtn.className = 'btn btn-ghost btn-xs';
       refundBtn.textContent = 'Возврат';
