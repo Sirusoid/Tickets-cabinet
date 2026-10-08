@@ -53,6 +53,12 @@ ZHASSAHNA_TICKET_PUBLIC_SECRET=...
 
 Локальный `.env` находится в корне проекта и не должен попадать в Git, архив релиза или публичный web-доступ.
 
+## BCC e-Commerce WEBVIEW — текущее состояние
+
+- Production credentials настроены через настройки (`settings/payment.php`) и `config.php`.
+- Исходящий MAC (подпись запроса к банку): реализован корректно, в файле `includes/payment/bcc.php` — функции `bcc_build_mac_string` / `bcc_sign`. Порядок полей зафиксирован для каждого `TRTYPE`, формат строки — `<len><value>` последовательно, ключ переводится через `hex2bin`/`pack("H*", ...)` → HMAC-SHA1 → uppercase HEX.
+- Входящий MAC (валидация ответа от банка): **placeholder/TODO**. Функция `bcc_validate_response_signature` пока не валидирует подпись. Требуется реализация для production безопасности.
+
 `ZHASSAHNA_TICKET_PUBLIC_SECRET` используется для подписей публичных ссылок на заказы/PDF. Нельзя менять его без плана миграции: старые ссылки перестанут работать.
 
 ## Вход и сессии
@@ -218,6 +224,11 @@ composer check-platform-reqs
 ```powershell
 php -r "require 'vendor/autoload.php'; echo class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet') ? 'ok' : 'missing';"
 ```
+
+## UI изменения
+
+- `assets/css/admin.css` обновлён: заголовок сделан sticky, кнопка переключения сайдбара переместилась внутрь заголовка и видна только при свернутом сайдбаре. Маргин бренда меняется в зависимости от состояния сайдбара.
+- `assets/js/tickets_list.js`: кнопка «Возврат» скрыта для билетов со статусом `used` («Использован»). Условие на строке 299: `if (!isRefunded && t.status !== 'used')`. Для статуса `cancelled` кнопка disabled, но видна.
 
 ## Известные ограничения
 

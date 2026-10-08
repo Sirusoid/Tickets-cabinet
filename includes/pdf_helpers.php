@@ -682,8 +682,9 @@ if (!function_exists('ticket_pdf_render_html')) {
             'В случае отмены, замены или переноса спектакля, решение о возврате денег принимает администрация театра. В случае таких изменений, администрация обязуется предоставить вам всю необходимую информацию в кратчайшие сроки.',
             'Администрация театра имеет право запретить съемку во время мероприятия или конфисковать оборудование в случае нарушения этого правила.',
             'Администрация театра вправе ограничить доступ на спектакль предъявителя билета, не соответствующих возрастным ограничениям без возмещения его стоимости.',
-            'Для получения консультации по любым вопросам включая возврат и обмен билетов просим обращаться в поддержку клиентов: info@zhassahna.kz или +7 727 259 65 98, +7 776 711 78 78.',
-            'Подробные правила, ограничения по срокам возврата и обмена билетов также изложены на нашем сайте и в публичной оферте: https://zhassahna.kz/agreement.'
+            'Для получения консультации по любым вопросам включая возврат и обмен билетов просим обращаться в поддержку клиентов: support@zhassahna.kz или +7 727 259 65 98, +7 776 711 78 78.',
+            'Подробные правила, ограничения по срокам возврата и обмена билетов также изложены на нашем сайте https://zhassahna.kz/payment-agreement.',
+            'С политикой конфиденциальности Вы можете ознакомиться на странице: https://zhassahna.kz/personal-policy.'
         ];
         $rulesKz = [
             'Осы электрондық билет аталған спектакльге қатысу құқығыңызды растайтын құжат болып табылады. Оны қауіпсіз сақтаңыз, бөгде адамдарға бермеңіз және билет штрих-коды көрінетін фотосуреттерді әлеуметтік желілерге жарияламаңыз.',
@@ -694,8 +695,9 @@ if (!function_exists('ticket_pdf_render_html')) {
             'Спектакль тоқтатылған, ауыстырылған немесе кейінге қалдырылған жағдайда ақша қайтару туралы шешімді театр әкімшілігі қабылдайды. Мұндай өзгерістер болған жағдайда әкімшілік сізге барлық қажетті ақпаратты мүмкіндігінше қысқа мерзімде беруге міндеттенеді.',
             'Театр әкімшілігі іс-шара кезінде түсірілімге тыйым салуға немесе осы қағида бұзылған жағдайда жабдықты тәркілеуге құқылы.',
             'Театр әкімшілігі жасы бойынша шектеулерге сәйкес келмейтін билет ұстаушысының спектакльге кіруін билет құнын қайтармай шектеуге құқылы.',
-            'Билеттерді қайтару және айырбастау, сондай-ақ кез келген басқа сұрақтар бойынша кеңес алу үшін клиенттерді қолдау қызметіне хабарласыңыз: info@zhassahna.kz немесе +7 727 259 65 98, +7 776 711 78 78.',
-            'Толық қағидалар, қайтару және айырбастау мерзімдеріне қатысты шектеулер біздің сайтта және жария офертада да көрсетілген: https://zhassahna.kz/agreement.'
+            'Билеттерді қайтару және айырбастау, сондай-ақ кез келген басқа сұрақтар бойынша кеңес алу үшін клиенттерді қолдау қызметіне хабарласыңыз: support@zhassahna.kz немесе +7 727 259 65 98, +7 776 711 78 78.',
+            'Толық қағидалар, қайтару және айырбастау мерзімдеріне қатысты шектеулер біздің сайтта да көрсетілген: https://zhassahna.kz/payment-agreement.',
+            'Құпиялылық саясатымен сіз бетте таныса аласыз: https://zhassahna.kz/personal-policy.'
         ];
         $rulesEn = [
             'This electronic ticket is a document confirming your right to attend the specified performance. Please keep it safe, do not transfer it to third parties, and do not publish photos with the ticket barcode visible on social media.',
@@ -706,8 +708,9 @@ if (!function_exists('ticket_pdf_render_html')) {
             'In case of cancellation, replacement, or postponement of the performance, the theatre administration decides whether a refund will be issued. In case of such changes, the administration undertakes to provide you with all necessary information as soon as possible.',
             'The theatre administration has the right to prohibit filming during the event or confiscate equipment if this rule is violated.',
             'The theatre administration may restrict admission to the performance without refunding the ticket price if the ticket holder does not meet the applicable age requirements.',
-            'For advice on any questions, including ticket refunds and exchanges, please contact customer support: info@zhassahna.kz or +7 727 259 65 98, +7 776 711 78 78.',
-            'Detailed rules and time limits for ticket refunds and exchanges are also set out on our website and in the public offer: https://zhassahna.kz/agreement.'
+            'For advice on any questions, including ticket refunds and exchanges, please contact customer support: support@zhassahna.kz or +7 727 259 65 98, +7 776 711 78 78.',
+            'Detailed rules and time limits for ticket refunds and exchanges are also set out on our website. https://zhassahna.kz/payment-agreement.',
+            'You can read the privacy policy on the following page: https://zhassahna.kz/personal-policy.'
         ];
 
         // Build HTML (same layout as before, using pdf_price_label, pdf_discount_percent, pdf_payment_label)
@@ -761,7 +764,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         }
         $html .= '<div class="ticket-sub">Электронный билет. Для прохода предъявите QR или UID / Электронды билет. Кіру үшін QR немесе UID көрсетіңіз.</div></div></div></div>';
         $html .= '<div class="ticket-content"><div class="ticket-main"><div class="ticket-main-left">';
-        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА:</strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ:</strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
+        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА: / КҮНІ: </strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ: / УАҚЫТ: </strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
         $html .= '<div class="ticket-section">';
         $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
         $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';
