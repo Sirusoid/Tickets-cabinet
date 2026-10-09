@@ -203,3 +203,4 @@ node_modules/playwright-core/lib/vite/traceViewer/assets/xtermModule-DywYcAf8.js
 node_modules/playwright-core/types/protocol.d.ts
 node_modules/playwright-core/types/structs.d.ts
 node_modules/playwright-core/types/types.d.ts
+.claude/agents/Hermes.agent.md
