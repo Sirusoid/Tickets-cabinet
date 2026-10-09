@@ -66,7 +66,7 @@
     }).catch(function (error) {
       scannerRunning = false;
       setCameraButtons();
-      setStatus('Не удалось включить камеру. Проверьте разрешение и HTTPS.', 'error');
+      setStatus('Не удалось включить камеру. Проверьте разрешение камеры.', 'error');
       console.error('Ticket scanner camera error:', error);
     });
   }

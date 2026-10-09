@@ -35,7 +35,6 @@ require __DIR__ . '/../includes/header.php';
           <h2 id="scanner-title">Проверить билет</h2>
           <p>Разрешите доступ к камере, наведите её на QR-код билета и дождитесь результата.</p>
         </div>
-        <span class="scanner-secure-note">Для камеры нужен HTTPS</span>
       </div>
 
       <div id="qr-reader" class="scanner-camera" aria-label="Область камеры для QR-кода"></div>

@@ -35,16 +35,6 @@
   color: var(--muted);
 }
 
-.scanner-secure-note {
-  flex: 0 0 auto;
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 .scanner-camera {
   min-height: 280px;
   overflow: hidden;
