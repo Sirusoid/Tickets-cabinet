@@ -192,7 +192,7 @@ if (!function_exists('db_query')) {
 if (!headers_sent()) {
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: same-origin');
-    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+    header('Permissions-Policy: camera=(self), microphone=(), geolocation=()');
     if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
