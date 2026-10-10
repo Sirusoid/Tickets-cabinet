@@ -88,7 +88,7 @@
         var secondRear = /back|rear|environment|задн/i.test(second.label || '');
         return Number(secondRear) - Number(firstRear);
       });
-      var camera = cameras.length ? cameras[0].id : { facingMode: { ideal: 'environment' } };
+      var camera = cameras.length ? cameras[0].id : { facingMode: 'environment' };
       return scanner.start(
         camera,
         { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
