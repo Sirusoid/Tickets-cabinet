@@ -4,6 +4,7 @@
 
   var scanner = null;
   var scannerRunning = false;
+  var scannerStarting = false;
   var lastCode = '';
   var lastCodeAt = 0;
   var deviceUid = getDeviceUid();
@@ -38,12 +39,43 @@
   }
 
   function setCameraButtons() {
-    startButton.disabled = scannerRunning;
+    startButton.disabled = scannerRunning || scannerStarting;
     stopButton.disabled = !scannerRunning;
   }
 
+  function startWithCamera(cameras, index, lastError) {
+    if (index >= cameras.length) {
+      throw lastError || new Error('Камеры не найдены');
+    }
+
+    return scanner.start(
+      cameras[index],
+      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
+      onScanSuccess,
+      function () {}
+    ).catch(function (error) {
+      console.warn('Ticket scanner camera attempt failed:', cameras[index], error);
+      return startWithCamera(cameras, index + 1, error);
+    });
+  }
+
+  function cameraErrorMessage(error) {
+    var messages = {
+      NotAllowedError: 'Chrome заблокировал доступ к камере. Проверьте разрешение сайта и системное разрешение камеры.',
+      NotFoundError: 'Камера не найдена на устройстве.',
+      NotReadableError: 'Камера занята другим приложением. Закройте его и попробуйте снова.',
+      OverconstrainedError: 'Не удалось выбрать камеру устройства.',
+      SecurityError: 'Браузер запретил доступ к камере. Откройте сайт по HTTPS и проверьте настройки безопасности.'
+    };
+    var name = error && error.name ? error.name : '';
+    var details = error && error.message ? String(error.message) : String(error || '');
+    if (details.length > 180) details = details.slice(0, 177) + '...';
+    var message = messages[name] || 'Не удалось включить камеру. Проверьте настройки устройства и Chrome.';
+    return details ? message + ' (' + (name ? name + ': ' : '') + details + ')' : message;
+  }
+
   function startCamera() {
-    if (scannerRunning) return;
+    if (scannerRunning || scannerStarting) return;
     if (window.isSecureContext !== true || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setStatus('Камера в Chrome доступна только на защищённой странице HTTPS. Откройте защищённый адрес сайта.', 'error');
       return;
@@ -57,26 +89,33 @@
       scanner = new window.Html5Qrcode('qr-reader');
     }
 
+    scannerStarting = true;
+    setCameraButtons();
     setStatus('Запрашиваем доступ к камере…', 'idle');
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
-      onScanSuccess,
-      function () {}
-    ).then(function () {
+    window.Html5Qrcode.getCameras().catch(function (error) {
+      console.warn('Ticket scanner camera enumeration failed:', error);
+      return [];
+    }).then(function (devices) {
+      var cameras = (devices || []).slice().sort(function (first, second) {
+        var firstRear = /back|rear|environment|задн/i.test(first.label || '');
+        var secondRear = /back|rear|environment|задн/i.test(second.label || '');
+        return Number(secondRear) - Number(firstRear);
+      }).map(function (device) {
+        return device.id;
+      }).filter(Boolean);
+      cameras.push({ facingMode: { ideal: 'environment' } });
+      cameras.push({ facingMode: 'environment' });
+      return startWithCamera(cameras, 0);
+    }).then(function () {
+      scannerStarting = false;
       scannerRunning = true;
       setCameraButtons();
       setStatus('Наведите камеру на QR-код билета', 'active');
     }).catch(function (error) {
+      scannerStarting = false;
       scannerRunning = false;
       setCameraButtons();
-      var messages = {
-        NotAllowedError: 'Chrome заблокировал доступ к камере. Разрешите камеру для этого сайта и обновите страницу.',
-        NotFoundError: 'Камера не найдена на устройстве.',
-        NotReadableError: 'Камера занята другим приложением. Закройте его и попробуйте снова.',
-        OverconstrainedError: 'Не удалось выбрать камеру. Проверьте настройки камеры устройства.'
-      };
-      setStatus(messages[error && error.name] || 'Не удалось включить камеру. Проверьте разрешение камеры в настройках Chrome.', 'error');
+      setStatus(cameraErrorMessage(error), 'error');
       console.error('Ticket scanner camera error:', error);
     });
   }
