@@ -44,6 +44,10 @@
 
   function startCamera() {
     if (scannerRunning) return;
+    if (window.isSecureContext !== true || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('Камера в Chrome доступна только на защищённой странице HTTPS. Откройте защищённый адрес сайта.', 'error');
+      return;
+    }
     if (!window.Html5Qrcode) {
       setStatus('Модуль камеры не загрузился. Используйте UID или загрузку изображения.', 'error');
       return;
@@ -66,7 +70,13 @@
     }).catch(function (error) {
       scannerRunning = false;
       setCameraButtons();
-      setStatus('Не удалось включить камеру. Проверьте разрешение камеры.', 'error');
+      var messages = {
+        NotAllowedError: 'Chrome заблокировал доступ к камере. Разрешите камеру для этого сайта и обновите страницу.',
+        NotFoundError: 'Камера не найдена на устройстве.',
+        NotReadableError: 'Камера занята другим приложением. Закройте его и попробуйте снова.',
+        OverconstrainedError: 'Не удалось выбрать камеру. Проверьте настройки камеры устройства.'
+      };
+      setStatus(messages[error && error.name] || 'Не удалось включить камеру. Проверьте разрешение камеры в настройках Chrome.', 'error');
       console.error('Ticket scanner camera error:', error);
     });
   }
@@ -179,18 +189,20 @@
 
   startButton.addEventListener('click', startCamera);
   stopButton.addEventListener('click', stopCamera);
-  manualForm.addEventListener('submit', function (event) {
-    event.preventDefault();
-    var code = manualCode.value.trim();
-    if (!code) {
-      setStatus('Введите UID билета', 'error');
-      manualCode.focus();
-      return;
-    }
-    stopCamera().then(function () {
-      checkTicket(code);
+  if (manualForm && manualCode) {
+    manualForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var code = manualCode.value.trim();
+      if (!code) {
+        setStatus('Введите UID билета', 'error');
+        manualCode.focus();
+        return;
+      }
+      stopCamera().then(function () {
+        checkTicket(code);
+      });
     });
-  });
+  }
 
   imageInput.addEventListener('change', function () {
     var file = imageInput.files && imageInput.files[0];

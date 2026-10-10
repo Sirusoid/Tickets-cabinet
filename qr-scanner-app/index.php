@@ -22,7 +22,7 @@ $page_title_meta = 'Сканер билетов';
 $page_styles = ['/qr-scanner-app/assets/css/ticket-scanner.css'];
 $page_scripts = [
     'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
-    '/qr-scanner-app/assets/js/ticket_scanner.js',
+    '/qr-scanner-app/assets/js/ticket_scanner.js?v=' . filemtime(__DIR__ . '/assets/js/ticket_scanner.js'),
 ];
 
 require __DIR__ . '/../includes/header.php';
