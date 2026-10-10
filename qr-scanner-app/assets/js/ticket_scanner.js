@@ -43,22 +43,6 @@
     stopButton.disabled = !scannerRunning;
   }
 
-  function startWithCamera(cameras, index, lastError) {
-    if (index >= cameras.length) {
-      throw lastError || new Error('Камеры не найдены');
-    }
-
-    return scanner.start(
-      cameras[index],
-      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
-      onScanSuccess,
-      function () {}
-    ).catch(function (error) {
-      console.warn('Ticket scanner camera attempt failed:', cameras[index], error);
-      return startWithCamera(cameras, index + 1, error);
-    });
-  }
-
   function cameraErrorMessage(error) {
     var messages = {
       NotAllowedError: 'Chrome заблокировал доступ к камере. Проверьте разрешение сайта и системное разрешение камеры.',
@@ -96,16 +80,21 @@
       console.warn('Ticket scanner camera enumeration failed:', error);
       return [];
     }).then(function (devices) {
-      var cameras = (devices || []).slice().sort(function (first, second) {
+      var cameras = (devices || []).filter(function (device) {
+        return device && device.id;
+      });
+      cameras.sort(function (first, second) {
         var firstRear = /back|rear|environment|задн/i.test(first.label || '');
         var secondRear = /back|rear|environment|задн/i.test(second.label || '');
         return Number(secondRear) - Number(firstRear);
-      }).map(function (device) {
-        return device.id;
-      }).filter(Boolean);
-      cameras.push({ facingMode: { ideal: 'environment' } });
-      cameras.push({ facingMode: 'environment' });
-      return startWithCamera(cameras, 0);
+      });
+      var camera = cameras.length ? cameras[0].id : { facingMode: { ideal: 'environment' } };
+      return scanner.start(
+        camera,
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
+        onScanSuccess,
+        function () {}
+      );
     }).then(function () {
       scannerStarting = false;
       scannerRunning = true;
@@ -114,6 +103,7 @@
     }).catch(function (error) {
       scannerStarting = false;
       scannerRunning = false;
+      scanner = null;
       setCameraButtons();
       setStatus(cameraErrorMessage(error), 'error');
       console.error('Ticket scanner camera error:', error);
