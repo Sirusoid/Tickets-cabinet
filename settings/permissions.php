@@ -173,7 +173,10 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						$selected = isset($postedPerms[$roleCode]) && is_array($postedPerms[$roleCode])
 								? $postedPerms[$roleCode]
 								: [];
-						$selectedMap = array_fill_keys($selected, true);
+						$selectedMap = array_fill_keys(
+							array_intersect(array_filter($selected, 'is_string'), array_keys($modules)),
+							true
+						);
 						foreach ($modules as $moduleKey => $moduleConfig) {
 								$matrix[$roleCode][$moduleKey] = !empty($selectedMap[$moduleKey]);
 						}
@@ -185,7 +188,10 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 
 				try {
 						$payload = json_encode($matrix, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-						settings_upsert_value(
+						if (!is_string($payload)) {
+							throw new RuntimeException('Не удалось сформировать матрицу прав.');
+						}
+						if (!settings_upsert_value(
 								$pdo,
 								'security.role_permissions',
 								'Матрица прав доступа',
@@ -195,7 +201,12 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 								'Управляет доступом ролей к разделам интерфейса и меню',
 								1,
 								40
-						);
+						)) {
+							throw new RuntimeException('Не удалось создать настройку матрицы прав.');
+						}
+						if (!settings_set_value($pdo, 'security.role_permissions', $payload)) {
+							throw new RuntimeException('Не удалось записать матрицу прав в базу данных.');
+						}
 						$saveSuccess = 'Права доступа сохранены.';
 				} catch (Throwable $e) {
 						$saveErrors[] = 'Ошибка при сохранении: ' . $e->getMessage();
