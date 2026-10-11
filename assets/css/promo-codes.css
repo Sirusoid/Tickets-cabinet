@@ -154,28 +154,31 @@
 
 .promo-create__form {
   display: grid;
-  grid-template-columns: minmax(200px, 1.4fr) minmax(155px, .9fr) minmax(150px, .8fr) auto;
-  align-items: end;
+  grid-template-columns: minmax(250px, 1.55fr) minmax(180px, 1fr) minmax(185px, .9fr) minmax(168px, auto);
+  align-items: start;
   gap: 13px;
 }
 
 .promo-field {
   display: grid;
   min-width: 0;
-  gap: 6px;
+  grid-template-rows: 17px 44px 28px;
+  gap: 5px;
 }
 
 .promo-field > span {
+  align-self: center;
   color: #42584d;
   font-size: 11px;
   font-weight: 750;
+  line-height: 17px;
 }
 
 .promo-field input,
 .promo-field select {
   box-sizing: border-box;
   width: 100%;
-  min-height: 42px;
+  height: 44px;
   padding: 0 11px;
   border: 1px solid #dce5dd;
   border-radius: 9px;
@@ -192,9 +195,14 @@
 }
 
 .promo-field small {
-  min-height: 14px;
+  display: -webkit-box;
+  min-height: 28px;
+  overflow: hidden;
   color: #829087;
   font-size: 10px;
+  line-height: 14px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .promo-code-input,
@@ -213,7 +221,7 @@
 
 .promo-code-input .btn {
   flex: 0 0 auto;
-  min-height: 42px;
+  height: 44px;
   padding: 0 10px;
   border: 1px solid #dce5dd;
   border-left: 0;
@@ -240,8 +248,21 @@
   font-weight: 750;
 }
 
+.promo-field input[readonly] {
+  background: #f4f6f3;
+  color: #78857c;
+  cursor: not-allowed;
+}
+
+.promo-form-actions {
+  display: grid;
+  grid-template-rows: 17px 44px 28px;
+  gap: 5px;
+}
+
 .promo-submit {
-  min-height: 42px;
+  grid-row: 2;
+  min-height: 44px;
   padding: 0 15px;
   border: 1px solid #234b3d;
   border-radius: 9px;
@@ -249,6 +270,37 @@
   font-size: 12px;
   font-weight: 750;
   white-space: nowrap;
+}
+
+.promo-cancel-edit {
+  grid-row: 3;
+  min-height: 30px;
+  color: #67766b;
+  font-size: 11px;
+}
+
+.promo-session-picker {
+  display: grid;
+  min-width: min(340px, 45%);
+  gap: 5px;
+}
+
+.promo-session-picker span {
+  color: #78877c;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.promo-session-picker select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #dce5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #314a3b;
+  font: inherit;
+  font-size: 11px;
 }
 
 .promo-list-section {
@@ -291,6 +343,71 @@
 .promo-table td:first-child,
 .promo-table th:first-child {
   padding-left: 20px;
+}
+
+.promo-table td {
+  vertical-align: middle;
+}
+
+.promo-table-note {
+  display: block;
+  margin-top: 3px;
+  color: #89958c;
+  font-size: 9px;
+}
+
+.promo-actions-cell {
+  min-width: 370px;
+}
+
+.promo-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.promo-row-actions form {
+  margin: 0;
+}
+
+.promo-row-actions .btn {
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid #e3e9e2;
+  border-radius: 7px;
+  color: #4f6557;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.promo-row-actions .promo-delete {
+  color: #a0473c;
+}
+
+.promo-row-actions .btn:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.promo-row-actions .is-copied {
+  border-color: #bbd3a8;
+  background: #f1f8ea;
+  color: #436d39;
+}
+
+.promo-icon-button {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  margin-left: 3px;
+  place-items: center;
+  border: 1px solid #e1e9de;
+  border-radius: 7px;
+  background: #fff;
+  color: #58715d;
+  cursor: pointer;
+  font: inherit;
 }
 
 .promo-code-badge {
@@ -350,8 +467,8 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .promo-submit {
-    align-self: end;
+  .promo-form-actions {
+    grid-template-rows: 17px 44px 28px;
   }
 }
 
@@ -392,8 +509,36 @@
     gap: 11px;
   }
 
+  .promo-field {
+    grid-template-rows: 17px 44px 20px;
+  }
+
+  .promo-field small {
+    min-height: 20px;
+  }
+
+  .promo-form-actions {
+    grid-template-rows: 44px auto;
+    gap: 8px;
+  }
+
   .promo-submit {
     width: 100%;
+    grid-row: 1;
+  }
+
+  .promo-cancel-edit {
+    grid-row: 2;
+  }
+
+  .promo-section-heading:has(.promo-session-picker) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .promo-session-picker {
+    width: 100%;
+    min-width: 0;
   }
 
   .promo-table th,

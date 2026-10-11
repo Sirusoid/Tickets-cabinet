@@ -264,7 +264,7 @@
         selectedSeats = [];
         appliedPromoCode = '';
         appliedPromoDiscountCents = 0;
-        if (promoInput) promoInput.value = '';
+        if (promoInput) promoInput.value = String(window.bccInitialPromoCode || '').toUpperCase();
         if (promoStatus) {
             promoStatus.textContent = '';
             promoStatus.className = 'bcc-promo-status';
@@ -308,6 +308,9 @@
             }
             if (totalBar) totalBar.style.display = 'none';
             renderCustomerCart();
+            if (promoInput && promoInput.value.trim() && !appliedPromoCode) {
+                applyPromoCode();
+            }
         } else {
             if (stepSeats) {
                 stepSeats.classList.add('active');

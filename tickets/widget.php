@@ -34,6 +34,10 @@ $cfg = bcc_config($pdo);
 $enabled = bcc_is_enabled($pdo);
 
 $session_id = isset($_GET['session_id']) ? (int)$_GET['session_id'] : 0;
+$initialPromoCode = strtoupper(trim((string)($_GET['promo_code'] ?? '')));
+if (!preg_match('/^[A-Z0-9]{4,12}$/', $initialPromoCode)) {
+    $initialPromoCode = '';
+}
 $openSession = null;
 
 if ($session_id > 0) {
@@ -311,6 +315,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php if ($openSession): ?>
     window.bccWidgetAutoOpen = <?= (int)$openSession['id'] ?>;
     <?php endif; ?>
+    window.bccInitialPromoCode = <?= json_encode($initialPromoCode, JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
 <script src="/assets/js/schedule-seating-canvas.js"></script>
