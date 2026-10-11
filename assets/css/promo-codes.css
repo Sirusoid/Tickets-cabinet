@@ -1,42 +1,8 @@
 .promo-page {
   display: grid;
-  gap: 22px;
+  gap: 18px;
   max-width: 1120px;
   padding-bottom: 36px;
-}
-
-.promo-hero {
-  position: relative;
-  display: flex;
-  min-height: 218px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  overflow: hidden;
-  padding: clamp(22px, 5vw, 42px);
-  border-radius: 20px;
-  background:
-    radial-gradient(ellipse at 80% 10%, rgba(189, 213, 133, .25), transparent 35%),
-    linear-gradient(115deg, #173c35, #28584a 68%, #406b51);
-  color: #fff;
-}
-
-.promo-hero::after {
-  position: absolute;
-  right: 22%;
-  bottom: -88px;
-  width: 240px;
-  height: 240px;
-  border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: 50%;
-  box-shadow: 0 0 0 24px rgba(255, 255, 255, .035), 0 0 0 54px rgba(255, 255, 255, .025);
-  content: "";
-}
-
-.promo-hero__copy {
-  position: relative;
-  z-index: 1;
-  max-width: 520px;
 }
 
 .promo-eyebrow {
@@ -45,77 +11,6 @@
   font-weight: 800;
   letter-spacing: .14em;
   text-transform: uppercase;
-}
-
-.promo-hero .promo-eyebrow {
-  color: #c0d991;
-}
-
-.promo-hero h2 {
-  margin: 8px 0 10px;
-  font-size: clamp(28px, 5vw, 42px);
-  font-weight: 750;
-  letter-spacing: -.055em;
-  line-height: .98;
-}
-
-.promo-hero p {
-  max-width: 410px;
-  margin: 0;
-  color: rgba(255, 255, 255, .72);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.promo-ticket-art {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  flex: 0 0 174px;
-  width: 174px;
-  height: 116px;
-  align-content: center;
-  justify-items: center;
-  transform: rotate(7deg);
-  border: 1px solid rgba(255, 255, 255, .35);
-  border-radius: 14px;
-  background: linear-gradient(135deg, #d7e7b0, #a9c87a);
-  box-shadow: 0 14px 30px rgba(9, 28, 21, .25);
-  color: #244535;
-}
-
-.promo-ticket-art::before,
-.promo-ticket-art::after {
-  position: absolute;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%);
-  border-radius: 50%;
-  background: #28584a;
-  content: "";
-}
-
-.promo-ticket-art::before { left: -9px; }
-.promo-ticket-art::after { right: -9px; }
-
-.promo-ticket-art span {
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: .2em;
-}
-
-.promo-ticket-art strong {
-  font-size: 44px;
-  font-weight: 800;
-  letter-spacing: -.08em;
-  line-height: 1;
-}
-
-.promo-ticket-art small {
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: .13em;
 }
 
 .promo-create,
@@ -476,33 +371,6 @@
   .promo-page {
     gap: 16px;
   }
-
-  .promo-hero {
-    min-height: 190px;
-    gap: 8px;
-    padding: 22px 18px;
-    border-radius: 15px;
-  }
-
-  .promo-hero h2 {
-    font-size: 30px;
-  }
-
-  .promo-hero p {
-    max-width: 270px;
-    font-size: 11px;
-  }
-
-  .promo-ticket-art {
-    flex-basis: 96px;
-    width: 96px;
-    height: 76px;
-    margin-right: -23px;
-  }
-
-  .promo-ticket-art span { font-size: 6px; }
-  .promo-ticket-art strong { font-size: 30px; }
-  .promo-ticket-art small { font-size: 5px; }
 
   .promo-create__form {
     grid-template-columns: 1fr;

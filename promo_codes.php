@@ -184,6 +184,8 @@ if (!$migrationRequired) {
 $use_sidebar = true;
 $active_menu = 'promo_codes';
 $page_title_meta = 'Промокоды';
+$panel_title = 'Промокоды';
+$panel_subtitle = 'Создание и управление скидками для онлайн-покупок';
 $page_styles = ['/assets/css/forms.css', '/assets/css/settings.css', '/assets/css/promo-codes.css'];
 require_once __DIR__ . '/includes/header.php';
 require_once __DIR__ . '/includes/panel.php';
@@ -192,19 +194,6 @@ require_once __DIR__ . '/includes/panel.php';
 <div class="promo-page page container-full">
     <?php if ($success !== ''): ?><div class="alert settings-alert settings-alert--success"><?= h($success) ?></div><?php endif; ?>
     <?php if ($error !== ''): ?><div class="alert alert--danger"><?= h($error) ?></div><?php endif; ?>
-
-    <section class="promo-hero">
-        <div class="promo-hero__copy">
-            <span class="promo-eyebrow">Продвижение · Онлайн-продажи</span>
-            <h2>Промокоды<br>для ваших зрителей</h2>
-            <p>Создавайте короткие коды и выбирайте: процент от заказа или фиксированная скидка в тенге.</p>
-        </div>
-        <div class="promo-ticket-art" aria-hidden="true">
-            <span>ЖАС САХНА</span>
-            <strong>%</strong>
-            <small>ВПЕЧАТЛЕНИЯ СО СКИДКОЙ</small>
-        </div>
-    </section>
 
     <section class="promo-create card" id="promo-editor">
         <div class="promo-section-heading">
