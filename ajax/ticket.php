@@ -298,15 +298,103 @@ if ($action === 'get_ticket') {
 }
 
 // --- CHECK-IN action (QR scanner / manual UID) ---
+if ($action === 'scanner_sessions') {
+    if (!user_has_permission($pdo, 'scanner', false)) {
+        json_resp(['success' => false, 'message' => 'Доступ к сканеру запрещён.'], 403);
+    }
+
+    try {
+        $stmt = $pdo->query(
+            "SELECT s.id, s.start_time, e.title AS event_title, h.name AS hall_name,
+                    COUNT(CASE
+                        WHEN t.payment_status = 'paid'
+                            AND t.status IN ('issued', 'used')
+                            AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                        THEN 1
+                    END) AS total_tickets,
+                    COUNT(CASE
+                        WHEN t.payment_status = 'paid'
+                            AND (t.is_checked_in = 1 OR t.status = 'used')
+                            AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                        THEN 1
+                    END) AS checked_in_tickets
+             FROM schedules s
+             JOIN events e ON e.id = s.event_id
+             LEFT JOIN halls h ON h.id = s.hall_id
+             LEFT JOIN tickets t ON t.schedule_id = s.id
+             WHERE COALESCE(s.status, 'upcoming') IN ('upcoming', 'active')
+                AND s.end_time >= NOW()
+             GROUP BY s.id, s.start_time, e.title, h.name
+             ORDER BY s.start_time ASC
+             LIMIT 100"
+        );
+        json_resp(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (Throwable $e) {
+        error_log('ajax/ticket.php scanner_sessions error: ' . $e->getMessage());
+        json_resp(['success' => false, 'message' => 'Не удалось загрузить расписание для сканера.'], 500);
+    }
+}
+
+if ($action === 'scanner_stats') {
+    if (!user_has_permission($pdo, 'scanner', false)) {
+        json_resp(['success' => false, 'message' => 'Доступ к сканеру запрещён.'], 403);
+    }
+    $scheduleId = filter_var($_GET['schedule_id'] ?? '', FILTER_VALIDATE_INT);
+    if (!$scheduleId || $scheduleId < 1) {
+        json_resp(['success' => false, 'message' => 'Выберите сеанс для просмотра статистики.'], 400);
+    }
+
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT
+                COUNT(CASE
+                    WHEN t.payment_status = 'paid'
+                        AND t.status IN ('issued', 'used')
+                        AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                    THEN 1
+                END) AS total_tickets,
+                COUNT(CASE
+                    WHEN t.payment_status = 'paid'
+                        AND (t.is_checked_in = 1 OR t.status = 'used')
+                        AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                    THEN 1
+                END) AS checked_in_tickets
+             FROM schedules s
+             LEFT JOIN tickets t ON t.schedule_id = s.id
+             WHERE s.id = :schedule_id
+                AND COALESCE(s.status, 'upcoming') IN ('upcoming', 'active')
+                AND s.end_time >= NOW()"
+        );
+        $stmt->execute([':schedule_id' => $scheduleId]);
+        $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$stats) {
+            json_resp(['success' => false, 'message' => 'Сеанс не найден или больше не действует.'], 404);
+        }
+        $stats['total_tickets'] = (int)$stats['total_tickets'];
+        $stats['checked_in_tickets'] = (int)$stats['checked_in_tickets'];
+        json_resp(['success' => true, 'data' => $stats]);
+    } catch (Throwable $e) {
+        error_log('ajax/ticket.php scanner_stats error: ' . $e->getMessage());
+        json_resp(['success' => false, 'message' => 'Не удалось обновить статистику входа.'], 500);
+    }
+}
+
 if ($action === 'checkin') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         json_resp(['success' => false, 'message' => 'Неверный метод'], 405);
     }
     check_csrf();
+    if (!user_has_permission($pdo, 'scanner', false)) {
+        json_resp(['success' => false, 'message' => 'Доступ к сканеру запрещён.'], 403);
+    }
 
     $rawCode = trim((string)($_POST['code'] ?? $_POST['ticket_uid'] ?? ''));
     if ($rawCode === '') {
         json_resp(['success' => false, 'message' => 'Отсканируйте QR-код или введите UID билета'], 400);
+    }
+    $scheduleId = filter_var($_POST['schedule_id'] ?? '', FILTER_VALIDATE_INT);
+    if (!$scheduleId || $scheduleId < 1) {
+        json_resp(['success' => false, 'message' => 'Сначала выберите сеанс в расписании.'], 400);
     }
 
     // QR-код билета содержит UID. Также принимаем публичную ссылку, если QR
@@ -330,7 +418,7 @@ if ($action === 'checkin') {
         $pdo->beginTransaction();
 
         $stmt = $pdo->prepare(
-            "SELECT t.id, t.ticket_uid, t.seat_identifier, t.status, t.payment_status,
+            "SELECT t.id, t.schedule_id, t.ticket_uid, t.seat_identifier, t.status, t.payment_status,
                     t.refund_status, t.is_checked_in, t.checked_in_at,
                     COALESCE(e.title, '') AS event_title,
                     s.start_time AS session_start,
@@ -349,6 +437,19 @@ if ($action === 'checkin') {
         if (!$ticket) {
             $pdo->rollBack();
             json_resp(['success' => false, 'message' => 'Билет с таким QR-кодом не найден'], 404);
+        }
+
+        if ((int)$ticket['schedule_id'] !== (int)$scheduleId) {
+            $pdo->rollBack();
+            json_resp([
+                'success' => false,
+                'message' => 'Билет относится к другому сеансу. Проверьте выбранный спектакль и дату.',
+                'data' => [
+                    'event_title' => $ticket['event_title'],
+                    'session_start' => $ticket['session_start'],
+                    'seat_identifier' => $ticket['seat_identifier'],
+                ],
+            ], 422);
         }
 
         $ticketId = (int)$ticket['id'];
