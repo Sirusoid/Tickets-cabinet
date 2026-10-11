@@ -104,6 +104,44 @@ if (!function_exists('schedule_notification_collect_recipients')) {
     }
 }
 
+if (!function_exists('schedule_notification_collect_online_refund_orders')) {
+    function schedule_notification_collect_online_refund_orders(PDO $pdo, int $scheduleId): array
+    {
+        $stmt = $pdo->prepare(
+            "SELECT ps.id, ps.session_id, ps.event_id, ps.hall_id, ps.order_number,
+                    ps.merch_rn_id, ps.amount_cents, ps.provider_response, ps.status,
+                    ps.customer_id, ps.provider,
+                    (SELECT COUNT(*)
+                     FROM tickets counted
+                     WHERE counted.payment_session_id = ps.id
+                       AND counted.payment_status = 'paid'
+                       AND counted.status <> 'cancelled'
+                       AND COALESCE(counted.refund_status, 'none') <> 'refunded') AS ticket_count,
+                    (SELECT COALESCE(SUM(amount.final_price), 0)
+                     FROM tickets amount
+                     WHERE amount.payment_session_id = ps.id
+                       AND amount.payment_status = 'paid'
+                       AND amount.status <> 'cancelled'
+                       AND COALESCE(amount.refund_status, 'none') <> 'refunded') AS ticket_refund_amount
+             FROM payment_sessions ps
+             WHERE ps.session_id = :schedule_id
+               AND ps.status = 'paid'
+               AND ps.provider = 'bcc'
+               AND EXISTS (
+                   SELECT 1
+                   FROM tickets eligible
+                   WHERE eligible.payment_session_id = ps.id
+                     AND eligible.payment_status = 'paid'
+                     AND eligible.status <> 'cancelled'
+                     AND COALESCE(eligible.refund_status, 'none') <> 'refunded'
+               )
+             ORDER BY ps.id ASC"
+        );
+        $stmt->execute([':schedule_id' => $scheduleId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
 if (!function_exists('schedule_notification_validate_payload')) {
     function schedule_notification_validate_payload(array $payload): array
     {

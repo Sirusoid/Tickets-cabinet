@@ -8,7 +8,9 @@
     defaultTemplate: '',
     eventTitle: '',
     hall: '',
-    oldStart: ''
+    oldStart: '',
+    cancelRefundsConfirmed: false,
+    lastPreviewCounts: null
   };
 
   function escapeHtml(value) {
@@ -78,7 +80,7 @@
       + 'ВРЕМЯ: ' + oldTime + '\n'
       + (hallLabel ? 'ЗАЛ: ' + hallLabel + '\n' : '')
       + '\n'
-      + 'Для оформления возврата, пожалуйста, обратитесь в службу поддержки театра. Мы обязательно поможем решить вопрос.\n\n'
+      + 'Если билеты были оплачены онлайн, мы автоматически направим возврат на счёт или карту, с которых была оплата. Срок зачисления зависит от банка. Если билет был куплен в кассе, пожалуйста, обратитесь в театр для возврата.\n\n'
       + 'Номер заказа: {{ORDER_NUMBERS}}\n\n'
       + 'Если у Вас возникнут вопросы, пожалуйста, напишите нам или позвоните:\n'
       + 'info@zhassahna.kz\n+7 727 259 65 98\n+7 776 711 78 78\n\n'
@@ -139,6 +141,70 @@
     return modal;
   }
 
+  function ensureCancellationConfirmation() {
+    var existing = document.getElementById('scheduleCancellationRefundConfirmation');
+    if (existing) return existing;
+
+    var confirmation = document.createElement('div');
+    confirmation.id = 'scheduleCancellationRefundConfirmation';
+    confirmation.className = 'schedule-cancellation-confirmation';
+    confirmation.hidden = true;
+    confirmation.innerHTML = ''
+      + '<div class="schedule-cancellation-confirmation__backdrop"></div>'
+      + '<section class="schedule-cancellation-confirmation__dialog" role="dialog" aria-modal="true" aria-labelledby="scheduleCancellationConfirmTitle">'
+      + '  <div class="schedule-cancellation-confirmation__icon" aria-hidden="true">!</div>'
+      + '  <h2 id="scheduleCancellationConfirmTitle">Подтвердите отмену сеанса</h2>'
+      + '  <p>Сеанс будет отменён. Для онлайн-покупателей система отправит банку запрос на автоматический возврат полной суммы заказа на тот же счёт или карту, с которых прошла оплата.</p>'
+      + '  <p class="schedule-cancellation-confirmation__note">Зачисление выполняет банк, поэтому срок поступления средств может отличаться. Возвраты, которые банк не подтвердит сразу, будут показаны отдельно и доступны для повторной отправки.</p>'
+      + '  <div class="schedule-cancellation-confirmation__estimate" id="scheduleCancellationRefundEstimate"></div>'
+      + '  <label class="schedule-cancellation-confirmation__consent">'
+      + '    <input type="checkbox" id="scheduleCancellationRefundConsent">'
+      + '    <span>Я согласен(на) отменить сеанс и понимаю, что онлайн-возврат будет направлен на исходный счёт или карту.</span>'
+      + '  </label>'
+      + '  <div class="schedule-cancellation-confirmation__actions">'
+      + '    <button type="button" class="btn btn-ghost" id="scheduleCancellationRefundBack">Вернуться</button>'
+      + '    <button type="button" class="btn btn-danger" id="scheduleCancellationRefundProceed" disabled>Отменить сеанс и вернуть средства</button>'
+      + '  </div>'
+      + '</section>';
+    document.body.appendChild(confirmation);
+    return confirmation;
+  }
+
+  function confirmCancellationAndRefund(onConfirm) {
+    var confirmation = ensureCancellationConfirmation();
+    var consent = document.getElementById('scheduleCancellationRefundConsent');
+    var proceed = document.getElementById('scheduleCancellationRefundProceed');
+    var estimate = document.getElementById('scheduleCancellationRefundEstimate');
+    var counts = state.lastPreviewCounts || {};
+    var orderCount = Number(counts.online_refund_orders) || 0;
+    var amount = (Number(counts.online_refund_amount_cents) || 0) / 100;
+    if (estimate) {
+      estimate.innerHTML = orderCount
+        ? 'Онлайн-заказов к возврату: <strong>' + escapeHtml(orderCount) + '</strong><br>'
+          + 'Сумма возвратов: <strong>' + escapeHtml(amount.toLocaleString('ru-KZ', { maximumFractionDigits: 2 })) + ' ₸</strong>'
+        : 'Оплаченных онлайн-заказов для возврата не найдено.';
+    }
+    if (consent) {
+      consent.checked = false;
+      consent.onchange = function () {
+        proceed.disabled = !consent.checked;
+      };
+    }
+    proceed.disabled = true;
+    proceed.onclick = function () {
+      if (!consent || !consent.checked) return;
+      state.cancelRefundsConfirmed = true;
+      confirmation.hidden = true;
+      onConfirm();
+    };
+    document.getElementById('scheduleCancellationRefundBack').onclick = function () {
+      state.cancelRefundsConfirmed = false;
+      confirmation.hidden = true;
+    };
+    confirmation.hidden = false;
+    consent.focus();
+  }
+
   function getField(id) {
     return document.getElementById(id);
   }
@@ -153,6 +219,7 @@
 
   function clearPreview() {
     state.lastPreview = false;
+    state.lastPreviewCounts = null;
     var send = getField('scheduleNotificationSend');
     var result = getField('scheduleNotificationResult');
     if (send) send.disabled = true;
@@ -174,6 +241,7 @@
     if (start) start.disabled = !isPostponed;
     if (end) end.disabled = !isPostponed;
     state.type = isPostponed ? 'postponed' : 'cancelled';
+    state.cancelRefundsConfirmed = false;
     refreshDefaultTemplate();
     clearPreview();
   }
@@ -200,6 +268,8 @@
     var modal = ensureModal();
     state.scheduleId = button.getAttribute('data-id') || '';
     state.type = button.getAttribute('data-status') === 'cancelled' ? 'cancelled' : 'postponed';
+    state.cancelRefundsConfirmed = false;
+    state.lastPreviewCounts = null;
     var title = button.getAttribute('data-event-title') || 'Спектакль';
     var hall = button.getAttribute('data-hall') || '';
     var start = button.getAttribute('data-start') || '';
@@ -239,6 +309,8 @@
   function closeModal() {
     var modal = document.getElementById('scheduleNotificationModal');
     if (modal) modal.hidden = true;
+    var cancellationConfirmation = document.getElementById('scheduleCancellationRefundConfirmation');
+    if (cancellationConfirmation) cancellationConfirmation.hidden = true;
   }
 
   function buildRequest(action) {
@@ -250,6 +322,7 @@
     body.append('new_end_time', getField('scheduleNotificationNewEnd').value || '');
     body.append('template_text', getField('scheduleNotificationTemplate').value || '');
     body.append('csrf_token', window.APP_CSRF_TOKEN || '');
+    body.append('cancel_refunds_confirmed', state.cancelRefundsConfirmed ? '1' : '0');
     return body;
   }
 
@@ -283,10 +356,15 @@
         throw new Error((payload && payload.message) || 'Не удалось подготовить предпросмотр.');
       }
       var counts = payload.counts || {};
+      state.lastPreviewCounts = counts;
       var previewHtml = '<strong>Получатели проверены:</strong><br>'
         + 'Оплаченных билетов: ' + escapeHtml(counts.total_tickets || 0) + '<br>'
         + 'Клиентов с email: ' + escapeHtml(counts.total_recipients || 0) + '<br>'
         + 'Билетов без email: ' + escapeHtml(counts.no_email_tickets || 0)
+        + (state.type === 'cancelled'
+          ? '<br>Онлайн-заказов к возврату: ' + escapeHtml(counts.online_refund_orders || 0)
+            + '<br>Сумма автоматических возвратов: ' + escapeHtml(((Number(counts.online_refund_amount_cents) || 0) / 100).toLocaleString('ru-KZ', { maximumFractionDigits: 2 })) + ' ₸'
+          : '')
         + '<br><br><strong>Тема:</strong> ' + escapeHtml(payload.subject || '')
         + '<div class="schedule-notification-modal__preview">' + (payload.preview_html || '') + '</div>';
       setResult('', false, previewHtml);
@@ -338,9 +416,33 @@
         if (!payload || !payload.success) {
           throw new Error((payload && payload.message) || 'Не удалось отправить уведомления.');
         }
-        setResult(payload.message || 'Уведомления обработаны.', payload.status !== 'sent');
+        var refunds = payload.refunds;
+        var hasRefundFailures = refunds && Number(refunds.failed) > 0;
+        var hasRefundsProcessing = refunds && Number(refunds.processing) > 0;
+        var resultHtml = '<strong>' + escapeHtml(payload.message || 'Уведомления обработаны.') + '</strong>';
+        if (refunds && refunds.details && refunds.details.length) {
+          resultHtml += '<ul class="schedule-cancellation-refund-results">';
+          refunds.details.forEach(function (refund) {
+            var stateLabel = refund.state === 'refunded'
+              ? 'Возвращено'
+              : (refund.state === 'processing' ? 'Ожидает подтверждения банка' : 'Не завершено');
+            resultHtml += '<li><strong>' + escapeHtml(refund.order || 'Заказ') + '</strong>: '
+              + escapeHtml(stateLabel) + ' — '
+              + escapeHtml(((Number(refund.amount_cents) || 0) / 100).toLocaleString('ru-KZ', { maximumFractionDigits: 2 })) + ' ₸. '
+              + escapeHtml(refund.message || '') + '</li>';
+          });
+          resultHtml += '</ul>';
+        }
+        if (hasRefundFailures) {
+          resultHtml += '<button type="button" class="btn btn-secondary js-retry-schedule-refunds" data-id="'
+            + escapeHtml(state.scheduleId) + '">Повторить неудачные возвраты</button>';
+        }
+        setResult('', payload.status !== 'sent' || hasRefundFailures, resultHtml);
         if (typeof window.showToast === 'function') {
-          window.showToast(payload.message || 'Уведомления обработаны.', payload.status === 'sent' ? 'success' : 'info');
+          window.showToast(
+            payload.message || 'Уведомления обработаны.',
+            payload.status === 'sent' && !hasRefundFailures && !hasRefundsProcessing ? 'success' : 'info'
+          );
         }
         if (typeof window.refreshScheduleTable === 'function') {
           window.refreshScheduleTable();
@@ -356,14 +458,109 @@
       });
     };
 
-    if (typeof window.showConfirmModal === 'function') {
+    if (state.type === 'cancelled') {
+      confirmCancellationAndRefund(sendRequest);
+    } else if (typeof window.showConfirmModal === 'function') {
       window.showConfirmModal(
-        'Сеанс будет изменён, а письмо отправится всем клиентам с указанным email. Продолжить?',
+        'Сеанс будет перенесён, а письмо отправится всем клиентам с указанным email. Продолжить?',
         sendRequest
       );
-    } else if (window.confirm('Сеанс будет изменён, а письмо отправится клиентам. Продолжить?')) {
+    } else if (window.confirm('Сеанс будет перенесён, а письмо отправится клиентам. Продолжить?')) {
       sendRequest();
     }
+  }
+
+  function retryRefunds(button) {
+    button.disabled = true;
+    button.textContent = 'Повторная отправка…';
+    var body = new URLSearchParams();
+    body.append('action', 'retry_refunds');
+    body.append('schedule_id', button.getAttribute('data-id') || '');
+    body.append('csrf_token', window.APP_CSRF_TOKEN || '');
+    fetch('/ajax/schedule_notifications.php', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: body.toString()
+    }).then(function (response) {
+      return response.json().then(function (payload) {
+        if (!response.ok || !payload.success) throw new Error(payload.message || 'Не удалось повторить возврат.');
+        return payload;
+      });
+    }).then(function (payload) {
+      var refunds = payload.refunds || {};
+      var resultHtml = '<strong>' + escapeHtml(payload.message || 'Повторная обработка завершена.') + '</strong>';
+      if (refunds.details && refunds.details.length) {
+        resultHtml += '<ul class="schedule-cancellation-refund-results">';
+        refunds.details.forEach(function (refund) {
+          var stateLabel = refund.state === 'refunded'
+            ? 'Возвращено'
+            : (refund.state === 'processing' ? 'Ожидает подтверждения банка' : 'Не завершено');
+          resultHtml += '<li><strong>' + escapeHtml(refund.order || 'Заказ') + '</strong>: '
+            + escapeHtml(stateLabel) + ' — '
+            + escapeHtml(((Number(refund.amount_cents) || 0) / 100).toLocaleString('ru-KZ', { maximumFractionDigits: 2 })) + ' ₸. '
+            + escapeHtml(refund.message || '') + '</li>';
+        });
+        resultHtml += '</ul>';
+      }
+      if (Number(refunds.failed) > 0) {
+        resultHtml += '<button type="button" class="btn btn-secondary js-retry-schedule-refunds" data-id="'
+          + escapeHtml(button.getAttribute('data-id') || '') + '">Повторить неудачные возвраты</button>';
+      }
+      setResult('', Number(refunds.failed) > 0, resultHtml);
+    }).catch(function (error) {
+      setResult(error.message || 'Не удалось повторить возврат.', true);
+    });
+  }
+
+  function retryCancelledScheduleRefunds(button) {
+    var scheduleId = button.getAttribute('data-id') || '';
+    var status = button.parentNode.querySelector('.schedule-refund-retry-status');
+    button.disabled = true;
+    button.textContent = 'Повторная отправка...';
+    if (status) status.textContent = 'Проверяем онлайн-заказы...';
+
+    var body = new URLSearchParams();
+    body.append('action', 'retry_refunds');
+    body.append('schedule_id', scheduleId);
+    body.append('csrf_token', window.APP_CSRF_TOKEN || '');
+    fetch('/ajax/schedule_notifications.php', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: body.toString()
+    }).then(function (response) {
+      return response.json().then(function (payload) {
+        if (!response.ok || !payload.success) throw new Error(payload.message || 'Не удалось повторить возвраты.');
+        return payload;
+      });
+    }).then(function (payload) {
+      var refunds = payload.refunds || {};
+      var message = 'Заказов проверено: ' + (Number(refunds.orders) || 0)
+        + ', возвращено: ' + (Number(refunds.refunded) || 0)
+        + ', ожидают ответа банка: ' + (Number(refunds.processing) || 0)
+        + ', требуют внимания: ' + (Number(refunds.failed) || 0) + '.';
+      var failedOrders = (refunds.details || []).filter(function (item) {
+        return item.state === 'failed';
+      });
+      if (failedOrders.length) {
+        message += ' ' + failedOrders.map(function (item) {
+          return (item.order || 'Заказ') + ': ' + (item.message || 'не завершён');
+        }).join(' ');
+      }
+      if (status) status.textContent = message;
+      if (typeof window.showToast === 'function') {
+        window.showToast(message, Number(refunds.failed) > 0 ? 'error' : (Number(refunds.processing) > 0 ? 'info' : 'success'));
+      }
+    }).catch(function (error) {
+      if (status) status.textContent = error.message || 'Не удалось повторить возвраты.';
+      if (typeof window.showToast === 'function') {
+        window.showToast(error.message || 'Не удалось повторить возвраты.', 'error');
+      }
+    }).finally(function () {
+      button.disabled = false;
+      button.textContent = 'Повторить возвраты';
+    });
   }
 
   document.addEventListener('click', function (event) {
@@ -371,6 +568,18 @@
     if (notifyButton) {
       event.preventDefault();
       openModal(notifyButton);
+      return;
+    }
+    var retryButton = event.target.closest && event.target.closest('.js-retry-schedule-refunds');
+    if (retryButton) {
+      event.preventDefault();
+      retryRefunds(retryButton);
+      return;
+    }
+    var scheduleRetryButton = event.target.closest && event.target.closest('.js-schedule-refund-retry');
+    if (scheduleRetryButton) {
+      event.preventDefault();
+      retryCancelledScheduleRefunds(scheduleRetryButton);
       return;
     }
     var previewButton = event.target.closest && event.target.closest('#scheduleNotificationPreview');
@@ -407,5 +616,16 @@
     if (event.target && event.target.id === 'scheduleNotificationForm') {
       sendNotification(event);
     }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    var cancellationConfirmation = document.getElementById('scheduleCancellationRefundConfirmation');
+    if (cancellationConfirmation && !cancellationConfirmation.hidden) {
+      cancellationConfirmation.hidden = true;
+      state.cancelRefundsConfirmed = false;
+      return;
+    }
+    closeModal();
   });
 })();

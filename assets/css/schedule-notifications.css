@@ -149,3 +149,154 @@
     width: 100%;
   }
 }
+
+  .schedule-cancellation-confirmation[hidden] {
+    display: none;
+  }
+
+  .schedule-cancellation-confirmation {
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+  }
+
+  .schedule-cancellation-confirmation__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(18, 33, 29, .68);
+    backdrop-filter: blur(3px);
+  }
+
+  .schedule-cancellation-confirmation__dialog {
+    position: relative;
+    width: min(520px, 100%);
+    padding: 24px;
+    border: 1px solid #e7ddd0;
+    border-radius: 16px;
+    background: #fffdfa;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, .32);
+    color: #334155;
+  }
+
+  .schedule-cancellation-confirmation__icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    margin-bottom: 13px;
+    place-items: center;
+    border: 1px solid #f2d2bf;
+    border-radius: 12px;
+    background: #fff3e9;
+    color: #b45a32;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .schedule-cancellation-confirmation__dialog h2 {
+    margin: 0 0 10px;
+    color: #263b34;
+    font-size: 20px;
+    letter-spacing: -.025em;
+  }
+
+  .schedule-cancellation-confirmation__dialog p {
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .schedule-cancellation-confirmation__note {
+    color: #718079;
+    font-size: 12px !important;
+  }
+
+  .schedule-cancellation-confirmation__estimate {
+    margin: 14px 0;
+    padding: 12px 14px;
+    border: 1px solid #e5ebe2;
+    border-radius: 10px;
+    background: #f7faf5;
+    color: #55685d;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .schedule-cancellation-confirmation__estimate strong {
+    color: #244b3d;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .schedule-cancellation-confirmation__consent {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 11px 0 3px;
+    color: #354b40;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.45;
+  }
+
+  .schedule-cancellation-confirmation__consent input {
+    width: 17px;
+    height: 17px;
+    margin: 1px 0 0;
+    accent-color: #315e4c;
+  }
+
+  .schedule-cancellation-confirmation__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .schedule-cancellation-confirmation__actions .btn {
+    min-height: 40px;
+  }
+
+  .schedule-cancellation-confirmation__actions .btn-danger:disabled {
+    cursor: not-allowed;
+    opacity: .48;
+  }
+
+  .schedule-cancellation-refund-results {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0;
+    padding-left: 18px;
+    font-size: 12px;
+  }
+
+  .schedule-cancellation-refund-results li {
+    overflow-wrap: anywhere;
+  }
+
+  .schedule-refund-retry-status {
+    flex-basis: 100%;
+    width: 100%;
+    max-width: 100%;
+    color: #6a766f;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: normal;
+  }
+
+  @media (max-width: 640px) {
+    .schedule-cancellation-confirmation__dialog {
+      padding: 19px;
+    }
+
+    .schedule-cancellation-confirmation__actions {
+      flex-direction: column-reverse;
+    }
+
+    .schedule-cancellation-confirmation__actions .btn {
+      width: 100%;
+    }
+  }

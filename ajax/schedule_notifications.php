@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/schedule_notifications.php';
+require_once __DIR__ . '/../includes/payment/bcc_refund.php';
 
 require_login();
 header('Content-Type: application/json; charset=utf-8');
@@ -12,6 +13,92 @@ function schedule_notification_json_response(bool $success, string $message = ''
         'message' => $message,
     ], $data), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
+}
+
+function schedule_notification_process_online_refunds(PDO $pdo, int $scheduleId, string $source): array
+{
+    $orders = schedule_notification_collect_online_refund_orders($pdo, $scheduleId);
+    $results = [];
+    $summary = [
+        'orders' => count($orders),
+        'refunded' => 0,
+        'processing' => 0,
+        'failed' => 0,
+        'amount_cents' => 0,
+        'details' => [],
+    ];
+
+    foreach ($orders as $order) {
+        $orderNumber = trim((string)($order['order_number'] ?? ''));
+        $paymentSessionId = (int)$order['id'];
+        $ticketStmt = $pdo->prepare(
+            'SELECT id, ticket_uid, final_price, refund_status
+             FROM tickets
+             WHERE payment_session_id = :payment_session_id
+             ORDER BY id ASC'
+        );
+        $ticketStmt->execute([':payment_session_id' => $paymentSessionId]);
+        $tickets = $ticketStmt->fetchAll(PDO::FETCH_ASSOC);
+        $ticketStatuses = array_column($tickets, 'refund_status');
+
+        if (in_array('requested', $ticketStatuses, true)) {
+            $result = [
+                'order' => $orderNumber,
+                'state' => 'processing',
+                'amount_cents' => (int)$order['amount_cents'],
+                'message' => 'Запрос на возврат уже ожидает ответа банка.',
+            ];
+        } elseif (in_array('refunded', $ticketStatuses, true)) {
+            $result = [
+                'order' => $orderNumber,
+                'state' => 'failed',
+                'amount_cents' => (int)$order['amount_cents'],
+                'message' => 'В заказе уже есть возвращённые билеты; требуется ручная проверка.',
+            ];
+        } else {
+            $originalResponse = json_decode((string)($order['provider_response'] ?? ''), true);
+            if (!is_array($originalResponse)) {
+                $originalResponse = [];
+            }
+            try {
+                $refund = bcc_process_refund_request(
+                    $pdo,
+                    $order,
+                    $tickets,
+                    $originalResponse,
+                    $source
+                );
+                $refundState = (string)($refund['state'] ?? 'rejected');
+                $result = [
+                    'order' => $orderNumber,
+                    'state' => $refundState === 'refunded' ? 'refunded' : ($refundState === 'processing' ? 'processing' : 'failed'),
+                    'amount_cents' => (int)$order['amount_cents'],
+                    'message' => (string)($refund['message'] ?? 'Не удалось получить результат возврата.'),
+                ];
+            } catch (Throwable $exception) {
+                error_log('[SCHEDULE CANCELLATION REFUND] Order ' . $orderNumber . ': ' . $exception->getMessage());
+                $result = [
+                    'order' => $orderNumber,
+                    'state' => 'failed',
+                    'amount_cents' => (int)$order['amount_cents'],
+                    'message' => 'Возврат не завершён. Проверьте банковские данные и журнал ошибок.',
+                ];
+            }
+        }
+
+        $summary['amount_cents'] += (int)$result['amount_cents'];
+        if ($result['state'] === 'refunded') {
+            $summary['refunded']++;
+        } elseif ($result['state'] === 'processing') {
+            $summary['processing']++;
+        } else {
+            $summary['failed']++;
+        }
+        $results[] = $result;
+        $summary['details'][] = $result;
+    }
+
+    return $summary;
 }
 
 global $pdo;
@@ -32,14 +119,52 @@ if (!function_exists('validate_csrf') || !validate_csrf($csrfToken)) {
 
 $action = trim((string)($_REQUEST['action'] ?? ''));
 $scheduleId = (int)($_REQUEST['schedule_id'] ?? 0);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    schedule_notification_json_response(false, 'Неверный метод запроса.');
+}
 if ($scheduleId <= 0) {
     schedule_notification_json_response(false, 'Не указан сеанс.');
 }
 
 try {
+    if ($action === 'retry_refunds') {
+        $schedule = schedule_notification_fetch_schedule($pdo, $scheduleId);
+        if ((string)$schedule['status'] !== 'cancelled') {
+            schedule_notification_json_response(false, 'Повторный возврат доступен только для отменённого сеанса.');
+        }
+        $cancellationStmt = $pdo->prepare(
+            "SELECT id FROM schedule_notifications
+             WHERE schedule_id = :schedule_id AND notification_type = 'cancelled'
+             ORDER BY id DESC LIMIT 1"
+        );
+        $cancellationStmt->execute([':schedule_id' => $scheduleId]);
+        $notificationId = (int)$cancellationStmt->fetchColumn();
+        if ($notificationId <= 0) {
+            schedule_notification_json_response(false, 'Запись об отмене сеанса не найдена.');
+        }
+
+        $refunds = schedule_notification_process_online_refunds($pdo, $scheduleId, 'schedule_cancellation_bcc_refund_retry');
+        if (function_exists('audit_log_event')) {
+            audit_log_event($pdo, 'schedule.cancellation_refund_retry', 'schedule', $scheduleId, (string)($schedule['event_title'] ?? ''), [], [
+                'notification_id' => $notificationId,
+                'refunds' => $refunds,
+            ]);
+        }
+        schedule_notification_json_response(true, 'Повторная обработка возвратов завершена.', [
+            'refunds' => $refunds,
+        ]);
+    }
+
     $payload = schedule_notification_validate_payload($_REQUEST);
     $schedule = schedule_notification_fetch_schedule($pdo, $scheduleId);
     $recipients = schedule_notification_collect_recipients($pdo, $scheduleId);
+    $onlineRefundOrders = $payload['notification_type'] === 'cancelled'
+        ? schedule_notification_collect_online_refund_orders($pdo, $scheduleId)
+        : [];
+    $onlineRefundAmountCents = array_sum(array_map(static function (array $order): int {
+        return (int)($order['amount_cents'] ?? 0);
+    }, $onlineRefundOrders));
 
     if ($action === 'preview') {
         $previewRecipient = [
@@ -70,6 +195,8 @@ try {
                 'total_tickets' => $recipients['total_tickets'],
                 'total_recipients' => $recipients['total_recipients'],
                 'no_email_tickets' => $recipients['no_email_tickets'],
+                'online_refund_orders' => count($onlineRefundOrders),
+                'online_refund_amount_cents' => $onlineRefundAmountCents,
             ],
             'subject' => $message['subject'],
             'preview_html' => $message['html'],
@@ -78,6 +205,12 @@ try {
 
     if ($action !== 'notify') {
         schedule_notification_json_response(false, 'Неизвестное действие.');
+    }
+    if (
+        $payload['notification_type'] === 'cancelled'
+        && (string)($_REQUEST['cancel_refunds_confirmed'] ?? '') !== '1'
+    ) {
+        schedule_notification_json_response(false, 'Для отмены сеанса требуется подтвердить автоматический возврат онлайн-покупателям.');
     }
 
     $settings = order_email_settings($pdo);
@@ -181,6 +314,10 @@ try {
         $mailSchedule['start_time'] = $payload['new_start_time'];
         $mailSchedule['end_time'] = $payload['new_end_time'];
     }
+
+    $refundSummary = $payload['notification_type'] === 'cancelled'
+        ? schedule_notification_process_online_refunds($pdo, $scheduleId, 'schedule_cancellation_bcc_refund')
+        : null;
 
     $recipientRowsStmt = $pdo->prepare(
         'SELECT id, email, customer_name, order_numbers, ticket_uids
@@ -290,13 +427,23 @@ try {
     $message = $finalStatus === 'sent'
         ? 'Изменение сохранено, уведомления отправлены всем клиентам.'
         : 'Изменение сохранено частично: отправлено ' . $sentCount . ', ошибок ' . $failedCount . ', без email билетов ' . $noEmailCount . '.';
+    if ($refundSummary !== null) {
+        $message .= ' Возвраты онлайн-заказов: подтверждено ' . $refundSummary['refunded']
+            . ', в обработке у банка ' . $refundSummary['processing']
+            . ', требуют внимания ' . $refundSummary['failed'] . '.';
+    }
     schedule_notification_json_response(true, $message, [
         'notification_id' => $notificationId,
         'status' => $finalStatus,
+        'refunds' => $refundSummary,
         'counts' => [
             'sent' => $sentCount,
             'failed' => $failedCount,
             'no_email_tickets' => $noEmailCount,
+            'online_refund_orders' => $refundSummary['orders'] ?? 0,
+            'online_refunds_confirmed' => $refundSummary['refunded'] ?? 0,
+            'online_refunds_processing' => $refundSummary['processing'] ?? 0,
+            'online_refunds_failed' => $refundSummary['failed'] ?? 0,
         ],
     ]);
 } catch (InvalidArgumentException $exception) {
