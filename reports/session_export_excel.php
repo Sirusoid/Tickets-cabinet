@@ -28,7 +28,7 @@ try {
     }
 
     $rows = db_fetch_all("SELECT
-            t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount,
+            t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.promo_code,
             t.customer_segment, t.channel, t.payment_status, t.status, t.is_checked_in,
             t.customer_email, t.customer_phone, t.payment_transaction_id,
             t.refund_status, t.refund_at, t.purchased_at,
@@ -124,7 +124,9 @@ foreach ($rows as $row) {
         $seatNumber !== '' ? $seatNumber : '—',
         $financials['paid'],
         $tariffName,
-        reporting_segment_label($row['customer_segment'] ?? ''),
+        trim((string)($row['promo_code'] ?? '')) !== ''
+            ? 'Промокод ' . (string)$row['promo_code']
+            : reporting_segment_label($row['customer_segment'] ?? ''),
         (string)($row['payment_transaction_id'] ?? '—') !== '' ? (string)($row['payment_transaction_id'] ?? '—') : '—',
         (string)($row['order_number'] ?? '') !== '' ? (string)($row['order_number'] ?? '') : '—',
         !empty($row['purchased_at']) ? reporting_format_date($row['purchased_at'], true) : '—',

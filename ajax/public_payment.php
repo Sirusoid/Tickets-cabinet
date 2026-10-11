@@ -28,6 +28,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../includes/payment/bcc.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
+require_once __DIR__ . '/../includes/promo_codes.php';
 
 function json_response($data)
 {
@@ -38,6 +39,113 @@ function json_response($data)
 function public_payment_setting(PDO $pdo, string $key, $default = null) {
     $value = function_exists('settings_get_value') ? settings_get_value($pdo, $key, $default) : $default;
     return $value === null || $value === '' ? $default : $value;
+}
+
+function public_payment_normalize_seats(array $seatsRaw, array $session): array
+{
+    $seatMap = json_decode((string)($session['seat_map'] ?? ''), true);
+    $hallSeatMap = json_decode((string)($session['hall_seatmap'] ?? ''), true);
+    $layoutMap = is_array($seatMap) && !empty($seatMap['rows'])
+        ? $seatMap
+        : $hallSeatMap;
+    $seatPrices = is_array($hallSeatMap) && isset($hallSeatMap['seats']) && is_array($hallSeatMap['seats'])
+        ? $hallSeatMap['seats']
+        : [];
+    if (is_array($seatMap) && isset($seatMap['seats']) && is_array($seatMap['seats'])) {
+        $seatPrices = array_replace($seatPrices, $seatMap['seats']);
+    }
+    $priceRanges = json_decode((string)($session['price_ranges'] ?? ''), true);
+    $priceRanges = is_array($priceRanges) ? $priceRanges : [];
+    $normalized = [];
+    $seen = [];
+
+    foreach ($seatsRaw as $seatRaw) {
+        $identifier = is_array($seatRaw) && isset($seatRaw['identifier'])
+            ? str_replace(':', '-', trim((string)$seatRaw['identifier']))
+            : (is_string($seatRaw) ? str_replace(':', '-', trim($seatRaw)) : '');
+        if ($identifier === '' || isset($seen[$identifier])) {
+            continue;
+        }
+        $seen[$identifier] = true;
+        $parts = preg_split('/[-:]/', $identifier, 2);
+        if (count($parts) !== 2 || !is_numeric($parts[0]) || !is_numeric($parts[1])) {
+            throw new InvalidArgumentException('Некорректный номер выбранного места.');
+        }
+        $rowNumber = (int)$parts[0];
+        $seatNumber = (int)$parts[1];
+        $validSeat = false;
+        if (is_array($layoutMap) && !empty($layoutMap['rows']) && is_array($layoutMap['rows'])) {
+            foreach ($layoutMap['rows'] as $row) {
+                if (!is_array($row) || (int)($row['number'] ?? 0) !== $rowNumber) {
+                    continue;
+                }
+                foreach (($row['segments'] ?? []) as $segment) {
+                    if (!is_array($segment)) {
+                        continue;
+                    }
+                    $start = (int)($segment['start'] ?? 0);
+                    $end = (int)($segment['end'] ?? 0);
+                    if ($start > 0 && $end > 0 && $seatNumber >= min($start, $end) && $seatNumber <= max($start, $end)) {
+                        $validSeat = true;
+                        break 2;
+                    }
+                }
+            }
+        } else {
+            $validSeat = isset($seatPrices[$identifier]) || isset($seatPrices[str_replace('-', ':', $identifier)]);
+        }
+        if (!$validSeat) {
+            throw new InvalidArgumentException('Выбранное место ' . $identifier . ' отсутствует в схеме зала.');
+        }
+
+        $price = 0.0;
+        $seatData = $seatPrices[$identifier] ?? $seatPrices[str_replace('-', ':', $identifier)] ?? null;
+        $hasDirectPrice = false;
+        if (is_array($seatData)) {
+            $seatPrice = $seatData['price'] ?? $seatData['meta']['price'] ?? null;
+            if (is_numeric($seatPrice)) {
+                $price = (float)$seatPrice;
+                $hasDirectPrice = true;
+            }
+        }
+
+        foreach ($priceRanges as $range) {
+            if ($hasDirectPrice) {
+                break;
+            }
+            if (!is_array($range)) {
+                continue;
+            }
+            $rangePrice = $range['price'] ?? $range['value'] ?? $range['p'] ?? null;
+            if (!is_numeric($rangePrice) || (float)$rangePrice <= 0) {
+                continue;
+            }
+            $seatIds = $range['seat_ids'] ?? [];
+            $matchesSeat = is_array($seatIds) && (
+                in_array($identifier, $seatIds, true)
+                || in_array(str_replace('-', ':', $identifier), $seatIds, true)
+            );
+            $rowStart = $range['row_start'] ?? $range['row_end'] ?? null;
+            $rowEnd = $range['row_end'] ?? $range['row_start'] ?? null;
+            $matchesRow = is_numeric($rowStart) && is_numeric($rowEnd) && $rowNumber > 0
+                && $rowNumber >= min((int)$rowStart, (int)$rowEnd)
+                && $rowNumber <= max((int)$rowStart, (int)$rowEnd);
+            if ($matchesSeat || $matchesRow) {
+                $price = (float)$rangePrice;
+            }
+        }
+
+        if ($price <= 0) {
+            throw new InvalidArgumentException('Не удалось определить цену места ' . $identifier . '. Обновите схему зала.');
+        }
+        $normalized[] = [
+            'identifier' => $identifier,
+            'original_price' => round($price, 2),
+            'final_price' => round($price, 2),
+        ];
+    }
+
+    return $normalized;
 }
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
@@ -63,6 +171,45 @@ if (!empty($_POST) && is_array($_POST)) $input = array_merge($input, $_POST);
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : (isset($input['action']) ? trim((string)$input['action']) : '');
 
 switch ($action) {
+    case 'validate_promo':
+        $sessionId = (int)($input['session_id'] ?? 0);
+        $seatsRaw = $input['seats'] ?? [];
+        $code = promo_normalize_code((string)($input['promo_code'] ?? ''));
+        if ($sessionId <= 0 || !is_array($seatsRaw) || !$seatsRaw || $code === '') {
+            json_response(['success' => false, 'message' => 'Выберите места и введите промокод.']);
+        }
+        try {
+            $sessionStmt = $pdo->prepare("SELECT s.*, h.seat_map AS hall_seatmap FROM schedules s
+                LEFT JOIN halls h ON h.id = s.hall_id
+                WHERE s.id = :id AND s.status IN ('upcoming', 'active') AND s.start_time >= NOW()
+                LIMIT 1");
+            $sessionStmt->execute([':id' => $sessionId]);
+            $promoSession = $sessionStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$promoSession) {
+                json_response(['success' => false, 'message' => 'Сеанс не найден или продажа уже закрыта.']);
+            }
+            $normalizedSeats = public_payment_normalize_seats($seatsRaw, $promoSession);
+            $maxTickets = max(1, (int)public_payment_setting($pdo, 'tickets.max_tickets_per_user', '6'));
+            if (!$normalizedSeats || count($normalizedSeats) > $maxTickets) {
+                json_response(['success' => false, 'message' => 'Проверьте количество выбранных билетов.']);
+            }
+            $applied = promo_apply_to_seats($pdo, $code, $normalizedSeats);
+            $subtotalCents = (int)round(array_sum(array_column($normalizedSeats, 'original_price')) * 100);
+            json_response([
+                'success' => true,
+                'code' => $applied['promo']['code'],
+                'discount_cents' => $applied['discount_cents'],
+                'subtotal_cents' => $subtotalCents,
+                'total_cents' => $subtotalCents - $applied['discount_cents'],
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            json_response(['success' => false, 'message' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            error_log('public_payment validate_promo error: ' . $exception->getMessage());
+            json_response(['success' => false, 'message' => 'Не удалось проверить промокод.']);
+        }
+        break;
+
     case 'create_bcc_session':
         $session_id = isset($input['session_id']) ? (int)$input['session_id'] : 0;
         $seats_raw = isset($input['seats']) ? $input['seats'] : [];
@@ -87,7 +234,12 @@ switch ($action) {
             json_response(['success' => false, 'message' => 'Некорректный номер телефона']);
         }
 
-        $stmt = $pdo->prepare("SELECT s.*, e.title AS event_title FROM schedules s LEFT JOIN events e ON s.event_id = e.id WHERE s.id = :id AND s.status IN ('upcoming','active') AND s.start_time >= NOW() LIMIT 1");
+        $stmt = $pdo->prepare("SELECT s.*, e.title AS event_title, h.seat_map AS hall_seatmap
+            FROM schedules s
+            LEFT JOIN events e ON s.event_id = e.id
+            LEFT JOIN halls h ON h.id = s.hall_id
+            WHERE s.id = :id AND s.status IN ('upcoming','active') AND s.start_time >= NOW()
+            LIMIT 1");
         $stmt->execute([':id' => $session_id]);
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$session) {
@@ -99,25 +251,13 @@ switch ($action) {
 
         $seats = [];
         $seat_keys = [];
-        foreach ($seats_raw as $s) {
-            $identifier = is_array($s) && isset($s['identifier']) ? (string)$s['identifier'] : (is_string($s) ? $s : '');
-            $identifier = str_replace(':', '-', trim($identifier));
-            if ($identifier === '') continue;
-            $price = 0.0;
-            if (is_array($s) && isset($s['original_price'])) {
-                $price = (float)$s['original_price'];
-            } elseif (is_array($s) && isset($s['price'])) {
-                // Переходная совместимость со старым JS; в БД сохраняется только original_price/final_price.
-                $price = (float)$s['price'];
-            }
-            if ($price <= 0) {
-                continue;
-            }
-            $seats[] = [
-                'identifier' => $identifier,
-                'original_price' => $price,
-                'final_price' => $price,
-            ];
+        try {
+            $seats = public_payment_normalize_seats($seats_raw, $session);
+        } catch (InvalidArgumentException $exception) {
+            json_response(['success' => false, 'message' => $exception->getMessage()]);
+        }
+        foreach ($seats as $seat) {
+            $identifier = $seat['identifier'];
             $seat_keys[] = $identifier;
         }
 
@@ -168,7 +308,17 @@ switch ($action) {
             json_response(['success' => false, 'message' => 'Ошибка проверки мест']);
         }
 
-        $amountCents = (int) round(array_sum(array_column($seats, 'original_price')) * 100);
+        $promoCode = promo_normalize_code((string)($input['promo_code'] ?? ''));
+        if ($promoCode !== '') {
+            try {
+                $appliedPromo = promo_apply_to_seats($pdo, $promoCode, $seats);
+                $seats = $appliedPromo['seats'];
+            } catch (InvalidArgumentException $exception) {
+                json_response(['success' => false, 'message' => $exception->getMessage()]);
+            }
+        }
+
+        $amountCents = (int)round(array_sum(array_column($seats, 'final_price')) * 100);
         if ($amountCents <= 0) {
             json_response(['success' => false, 'message' => 'Сумма заказа должна быть больше 0']);
         }

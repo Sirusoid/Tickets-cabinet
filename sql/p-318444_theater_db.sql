@@ -423,6 +423,23 @@ CREATE TABLE `payment_sessions` (
 -- --------------------------------------------------------
 
 --
+-- Структура таблицы `promo_codes`
+--
+
+CREATE TABLE `promo_codes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `code` varchar(12) NOT NULL,
+  `discount_type` enum('percent','fixed') NOT NULL,
+  `discount_value` decimal(10,2) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` int(10) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Структура таблицы `refunds`
 --
 
@@ -673,6 +690,7 @@ CREATE TABLE `tickets` (
   `final_price` decimal(10,2) NOT NULL DEFAULT 0.00,
   `discount` int(11) NOT NULL DEFAULT 0,
   `discount_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `promo_code` varchar(12) DEFAULT NULL,
   `status` enum('issued','cancelled','used') NOT NULL DEFAULT 'issued',
   `payment_status` enum('pending','paid','failed') NOT NULL DEFAULT 'pending',
   `payment_provider` varchar(100) DEFAULT NULL,
@@ -847,6 +865,14 @@ ALTER TABLE `payment_sessions`
   ADD KEY `idx_payment_session_created` (`created_at`);
 
 --
+-- Индексы таблицы `promo_codes`
+--
+ALTER TABLE `promo_codes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_promo_codes_code` (`code`),
+  ADD KEY `idx_promo_codes_active` (`is_active`);
+
+--
 -- Индексы таблицы `refunds`
 --
 ALTER TABLE `refunds`
@@ -903,7 +929,8 @@ ALTER TABLE `tickets`
   ADD KEY `idx_tickets_hall` (`hall_id`),
   ADD KEY `idx_tickets_seat` (`seat_id`),
   ADD KEY `idx_tickets_customer` (`customer_id`),
-  ADD KEY `idx_tickets_sold_by` (`sold_by_staff_id`);
+  ADD KEY `idx_tickets_sold_by` (`sold_by_staff_id`),
+  ADD KEY `idx_tickets_promo_code` (`promo_code`);
 
 --
 -- Индексы таблицы `users`
@@ -1001,6 +1028,12 @@ ALTER TABLE `halls`
 --
 ALTER TABLE `payment_sessions`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=106;
+
+--
+-- AUTO_INCREMENT для таблицы `promo_codes`
+--
+ALTER TABLE `promo_codes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT для таблицы `refunds`

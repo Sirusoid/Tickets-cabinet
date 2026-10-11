@@ -21,6 +21,10 @@
     const cartList = document.getElementById('bccCartList');
     const customerCartList = document.getElementById('bccCustomerCartList');
     const totalEl = document.getElementById('bccTotal');
+    const promoInput = document.getElementById('bccPromoCode');
+    const applyPromoBtn = document.getElementById('bccApplyPromoBtn');
+    const promoStatus = document.getElementById('bccPromoStatus');
+    const promoSummary = document.getElementById('bccPromoSummary');
     const payBtn = document.getElementById('bccPayBtn');
     const buyBtn = document.getElementById('bccBuyBtn');
     const reserveBtn = document.getElementById('bccReserveBtn');
@@ -41,6 +45,8 @@
     let clientReservationMinutes = 15;
     let maxTicketsPerUser = 6;
     let clientReserved = false;
+    let appliedPromoCode = '';
+    let appliedPromoDiscountCents = 0;
 
     // Consent checkboxes
     const consentData = document.getElementById('bccConsentData');
@@ -80,6 +86,20 @@
     if (nameInput) nameInput.addEventListener('input', updatePayBtnState);
     if (phoneInput) phoneInput.addEventListener('input', updatePayBtnState);
     if (emailInput) emailInput.addEventListener('input', updatePayBtnState);
+    if (applyPromoBtn) applyPromoBtn.addEventListener('click', applyPromoCode);
+    if (promoInput) {
+        promoInput.addEventListener('input', function () {
+            if (appliedPromoCode && promoInput.value.trim().toUpperCase() !== appliedPromoCode) {
+                resetAppliedPromo('');
+            }
+        });
+        promoInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                applyPromoCode();
+            }
+        });
+    }
 
     function formatCustomerPhone(value) {
         let digits = phoneDigits(value);
@@ -124,6 +144,75 @@
     function hideError() {
         errorEl.textContent = '';
         errorEl.style.display = 'none';
+    }
+
+    function resetAppliedPromo(message) {
+        if (!appliedPromoCode) return;
+        appliedPromoCode = '';
+        appliedPromoDiscountCents = 0;
+        if (promoSummary) promoSummary.style.display = 'none';
+        if (promoStatus) {
+            promoStatus.textContent = message || 'Состав заказа изменился. Примените промокод снова.';
+            promoStatus.className = 'bcc-promo-status';
+        }
+    }
+
+    function applyPromoCode() {
+        const code = promoInput ? promoInput.value.trim().toUpperCase() : '';
+        if (!code || !currentSession || selectedSeats.length === 0) {
+            if (promoStatus) {
+                promoStatus.textContent = !code ? 'Введите промокод.' : 'Сначала выберите места.';
+                promoStatus.className = 'bcc-promo-status is-error';
+            }
+            return;
+        }
+
+        applyPromoBtn.disabled = true;
+        applyPromoBtn.textContent = 'Проверка…';
+        if (promoStatus) {
+            promoStatus.textContent = '';
+            promoStatus.className = 'bcc-promo-status';
+        }
+        fetch(cfg.ajaxUrl + '?action=validate_promo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: currentSession.id || currentSession.session_id,
+                promo_code: code,
+                seats: selectedSeats.map(function (seat) { return { identifier: seat.identifier }; })
+            })
+        }).then(function (response) {
+            return response.json().then(function (payload) {
+                if (!response.ok || !payload.success) throw new Error(payload.message || 'Не удалось применить промокод.');
+                return payload;
+            });
+        }).then(function (payload) {
+            appliedPromoCode = payload.code;
+            appliedPromoDiscountCents = Number(payload.discount_cents) || 0;
+            promoInput.value = appliedPromoCode;
+            if (promoStatus) {
+                promoStatus.textContent = 'Промокод применён.';
+                promoStatus.className = 'bcc-promo-status is-success';
+            }
+            if (promoSummary) {
+                promoSummary.innerHTML = '<div><span>Скидка по промокоду</span><strong>−' +
+                    formatMoney(appliedPromoDiscountCents / 100) + ' ' + cfg.currencySymbol +
+                    '</strong></div><div class="bcc-promo-summary__total"><span>Итого к оплате</span><strong>' +
+                    formatMoney((Number(payload.total_cents) || 0) / 100) + ' ' + cfg.currencySymbol +
+                    '</strong></div>';
+                promoSummary.style.display = 'flex';
+            }
+            updateTotal();
+        }).catch(function (error) {
+            resetAppliedPromo('');
+            if (promoStatus) {
+                promoStatus.textContent = error.message;
+                promoStatus.className = 'bcc-promo-status is-error';
+            }
+        }).finally(function () {
+            applyPromoBtn.disabled = false;
+            applyPromoBtn.textContent = 'Применить';
+        });
     }
 
     function formatMoney(amount) {
@@ -173,6 +262,14 @@
     function openModal(sessionId) {
         currentSession = null;
         selectedSeats = [];
+        appliedPromoCode = '';
+        appliedPromoDiscountCents = 0;
+        if (promoInput) promoInput.value = '';
+        if (promoStatus) {
+            promoStatus.textContent = '';
+            promoStatus.className = 'bcc-promo-status';
+        }
+        if (promoSummary) promoSummary.style.display = 'none';
         currentZoom = 1;
         clientHoldToken = createClientHoldToken();
         clientReserved = false;
@@ -225,7 +322,10 @@
     }
 
     function updateTotal() {
-        const total = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
+        const subtotal = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
+        const promoIsApplied = appliedPromoCode && promoInput
+            && promoInput.value.trim().toUpperCase() === appliedPromoCode;
+        const total = Math.max(0, subtotal - (promoIsApplied ? appliedPromoDiscountCents / 100 : 0));
         const count = selectedSeats.length;
         const overLimit = count > maxTicketsPerUser;
         if (totalEl) totalEl.textContent = formatMoney(total) + ' ' + cfg.currencySymbol;
@@ -540,6 +640,7 @@
     }
 
     function updateCart() {
+        resetAppliedPromo();
         if (!cartList) return;
         cartList.innerHTML = '';
         if (selectedSeats.length === 0) {
@@ -649,6 +750,12 @@
             showError('В одном заказе можно оформить не более ' + maxTicketsPerUser + ' билетов.');
             return;
         }
+        const enteredPromoCode = promoInput ? promoInput.value.trim().toUpperCase() : '';
+        if (enteredPromoCode && enteredPromoCode !== appliedPromoCode) {
+            applyPromoCode();
+            showError('Сначала проверьте и примените промокод.');
+            return;
+        }
 
         const phone = canonicalCustomerPhone(document.getElementById('bccCustomerPhone').value);
         const name = document.getElementById('bccCustomerName').value.trim();
@@ -677,7 +784,8 @@
                 customer_name: name,
                 customer_phone: phone,
                 customer_email: email,
-                client_hold_token: clientHoldToken
+                client_hold_token: clientHoldToken,
+                promo_code: appliedPromoCode
             };
         if (cfg.csrfToken) {
             payload.csrf_token = cfg.csrfToken;

@@ -12,6 +12,7 @@ if (!function_exists('reporting_segment_label')) {
             'senior' => 'Пенсионный',
             'pensioner' => 'Пенсионный',
             'vip' => 'VIP',
+            'manual' => 'Ручная скидка',
         ];
         $key = strtolower(trim((string)$segment));
         return $labels[$key] ?? ($key !== '' ? $key : 'Не указан');
@@ -83,7 +84,11 @@ if (!function_exists('reporting_discount_label')) {
             return 'Без скидки';
         }
         if ($discountAmount > 0 && $segment === 'manual') {
-            return 'Ручная, фиксированная';
+            return 'Ручная скидка';
+        }
+        $promoCode = trim((string)($row['promo_code'] ?? ''));
+        if ($discountAmount > 0 && $promoCode !== '') {
+            return 'Промокод ' . $promoCode;
         }
         if ($discountAmount > 0 && $segment !== '') {
             return 'По типу: ' . reporting_segment_label($segment);

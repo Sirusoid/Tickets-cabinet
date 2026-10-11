@@ -54,6 +54,7 @@ try {
 								t.final_price,
 								t.discount,
 								t.discount_amount,
+								t.promo_code,
 								t.seat_identifier,
 								t.customer_segment,
 								t.purchased_at,

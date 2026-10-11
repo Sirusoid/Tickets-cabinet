@@ -256,6 +256,16 @@ require_once __DIR__ . '/../includes/header.php';
                         <div id="bccCustomerCartList"></div>
                     </div>
 
+                    <div class="bcc-promo-box">
+                        <label for="bccPromoCode">Промокод</label>
+                        <div class="bcc-promo-box__row">
+                            <input type="text" class="bcc-form-input" id="bccPromoCode" maxlength="12" autocomplete="off" placeholder="Введите короткий код">
+                            <button type="button" class="bcc-btn-secondary" id="bccApplyPromoBtn">Применить</button>
+                        </div>
+                        <div id="bccPromoStatus" class="bcc-promo-status" aria-live="polite"></div>
+                        <div id="bccPromoSummary" class="bcc-promo-summary" style="display:none;"></div>
+                    </div>
+
                     <button type="button" class="bcc-btn-buy w-100" id="bccPayBtn" disabled>Перейти к оплате</button>
                     <div id="bccError" class="alert alert-danger mt-3 small" style="display:none;"></div>
                     <div id="bccDebugOutput" class="bcc-debug-output mt-3 small" style="display:none;"></div>

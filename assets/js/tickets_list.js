@@ -71,7 +71,7 @@
   }
 
   function mapSegment(code) {
-    var map = { adult: 'Взрослый', child: 'Детский', student: 'Студенческий', senior: 'Пенсионный', vip: 'VIP' };
+    var map = { adult: 'Взрослый', child: 'Детский', student: 'Студенческий', senior: 'Пенсионный', vip: 'VIP', manual: 'Ручная скидка' };
     return map[code] || (code || '—');
   }
 

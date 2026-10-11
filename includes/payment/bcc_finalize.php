@@ -135,12 +135,13 @@ if (!function_exists('bcc_finalize_payment_session')) {
                 $discountAmount = max(0.0, $originalPrice - $finalPrice);
                 $discountPercent = $originalPrice > 0 ? (int)round(($discountAmount / $originalPrice) * 100) : 0;
                 $ticketUid = bin2hex(random_bytes(8));
+                $promoCode = trim((string)($seat['promo_code'] ?? ''));
 
                 $insertTicket = $pdo->prepare("INSERT INTO tickets
-                    (schedule_id, event_id, hall_id, seat_identifier, original_price, final_price, discount, discount_amount,
+                    (schedule_id, event_id, hall_id, seat_identifier, original_price, final_price, discount, discount_amount, promo_code,
                      status, payment_status, payment_provider, payment_transaction_id, payment_session_id, customer_id, customer_name, customer_phone, customer_email, ticket_uid, channel, purchased_at, created_at, updated_at)
                     VALUES
-                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :original_price, :final_price, :discount, :discount_amount,
+                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :original_price, :final_price, :discount, :discount_amount, :promo_code,
                      'issued', 'paid', 'bcc', :txid, :payment_session_id, :customer_id, :customer_name, :customer_phone, :customer_email, :ticket_uid, 'web', NOW(), NOW(), NOW())");
                 $insertTicket->execute([
                     ':schedule_id' => (int)$lockedSession['session_id'],
@@ -151,6 +152,7 @@ if (!function_exists('bcc_finalize_payment_session')) {
                     ':final_price' => number_format($finalPrice, 2, '.', ''),
                     ':discount' => $discountPercent,
                     ':discount_amount' => number_format($discountAmount, 2, '.', ''),
+                    ':promo_code' => $promoCode !== '' ? $promoCode : null,
                     ':txid' => $transactionId,
                     ':payment_session_id' => $paymentSessionId,
                     ':customer_id' => $customerId,

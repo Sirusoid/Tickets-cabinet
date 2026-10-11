@@ -41,6 +41,9 @@ if (!function_exists('user_has_permission')) {
                 'scanner' => [
                     'scanner' => true,
                 ],
+                'promo_codes' => [
+                    'manager' => true,
+                ],
             ];
             if (isset($defaultPermissions[$permission][$role])) {
                 return (bool)$defaultPermissions[$permission][$role];
