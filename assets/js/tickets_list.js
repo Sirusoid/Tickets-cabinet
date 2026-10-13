@@ -103,11 +103,16 @@
     return dd + '.' + mm + '.' + yy + '.';
   }
 
+  function displaySeatIdentifier(value) {
+    var match = String(value || '').match(/^GA[-:](\d{1,5})$/i);
+    return match ? 'Свободное место № ' + Number(match[1]) : String(value || '').replace(/:/g, ' - ');
+  }
+
   function deriveSeatLabel(t) {
     if (!t) return '';
-    if (t.seat_label && String(t.seat_label).trim() !== '') return String(t.seat_label).trim();
-    if (t.seat_identifier && String(t.seat_identifier).trim() !== '') return String(t.seat_identifier).trim().replace(/:/g, ' - ');
-    if (t.seat && String(t.seat).trim() !== '') return String(t.seat).trim();
+    if (t.seat_label && String(t.seat_label).trim() !== '') return displaySeatIdentifier(String(t.seat_label).trim());
+    if (t.seat_identifier && String(t.seat_identifier).trim() !== '') return displaySeatIdentifier(String(t.seat_identifier).trim());
+    if (t.seat && String(t.seat).trim() !== '') return displaySeatIdentifier(String(t.seat).trim());
     if (t.seat_id !== undefined && t.seat_id !== null && String(t.seat_id).trim() !== '') return String(t.seat_id).trim();
 
     var candidates = ['payload','meta','ticket_meta','data'];
@@ -126,6 +131,7 @@
             var lbl2 = extractSeatFromObject(parsed);
             if (lbl2) return lbl2;
           }
+
         } catch (e) {
           var s = String(raw).trim();
           if (s.indexOf(':') !== -1) return s.replace(/:/g, ' - ');
@@ -152,9 +158,9 @@
 
   function extractSeatFromObject(obj) {
     if (!obj || typeof obj !== 'object') return '';
-    if (obj.seat_label && String(obj.seat_label).trim() !== '') return String(obj.seat_label).trim();
-    if (obj.seat_identifier && String(obj.seat_identifier).trim() !== '') return String(obj.seat_identifier).trim().replace(/:/g, ' - ');
-    if (obj.seat && String(obj.seat).trim() !== '') return String(obj.seat).trim();
+    if (obj.seat_label && String(obj.seat_label).trim() !== '') return displaySeatIdentifier(String(obj.seat_label).trim());
+    if (obj.seat_identifier && String(obj.seat_identifier).trim() !== '') return displaySeatIdentifier(String(obj.seat_identifier).trim());
+    if (obj.seat && String(obj.seat).trim() !== '') return displaySeatIdentifier(String(obj.seat).trim());
     if (obj.seat_id !== undefined && obj.seat_id !== null && String(obj.seat_id).trim() !== '') return String(obj.seat_id).trim();
     if (obj.row && obj.seat) return String(obj.row).trim() + ' - ' + String(obj.seat).trim();
     if (obj.row_label && obj.seat_number) return String(obj.row_label).trim() + ' - ' + String(obj.seat_number).trim();
@@ -417,7 +423,7 @@
     var sessionLabel = (t.event_title ? t.event_title : '') + (t.schedule_id ? ' #' + (t.schedule_id || '') : '');
     qs('refund_session').textContent = sessionLabel || '—';
     qs('refund_session_dt').textContent = t.session_start ? (new Date(t.session_start)).toLocaleString() : '—';
-    var seat = t.seat_label || t.seat_identifier || t.seat || '—';
+    var seat = displaySeatIdentifier(t.seat_label || t.seat_identifier || t.seat || '—');
     qs('refund_seat').textContent = seat;
     var amtEl = qs('refund_amount');
     if (amtEl) {

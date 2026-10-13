@@ -4,6 +4,7 @@
 // Использует $pdo из init.php. Включает безопасную проверку CSRF.
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -35,6 +36,80 @@ function compact_json_encode($data) {
     $s = json_encode($data, JSON_UNESCAPED_UNICODE);
     if ($s === false) return '';
     return $s;
+}
+
+function schedule_hall_has_seating(PDO $pdo, int $hallId): bool
+{
+    $stmt = $pdo->prepare('SELECT seat_map FROM halls WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $hallId]);
+    $seatMap = $stmt->fetchColumn();
+    if ($seatMap === false) {
+        throw new InvalidArgumentException('Выбранный зал не найден.');
+    }
+    return general_admission_layout_has_seats($seatMap);
+}
+
+function schedule_capacity_for_save(PDO $pdo, int $hallId, array $payload, ?int $scheduleId = null): ?int
+{
+    $hallHasSeating = schedule_hall_has_seating($pdo, $hallId);
+    $previousGeneralAdmission = false;
+    $occupiedCount = 0;
+
+    if ($scheduleId !== null) {
+        $currentStmt = $pdo->prepare(
+            'SELECT s.*, h.seat_map AS hall_seatmap
+             FROM schedules s LEFT JOIN halls h ON h.id = s.hall_id
+             WHERE s.id = :id LIMIT 1'
+        );
+        $currentStmt->execute([':id' => $scheduleId]);
+        $currentSession = $currentStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$currentSession) {
+            throw new InvalidArgumentException('Сеанс не найден.');
+        }
+        $previousGeneralAdmission = general_admission_is_session($currentSession);
+
+        $soldStmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM tickets
+             WHERE schedule_id = :id AND status <> 'cancelled'
+               AND payment_status = 'paid'
+               AND COALESCE(refund_status, 'none') <> 'refunded'"
+        );
+        $soldStmt->execute([':id' => $scheduleId]);
+        $occupiedCount = (int)$soldStmt->fetchColumn();
+        $heldStmt = $pdo->prepare(
+            'SELECT COUNT(DISTINCT seat_key) FROM cash_holds WHERE session_id = :id AND expires_at > NOW()'
+        );
+        $heldStmt->execute([':id' => $scheduleId]);
+        $occupiedCount += (int)$heldStmt->fetchColumn();
+    }
+
+    $targetGeneralAdmission = !$hallHasSeating;
+    if (
+        $scheduleId !== null
+        && $previousGeneralAdmission !== $targetGeneralAdmission
+        && $occupiedCount > 0
+    ) {
+        throw new InvalidArgumentException('Нельзя менять режим рассадки после продажи или резерва мест.');
+    }
+
+    if (!$targetGeneralAdmission) {
+        return null;
+    }
+
+    $capacity = filter_var($payload['capacity'] ?? null, FILTER_VALIDATE_INT);
+    if ($capacity === false || $capacity === null || $capacity < 1 || $capacity > 50000) {
+        throw new InvalidArgumentException('Для зала без рассадки укажите вместимость от 1 до 50000 мест.');
+    }
+    $basePrice = filter_var($payload['base_price'] ?? null, FILTER_VALIDATE_INT);
+    if ($basePrice === false || $basePrice === null || $basePrice < 1) {
+        throw new InvalidArgumentException('Для продажи мест без рассадки укажите базовую цену билета.');
+    }
+
+    if ($capacity < $occupiedCount) {
+        throw new InvalidArgumentException('Вместимость нельзя уменьшить ниже количества проданных и зарезервированных мест (' . $occupiedCount . ').');
+    }
+
+    return $capacity;
 }
 
 global $pdo;
@@ -88,15 +163,22 @@ if ($action === 'create') {
             throw new RuntimeException('Database connection not available');
         }
 
+        $capacity = schedule_capacity_for_save($pdo, $hall_id, $_POST);
+        if ($capacity !== null) {
+            $seat_map_compact = '';
+            $price_ranges_raw = null;
+        }
+
         // ВАЖНО: не включаем price_ranges_count в INSERT, чтобы избежать ошибок при несовпадении схемы.
         $sql = "INSERT INTO schedules
-                (event_id, hall_id, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status, created_at, updated_at)
+                (event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status, created_at, updated_at)
                 VALUES
-                (:event_id, :hall_id, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :status, NOW(), NOW())";
+                (:event_id, :hall_id, :capacity, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :status, NOW(), NOW())";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':event_id' => $event_id,
             ':hall_id' => $hall_id,
+            ':capacity' => $capacity,
             ':start_time' => $start_time,
             ':end_time' => $end_time,
             ':sales_start_time' => $sales_start_time !== '' ? $sales_start_time : null,
@@ -168,9 +250,22 @@ if ($action === 'update') {
             throw new RuntimeException('Database connection not available');
         }
 
+        $pdo->beginTransaction();
+        $lockedSchedule = $pdo->prepare('SELECT id FROM schedules WHERE id = :id FOR UPDATE');
+        $lockedSchedule->execute([':id' => $id]);
+        if (!$lockedSchedule->fetchColumn()) {
+            throw new InvalidArgumentException('Сеанс не найден.');
+        }
+        $capacity = schedule_capacity_for_save($pdo, $hall_id, $_POST, $id);
+        if ($capacity !== null) {
+            $seat_map_compact = '';
+            $price_ranges_raw = null;
+        }
+
         $sql = "UPDATE schedules
                 SET event_id = :event_id,
                     hall_id = :hall_id,
+                    capacity = :capacity,
                     start_time = :start_time,
                     end_time = :end_time,
                     sales_start_time = :sales_start_time,
@@ -186,6 +281,7 @@ if ($action === 'update') {
         $stmt->execute([
             ':event_id' => $event_id,
             ':hall_id' => $hall_id,
+            ':capacity' => $capacity,
             ':start_time' => $start_time,
             ':end_time' => $end_time,
             ':sales_start_time' => $sales_start_time !== '' ? $sales_start_time : null,
@@ -197,12 +293,16 @@ if ($action === 'update') {
             ':status' => $status,
             ':id' => $id
         ]);
+        $pdo->commit();
 
         if (function_exists('audit_log_event')) {
             audit_log_event($pdo, 'schedule.update', 'schedule', $id, null, [], ['event_id' => $event_id, 'hall_id' => $hall_id, 'start_time' => $start_time]);
         }
         json_resp(true, 'Сеанс сохранён', ['id' => $id]);
     } catch (Throwable $e) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         error_log('Schedule update error: ' . $e->getMessage());
         json_resp(false, 'Ошибка сохранения на сервере: ' . $e->getMessage());
     }
@@ -350,7 +450,7 @@ if ($action === 'duplicate') {
             if (function_exists('db_connect')) $pdo = db_connect();
         }
         // fetch existing schedule
-        $stmt = $pdo->prepare("SELECT event_id, hall_id, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status FROM schedules WHERE id = :id LIMIT 1");
+        $stmt = $pdo->prepare("SELECT event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status FROM schedules WHERE id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) json_resp(false, 'Сеанс не найден');
@@ -358,6 +458,7 @@ if ($action === 'duplicate') {
         // apply overrides if provided
         $new_event_id = $override_event !== null ? $override_event : $row['event_id'];
         $new_hall_id = $override_hall !== null ? $override_hall : $row['hall_id'];
+        $new_capacity = $row['capacity'];
         $new_start = $override_start !== null ? $override_start : $row['start_time'];
         $new_end = $override_end !== null ? $override_end : $row['end_time'];
         $new_sales_start = $row['sales_start_time'];
@@ -372,16 +473,22 @@ if ($action === 'duplicate') {
         if (!$new_start || !$new_end) {
             json_resp(false, 'Невозможно дублировать: отсутствует время начала/окончания');
         }
+        if (schedule_hall_has_seating($pdo, (int)$new_hall_id)) {
+            $new_capacity = null;
+        } elseif ((int)$new_capacity <= 0) {
+            json_resp(false, 'Для дублирования в зал без схемы рассадки укажите вместимость нового сеанса.');
+        }
 
         // Insert new schedule in transaction
         $pdo->beginTransaction();
         $ins = $pdo->prepare("INSERT INTO schedules
-            (event_id, hall_id, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status, created_at, updated_at)
+            (event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status, created_at, updated_at)
             VALUES
-            (:event_id, :hall_id, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :status, NOW(), NOW())");
+            (:event_id, :hall_id, :capacity, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :status, NOW(), NOW())");
         $ins->execute([
             ':event_id' => $new_event_id,
             ':hall_id' => $new_hall_id,
+            ':capacity' => $new_capacity,
             ':start_time' => $new_start,
             ':end_time' => $new_end,
             ':sales_start_time' => $new_sales_start !== '' ? $new_sales_start : null,

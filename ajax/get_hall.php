@@ -13,14 +13,21 @@ if (!$hall_id) {
     exit;
 }
 
-$stmt = $pdo->prepare("SELECT seat_map FROM halls WHERE id = :id");
+$stmt = $pdo->prepare("SELECT id, seat_map FROM halls WHERE id = :id");
 $stmt->execute([':id' => $hall_id]);
 $hall = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if ($hall && $hall['seat_map']) {
+if (!$hall) {
+    http_response_code(404);
+    echo json_encode(['error' => 'hall not found']);
+    exit;
+}
+
+if (!empty($hall['seat_map'])) {
     // seat_map хранится как JSON
     echo $hall['seat_map'];
-} else {
-    http_response_code(404);
-    echo json_encode(['error' => 'hall not found or empty']);
+    exit;
 }
+
+// Empty seating is a valid general-admission hall, not a missing hall.
+echo json_encode(['rows' => [], 'seats' => [], 'free_admission' => true], JSON_UNESCAPED_UNICODE);

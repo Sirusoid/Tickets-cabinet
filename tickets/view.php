@@ -3,6 +3,7 @@
 // Страница просмотра одного или нескольких купленных билетов.
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 
 $page_scripts = ['/assets/js/ticket_viewer.js'];
@@ -103,7 +104,7 @@ require __DIR__ . '/../includes/panel.php';
           <div>
             <div style="font-size:16px; font-weight:700; margin-bottom:6px;">UID: <?= h($ticket['ticket_uid']) ?></div>
             <div style="color:#555;">Сеанс: <?= h($ticket['event_title']) ?>, <?= h($ticket['schedule_start']) ?></div>
-            <div style="color:#555;">Место: <?= h($ticket['seat_identifier']) ?></div>
+            <div style="color:#555;">Место: <?= h(general_admission_display_label((string)$ticket['seat_identifier'])) ?></div>
             <div style="color:#555;">Клиент: <?= h($ticket['customer_name']) ?></div>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">

@@ -25,6 +25,11 @@
     const applyPromoBtn = document.getElementById('bccApplyPromoBtn');
     const promoStatus = document.getElementById('bccPromoStatus');
     const promoSummary = document.getElementById('bccPromoSummary');
+    const seatmapWrapper = document.getElementById('bccSeatmapWrapper');
+    const generalAdmissionPanel = document.getElementById('bccGeneralAdmission');
+    const generalAdmissionAvailability = document.getElementById('bccGeneralAdmissionAvailability');
+    const generalAdmissionQuantity = document.getElementById('bccGeneralAdmissionQuantity');
+    const generalAdmissionTotal = document.getElementById('bccGeneralAdmissionTotal');
     const payBtn = document.getElementById('bccPayBtn');
     const buyBtn = document.getElementById('bccBuyBtn');
     const reserveBtn = document.getElementById('bccReserveBtn');
@@ -47,6 +52,9 @@
     let clientReserved = false;
     let appliedPromoCode = '';
     let appliedPromoDiscountCents = 0;
+    let generalAdmission = false;
+    let generalAdmissionAvailableSeats = [];
+    let generalAdmissionMaxTickets = 6;
 
     // Consent checkboxes
     const consentData = document.getElementById('bccConsentData');
@@ -91,6 +99,10 @@
         promoInput.addEventListener('input', function () {
             if (appliedPromoCode && promoInput.value.trim().toUpperCase() !== appliedPromoCode) {
                 resetAppliedPromo('');
+            }
+            if (generalAdmissionQuantity) {
+                generalAdmissionQuantity.addEventListener('input', updateGeneralAdmissionSelection);
+                generalAdmissionQuantity.addEventListener('change', updateGeneralAdmissionSelection);
             }
         });
         promoInput.addEventListener('keydown', function (event) {
@@ -219,6 +231,63 @@
         return Number(amount).toLocaleString('ru-KZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     }
 
+    function updateGeneralAdmissionSelection() {
+        if (!generalAdmission || !generalAdmissionQuantity) return;
+        var quantity = Math.max(0, Math.min(generalAdmissionAvailableSeats.length, generalAdmissionMaxTickets, parseInt(generalAdmissionQuantity.value, 10) || 0));
+        generalAdmissionQuantity.value = quantity || '';
+        selectedSeats = generalAdmissionAvailableSeats.slice(0, quantity).map(function (number) {
+            return {
+                identifier: 'GA-' + String(number).padStart(5, '0'),
+                original_price: Number(currentSession.base_price) || 0,
+                row: 'Свободный вход',
+                col: number
+            };
+        });
+        if (generalAdmissionTotal) {
+            generalAdmissionTotal.textContent = 'Выбрано ' + quantity + ' из ' + generalAdmissionAvailableSeats.length
+                + ' доступных мест · ' + formatMoney(quantity * (Number(currentSession.base_price) || 0)) + ' ' + cfg.currencySymbol;
+        }
+        if (renderer && renderer.selectSeats) renderer.selectSeats([]);
+        updateCart();
+    }
+
+    function configureGeneralAdmission(payload, session) {
+        generalAdmission = payload.general_admission === true;
+        generalAdmissionMaxTickets = Number(payload.max_tickets_per_user || 6);
+        if (seatmapWrapper) seatmapWrapper.style.display = generalAdmission ? 'none' : '';
+        if (generalAdmissionPanel) generalAdmissionPanel.style.display = generalAdmission ? 'block' : 'none';
+        if (!generalAdmission) return;
+
+        var sold = {};
+        (payload.sold_seats || []).forEach(function (seat) {
+            sold[String(seat).replace(/:/g, '-')] = true;
+        });
+        var held = {};
+        (payload.held_seats || []).forEach(function (seat) {
+            var key = typeof seat === 'object' ? (seat.seat_key || seat.key) : seat;
+            if (key) held[String(key).replace(/:/g, '-')] = true;
+        });
+        generalAdmissionAvailableSeats = [];
+        for (var number = 1; number <= Number(session.capacity || 0); number++) {
+            var key = 'GA-' + String(number).padStart(5, '0');
+            if (!sold[key] && !held[key]) generalAdmissionAvailableSeats.push(number);
+        }
+
+        if (generalAdmissionAvailability) {
+            generalAdmissionAvailability.textContent = generalAdmissionAvailableSeats.length
+                ? 'Доступно мест: ' + generalAdmissionAvailableSeats.length + ' · цена билета ' + formatMoney(session.base_price) + ' ' + cfg.currencySymbol
+                : 'Свободных мест больше нет.';
+        }
+        if (generalAdmissionQuantity) {
+            generalAdmissionQuantity.max = String(Math.min(generalAdmissionAvailableSeats.length, generalAdmissionMaxTickets));
+            generalAdmissionQuantity.value = generalAdmissionAvailableSeats.length ? '1' : '';
+            generalAdmissionQuantity.disabled = generalAdmissionAvailableSeats.length === 0;
+        }
+        if (buyBtn) buyBtn.disabled = generalAdmissionAvailableSeats.length === 0;
+        if (generalAdmissionTotal) generalAdmissionTotal.textContent = '';
+        updateGeneralAdmissionSelection();
+    }
+
     function formatSessionDate(datetime) {
         if (!datetime) return '';
         var d;
@@ -262,8 +331,14 @@
     function openModal(sessionId) {
         currentSession = null;
         selectedSeats = [];
+        generalAdmission = false;
+        generalAdmissionAvailableSeats = [];
+        if (seatmapWrapper) seatmapWrapper.style.display = '';
+        if (generalAdmissionPanel) generalAdmissionPanel.style.display = 'none';
         appliedPromoCode = '';
         appliedPromoDiscountCents = 0;
+        generalAdmission = false;
+        generalAdmissionAvailableSeats = [];
         if (promoInput) promoInput.value = String(window.bccInitialPromoCode || '').toUpperCase();
         if (promoStatus) {
             promoStatus.textContent = '';
@@ -420,9 +495,10 @@
                 if (payload.hall_seatmap && !currentSession.hall_seatmap) {
                     currentSession.hall_seatmap = payload.hall_seatmap;
                 }
+                configureGeneralAdmission(payload, currentSession);
                 updateHeaderDate(currentSession);
                 updateReservationUi();
-                initSeatmap(currentSession);
+                if (!generalAdmission) initSeatmap(currentSession);
             })
             .catch(() => {
                 showError('Ошибка загрузки сеанса');
@@ -649,13 +725,14 @@
         if (selectedSeats.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'bcc-cart-empty';
-            empty.textContent = 'Выберите места на схеме зала';
+            empty.textContent = generalAdmission ? 'Укажите количество мест' : 'Выберите места на схеме зала';
             cartList.appendChild(empty);
         } else {
             selectedSeats.forEach(function (s, idx) {
                 cartList.appendChild(createSeatCard(s, idx));
             });
         }
+        if (stepCustomer && stepCustomer.style.display !== 'none') renderCustomerCart();
         updateTotal();
     }
 
@@ -666,7 +743,7 @@
         info.className = 'bcc-seat-card-info';
         const title = document.createElement('span');
         title.className = 'bcc-seat-card-title';
-        title.textContent = s.row + ' ряд, ' + s.col + ' место';
+        title.textContent = generalAdmission ? 'Свободное место №' + s.col : s.row + ' ряд, ' + s.col + ' место';
         const meta = document.createElement('span');
         meta.className = 'bcc-seat-card-meta';
         meta.textContent = 'Взрослый';
@@ -683,8 +760,13 @@
         remove.setAttribute('aria-label', 'Убрать билет');
         remove.innerHTML = '&times;';
         remove.addEventListener('click', function () {
+            if (generalAdmission) {
+                if (generalAdmissionQuantity) generalAdmissionQuantity.value = String(Math.max(0, selectedSeats.length - 1));
+                updateGeneralAdmissionSelection();
+                return;
+            }
             selectedSeats.splice(idx, 1);
-            renderer.selectSeats(selectedSeats.map(function (seat) { return seat.identifier; }));
+            if (renderer) renderer.selectSeats(selectedSeats.map(function (seat) { return seat.identifier; }));
             updateCart();
         });
         right.appendChild(price);
@@ -711,7 +793,7 @@
             info.className = 'bcc-seat-card-info';
             const title = document.createElement('span');
             title.className = 'bcc-seat-card-title';
-            title.textContent = s.row + ' ряд, ' + s.col + ' место';
+            title.textContent = generalAdmission ? 'Свободное место №' + s.col : s.row + ' ряд, ' + s.col + ' место';
             const meta = document.createElement('span');
             meta.className = 'bcc-seat-card-meta';
             meta.textContent = 'Взрослый';

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/reporting.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 
 $scheduleId = (int)($_GET['session_id'] ?? 0);
@@ -9,8 +10,8 @@ if ($scheduleId <= 0) {
 }
 
 $session = db_fetch_one(
-    "SELECT s.id, s.start_time, s.end_time, s.status, s.hall_id, s.seat_map,
-            e.title AS event_title, h.name AS hall_name
+    "SELECT s.id, s.start_time, s.end_time, s.status, s.hall_id, s.seat_map, s.capacity,
+            e.title AS event_title, h.name AS hall_name, h.seat_map AS hall_seatmap
      FROM schedules s
      LEFT JOIN events e ON e.id = s.event_id
      LEFT JOIN halls h ON h.id = s.hall_id
@@ -46,12 +47,14 @@ $tickets = db_fetch_all(
     [$scheduleId]
 );
 
-$capacity = 0;
-try {
-    $capacityRow = db_fetch_one('SELECT COUNT(*) AS total FROM seats WHERE hall_id = ?', [(int)$session['hall_id']]);
-    $capacity = (int)($capacityRow['total'] ?? 0);
-} catch (Throwable $exception) {
-    $capacity = 0;
+$capacity = general_admission_is_session($session) ? max(0, (int)($session['capacity'] ?? 0)) : 0;
+if ($capacity <= 0) {
+    try {
+        $capacityRow = db_fetch_one('SELECT COUNT(*) AS total FROM seats WHERE hall_id = ?', [(int)$session['hall_id']]);
+        $capacity = (int)($capacityRow['total'] ?? 0);
+    } catch (Throwable $exception) {
+        $capacity = 0;
+    }
 }
 
 if ($capacity <= 0 && !empty($session['seat_map'])) {
@@ -290,9 +293,10 @@ require __DIR__ . '/../includes/panel.php';
                 <?php else: foreach ($soldTickets as $ticket): ?>
                     <?php $ticketFinancials = reporting_ticket_financials($ticket); ?>
                     <?php
+                    $generalAdmissionNumber = general_admission_identifier_number((string)($ticket['seat_identifier'] ?? ''));
                     $seatParts = preg_split('/\s*-\s*/', str_replace(':', '-', (string)($ticket['seat_identifier'] ?? '')), 2);
-                    $seatRow = trim((string)($seatParts[0] ?? ''));
-                    $seatNumber = trim((string)($seatParts[1] ?? ''));
+                    $seatRow = $generalAdmissionNumber !== null ? 'Свободная рассадка' : trim((string)($seatParts[0] ?? ''));
+                    $seatNumber = $generalAdmissionNumber !== null ? (string)$generalAdmissionNumber : trim((string)($seatParts[1] ?? ''));
                     $saleChannel = strtolower(trim((string)($ticket['channel'] ?? '')));
                     $saleType = $saleTypeLabels[$saleChannel] ?? 'Продажа';
                     $tariffName = trim((string)($ticket['seat_type'] ?? '')) ?: 'Стандартный';

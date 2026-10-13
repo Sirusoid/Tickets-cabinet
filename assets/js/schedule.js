@@ -687,8 +687,27 @@
       formData.set('price_ranges', JSON.stringify(priceRanges));
       formData.set('csrf_token', cfg.csrf || window.APP_CSRF_TOKEN || '');
 
+      var capacityPanel = document.getElementById('generalAdmissionSettings');
+      var generalAdmission = capacityPanel && !capacityPanel.hidden;
+      if (generalAdmission) {
+        var capacityInput = document.getElementById('schedule_capacity');
+        var capacityValue = capacityInput ? parseInt(capacityInput.value, 10) : 0;
+        if (!capacityValue || capacityValue < 1) {
+          showToast('Укажите вместимость свободной рассадки', 'error', 8000);
+          if (capacityInput) capacityInput.focus();
+          return;
+        }
+        formData.set('capacity', String(capacityValue));
+        formData.set('seat_map', '');
+        formData.set('price_ranges', '');
+      } else {
+        formData.set('capacity', '');
+      }
+
       var sc = (window.SeatingCanvasRender && typeof window.SeatingCanvasRender.getInstance === 'function') ? window.SeatingCanvasRender.getInstance('editor-canvas') : null;
-      if (sc && typeof sc.exportLayout === 'function') {
+      if (generalAdmission) {
+        formData.set('seat_map', '');
+      } else if (sc && typeof sc.exportLayout === 'function') {
         try {
           var layout = sc.exportLayout();
           try { layout = sanitizeIncomingLayout(layout); } catch (e) {}

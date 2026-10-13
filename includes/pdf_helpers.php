@@ -1,6 +1,7 @@
 <?php
 // includes/pdf_helpers.php
 // Хэлперы для генерации PDF билета, сохранения и очистки архива.
+require_once __DIR__ . '/general_admission.php';
 
 // -----------------------------
 // Путь и утилиты
@@ -486,6 +487,7 @@ if (!function_exists('ticket_pdf_render_html')) {
         $hallNameRaw = trim((string)($ticket['hall_name'] ?? ''));
         $hallNameEsc = htmlspecialchars($hallNameRaw !== '' ? $hallNameRaw . ' (Абая 117)' : '—', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seat_raw = trim((string)($ticket['seat_label'] ?? $ticket['seat_identifier'] ?? ''));
+        $seat_raw = general_admission_display_label($seat_raw);
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 

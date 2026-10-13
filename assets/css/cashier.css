@@ -122,3 +122,50 @@
     outline: 3px solid rgba(255, 221, 87, 0.35);
     outline-offset: 2px;
   }
+.cash-general-admission {
+  min-height: 250px;
+  padding: clamp(20px, 4vw, 38px);
+  border: 1px solid #dfe7df;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #f5f8f1, #fff 72%);
+}
+
+.cash-general-admission__label {
+  color: #748b6b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.cash-general-admission h4 {
+  margin: 7px 0 4px;
+  color: #244538;
+  font-size: 20px;
+}
+
+.cash-general-admission p,
+.cash-general-admission small {
+  color: #718079;
+  font-size: 12px;
+}
+
+.cash-general-admission label {
+  display: block;
+  margin: 20px 0 6px;
+  color: #40584a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cash-general-admission input {
+  max-width: 240px;
+  min-height: 44px;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.cash-general-admission small {
+  display: block;
+  margin-top: 8px;
+}

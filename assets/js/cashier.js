@@ -39,6 +39,13 @@ var Cashier = (function () {
   var pricedColors = {};
   var soldSeats = {};
   var heldSeats = {};
+  var generalAdmissionMode = false;
+  var generalAdmissionCapacity = 0;
+  var generalAdmissionPrice = 0;
+  var generalAdmissionAvailable = [];
+  var generalAdmissionQuantityEl = null;
+  var generalAdmissionAvailabilityEl = null;
+  var generalAdmissionPanelEl = null;
   var cart = [];
   var selectedCartSeatKey = null;
   var legendRenderer = null;
@@ -161,6 +168,62 @@ var Cashier = (function () {
       if (price === undefined) price = pricedSeats[parsed.row + '-' + parsed.seat];
     }
     return price;
+  }
+
+  function refreshGeneralAdmissionSelection() {
+      if (!generalAdmissionMode || !generalAdmissionQuantityEl) return;
+      generalAdmissionAvailable = [];
+      for (var number = 1; number <= generalAdmissionCapacity; number++) {
+        var key = 'GA-' + String(number).padStart(5, '0');
+        var held = heldSeats[key];
+        var heldByOther = held && Number(held.user_id) !== currentUserId;
+        if (!soldSeats[key] && !heldByOther) generalAdmissionAvailable.push(key);
+      }
+
+      if (generalAdmissionAvailabilityEl) {
+        generalAdmissionAvailabilityEl.textContent = 'Доступно мест: ' + generalAdmissionAvailable.length
+          + ' · цена билета ' + formatMoneyTg(generalAdmissionPrice);
+      }
+
+      var desired = Math.max(0, parseInt(generalAdmissionQuantityEl.value, 10) || 0);
+      desired = Math.min(desired, generalAdmissionAvailable.length);
+      generalAdmissionQuantityEl.max = String(generalAdmissionAvailable.length);
+      generalAdmissionQuantityEl.value = desired ? String(desired) : '';
+      cart = generalAdmissionAvailable.slice(0, desired);
+      selectedCartSeatKey = cart[0] || null;
+      cart.forEach(function (seatKey) { pricedSeats[seatKey] = generalAdmissionPrice; });
+      renderCart();
+    }
+
+  function configureGeneralAdmission(session, sold, held) {
+      generalAdmissionMode = session && session.general_admission === true;
+      generalAdmissionCapacity = generalAdmissionMode ? Number(session.capacity) || 0 : 0;
+      generalAdmissionPrice = generalAdmissionMode ? Number(session.base_price) || 0 : 0;
+      generalAdmissionPanelEl = document.getElementById('cashGeneralAdmissionPanel');
+      generalAdmissionQuantityEl = document.getElementById('cashGeneralAdmissionQuantity');
+      generalAdmissionAvailabilityEl = document.getElementById('cashGeneralAdmissionAvailability');
+
+      if (generalAdmissionPanelEl) generalAdmissionPanelEl.style.display = generalAdmissionMode ? 'block' : 'none';
+      if (containerEl) containerEl.style.display = generalAdmissionMode ? 'none' : '';
+      var seatingTitle = containerEl && containerEl.parentNode
+        ? containerEl.parentNode.querySelector('.card-title')
+        : null;
+      if (seatingTitle) seatingTitle.textContent = generalAdmissionMode ? 'Свободная рассадка' : 'Схема рассадки';
+      if (generalAdmissionMode && generalAdmissionQuantityEl && !generalAdmissionQuantityEl.dataset.bound) {
+        generalAdmissionQuantityEl.dataset.bound = '1';
+        generalAdmissionQuantityEl.addEventListener('input', refreshGeneralAdmissionSelection);
+        generalAdmissionQuantityEl.addEventListener('change', refreshGeneralAdmissionSelection);
+      }
+      if (generalAdmissionMode) {
+        if (generalAdmissionPrice <= 0) {
+          if (generalAdmissionAvailabilityEl) generalAdmissionAvailabilityEl.textContent = 'Для сеанса не задана цена билета.';
+          if (reserveBtnEl) reserveBtnEl.disabled = true;
+          if (sellBtnEl) sellBtnEl.disabled = true;
+          return;
+        }
+        if (generalAdmissionQuantityEl && !generalAdmissionQuantityEl.value) generalAdmissionQuantityEl.value = '1';
+        refreshGeneralAdmissionSelection();
+      }
   }
 
   function computeCartTotal() {
@@ -299,7 +362,9 @@ var Cashier = (function () {
 
       var info = document.createElement('div');
       info.style.fontWeight = '700';
-      info.textContent = 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—') + ' - ' + (price ? Number(price).toLocaleString() + ' тг.' : '—');
+      info.textContent = generalAdmission && /^GA-\d+$/i.test(itemKey)
+        ? 'Свободное место № ' + parseInt(itemKey.slice(3), 10) + ' — ' + (price ? Number(price).toLocaleString() + ' тг.' : '—')
+        : 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—') + ' - ' + (price ? Number(price).toLocaleString() + ' тг.' : '—');
 
       left.appendChild(info);
 
@@ -311,6 +376,9 @@ var Cashier = (function () {
         ev.preventDefault();
         ev.stopPropagation();
         cart = cart.filter(function (x) { return normalizeSeatKey(x) !== itemKey; });
+        if (generalAdmissionMode && generalAdmissionQuantityEl) {
+          generalAdmissionQuantityEl.value = cart.length ? String(cart.length) : '';
+        }
         if (selectedCartSeatKey && normalizeSeatKey(selectedCartSeatKey) === itemKey) selectedCartSeatKey = null;
         renderCart();
         syncSelectionToRenderer();
@@ -467,6 +535,7 @@ var Cashier = (function () {
         renderer.setSoldSeats(Object.keys(soldSeats));
       }
       setReservedState(held);
+      if (generalAdmissionMode) refreshGeneralAdmissionSelection();
       if (typeof cb === 'function') cb(true, res);
     }, 'GET');
   }
@@ -886,6 +955,7 @@ var Cashier = (function () {
       var session = res.data && res.data.session ? res.data.session : null;
       var sold = res.data && res.data.sold_seats ? res.data.sold_seats : [];
       var held = res.data && res.data.held_seats ? res.data.held_seats : [];
+      if (session) session.general_admission = res.data.general_admission === true;
       try {
         if (onSessionLoaded && session) onSessionLoaded(session);
       } catch (e) {
@@ -901,8 +971,12 @@ var Cashier = (function () {
       if (Array.isArray(sold)) sold.forEach(function (k) { if (k) soldSeats[String(k)] = true; });
 
       setReservedState(held);
+      configureGeneralAdmission(session, sold, held);
 
-      if (options.seatmapRenderer && typeof options.seatmapRenderer.create === 'function') {
+      if (generalAdmissionMode) {
+        renderer = null;
+        viewer = null;
+      } else if (options.seatmapRenderer && typeof options.seatmapRenderer.create === 'function') {
         try {
           renderer = options.seatmapRenderer.create({
             canvasId: ids.canvasId,
@@ -1003,6 +1077,10 @@ var Cashier = (function () {
             renderCart();
             syncSelectionToRenderer();
             redrawLegend();
+            if (generalAdmissionMode && generalAdmissionQuantityEl) {
+              generalAdmissionQuantityEl.value = '';
+              refreshGeneralAdmissionSelection();
+            }
             refreshHoldState();
           });
         });
@@ -1051,12 +1129,14 @@ var Cashier = (function () {
             }
             cart.forEach(function (k) { soldSeats[k] = true; });
             cart = [];
+            if (generalAdmissionMode && generalAdmissionQuantityEl) generalAdmissionQuantityEl.value = '';
             if (renderer && typeof renderer.setSoldSeats === 'function') {
               renderer.setSoldSeats(Object.keys(soldSeats));
             } else if (viewer && typeof viewer.updateSoldSeats === 'function') {
               viewer.updateSoldSeats(Object.keys(soldSeats));
             }
-            renderCart();
+            if (generalAdmissionMode) refreshGeneralAdmissionSelection();
+            else renderCart();
             syncSelectionToRenderer();
             redrawLegend();
             showToast('Продано');

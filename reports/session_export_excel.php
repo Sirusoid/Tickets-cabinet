@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/reporting.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 
 require_once __DIR__ . '/../includes/excel.php';
@@ -85,9 +86,10 @@ foreach ($rows as $row) {
         $summary['sales'] += $financials['paid'];
     }
 
+    $generalAdmissionNumber = general_admission_identifier_number((string)($row['seat_identifier'] ?? ''));
     $seatParts = preg_split('/\s*-\s*/', str_replace(':', '-', (string)($row['seat_identifier'] ?? '')), 2);
-    $seatRow = trim((string)($seatParts[0] ?? ''));
-    $seatNumber = trim((string)($seatParts[1] ?? ''));
+    $seatRow = $generalAdmissionNumber !== null ? 'Свободная рассадка' : trim((string)($seatParts[0] ?? ''));
+    $seatNumber = $generalAdmissionNumber !== null ? (string)$generalAdmissionNumber : trim((string)($seatParts[1] ?? ''));
     $sector = trim((string)($row['seat_zone'] ?? ''));
     if ($sector === '') {
         $sector = trim((string)($row['seat_group'] ?? ''));

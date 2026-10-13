@@ -546,6 +546,74 @@
     font-size: 13px !important;
 }
 
+.bcc-general-admission {
+    min-height: 280px;
+    padding: clamp(22px, 5vw, 42px);
+    border: 1px solid #dfe8df;
+    border-radius: 14px;
+    background: linear-gradient(145deg, #f5f8f1, #fff 72%);
+}
+
+.bcc-general-admission__eyebrow {
+    color: #748b6b;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.bcc-general-admission h4 {
+    margin: 8px 0 5px;
+    color: #244538;
+    font-size: 22px;
+    letter-spacing: -.035em;
+}
+
+.bcc-general-admission p {
+    margin: 0 0 22px;
+    color: #718079;
+    font-size: 13px;
+}
+
+.bcc-general-admission label {
+    display: block;
+    margin-bottom: 6px;
+    color: #40584a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.bcc-general-admission input {
+    max-width: 220px;
+    min-height: 46px;
+    font-size: 18px;
+    font-weight: 750;
+}
+
+#bccGeneralAdmissionTotal {
+    margin-top: 14px;
+    color: #315c45;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.bcc-general-admission__seats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 16px;
+}
+
+.bcc-general-admission__seat {
+    padding: 5px 8px;
+    border: 1px solid #dce8d7;
+    border-radius: 7px;
+    background: #fff;
+    color: #4e6756;
+    font-size: 10px;
+    font-weight: 700;
+}
+
 @media (min-width: 992px) {
     #bccStepCustomer .bcc-cart {
         flex: 0 0 auto;

@@ -29,6 +29,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../includes/payment/bcc.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
 require_once __DIR__ . '/../includes/promo_codes.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 
 function json_response($data)
 {
@@ -43,6 +44,34 @@ function public_payment_setting(PDO $pdo, string $key, $default = null) {
 
 function public_payment_normalize_seats(array $seatsRaw, array $session): array
 {
+    if (general_admission_is_session($session)) {
+        $normalized = [];
+        $seen = [];
+        $capacity = (int)$session['capacity'];
+        $price = (float)($session['base_price'] ?? 0);
+        if ($price <= 0) {
+            throw new InvalidArgumentException('Цена билета для сеанса свободной рассадки не задана.');
+        }
+        foreach ($seatsRaw as $seatRaw) {
+            $rawIdentifier = is_array($seatRaw) ? (string)($seatRaw['identifier'] ?? '') : (string)$seatRaw;
+            $identifier = str_replace(':', '-', strtoupper(trim($rawIdentifier)));
+            $number = general_admission_identifier_number($identifier);
+            if ($number === null || $number > $capacity) {
+                throw new InvalidArgumentException('Выбрано место за пределами вместимости сеанса.');
+            }
+            if (isset($seen[$number])) {
+                throw new InvalidArgumentException('Одно и то же место выбрано несколько раз.');
+            }
+            $seen[$number] = true;
+            $normalized[] = [
+                'identifier' => general_admission_identifier($number),
+                'original_price' => round($price, 2),
+                'final_price' => round($price, 2),
+            ];
+        }
+        return $normalized;
+    }
+
     $seatMap = json_decode((string)($session['seat_map'] ?? ''), true);
     $hallSeatMap = json_decode((string)($session['hall_seatmap'] ?? ''), true);
     $layoutMap = is_array($seatMap) && !empty($seatMap['rows'])
@@ -291,7 +320,7 @@ switch ($action) {
                 $delHoldStmt->execute($params);
             }
 
-            $soldStmt = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status = 'issued'");
+            $soldStmt = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
             $soldStmt->execute($params);
             $sold = $soldStmt->fetchAll(PDO::FETCH_COLUMN, 0);
             if (!empty($sold)) {
@@ -328,6 +357,25 @@ switch ($action) {
 
         $pdo->beginTransaction();
         try {
+            if (general_admission_is_session($session)) {
+                $lockSchedule = $pdo->prepare('SELECT id FROM schedules WHERE id = :id FOR UPDATE');
+                $lockSchedule->execute([':id' => $session_id]);
+                if (!$lockSchedule->fetchColumn()) {
+                    throw new RuntimeException('Сеанс недоступен.');
+                }
+                $inventory = general_admission_inventory($pdo, $session_id);
+                foreach ($seat_keys as $seatKey) {
+                    $number = general_admission_identifier_number((string)$seatKey);
+                    if ($number === null || !empty($inventory['sold'][$number]) || !empty($inventory['held'][$number])) {
+                        throw new RuntimeException('Одно или несколько выбранных мест уже заняты. Обновите страницу и выберите места заново.');
+                    }
+                }
+                $occupied = $inventory['sold'] + $inventory['held'];
+                if (count($occupied) + count($seat_keys) > (int)$session['capacity']) {
+                    throw new RuntimeException('Свободных мест осталось меньше. Обновите страницу и выберите места заново.');
+                }
+            }
+
             $holdIns = $pdo->prepare("INSERT INTO cash_holds (session_id, seat_key, user_id, expires_at, meta) VALUES (:session_id, :seat_key, 0, :expires_at, :meta)");
             foreach ($seat_keys as $sk) {
                 $holdIns->execute([

@@ -18,7 +18,7 @@ $panel_actions = [
 $page_scripts = ['/assets/js/ticket_viewer.js',
                  '/assets/js/schedule-seating-canvas.js',
                  '/assets/js/legend-canvas.js',
-                 '/assets/js/cashier.js'];
+                 '/assets/js/cashier.js?v=' . filemtime(__DIR__ . '/../assets/js/cashier.js')];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
@@ -241,7 +241,7 @@ if ($totalSeats === null && !empty($session['seat_map'])) {
 // --- Получаем количество проданных билетов (status = 'issued') ---------------
 $soldCount = 0;
 try {
-    $q = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE schedule_id = :sid AND status = 'issued'");
+    $q = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE schedule_id = :sid AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
     $q->execute([':sid' => $session_id]);
     $soldCount = (int)$q->fetchColumn();
 } catch (Exception $e) {
@@ -263,7 +263,7 @@ if (!empty($prRaw)) {
 // --- Получаем список проданных билетов (для сопоставления с группами) ----------
 $soldTickets = [];
 try {
-    $q = $pdo->prepare("SELECT id, seat_id, seat_identifier FROM tickets WHERE schedule_id = :sid AND status = 'issued'");
+    $q = $pdo->prepare("SELECT id, seat_id, seat_identifier FROM tickets WHERE schedule_id = :sid AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
     $q->execute([':sid' => $session_id]);
     $soldTickets = $q->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
@@ -428,7 +428,7 @@ $jsSession = [
 ];
 ?>
 
-<link rel="stylesheet" href="/assets/css/cashier.css">
+<link rel="stylesheet" href="/assets/css/cashier.css?v=<?= h((string)filemtime(__DIR__ . '/../assets/css/cashier.css')) ?>">
 <link rel="stylesheet" href="/assets/css/actor_form.css">
 <link rel="stylesheet" href="/assets/css/seatmap.css">
 
@@ -534,6 +534,14 @@ $jsSession = [
 <!-- Схема рассадки (левая, широкая) -->
     <div class="profile-card" style="grid-column: 1 / 2;">
       <h3 class="card-title" style="margin-top:0;">Схема рассадки</h3>
+      <div id="cashGeneralAdmissionPanel" class="cash-general-admission" style="display:none;">
+        <div class="cash-general-admission__label">Свободная рассадка</div>
+        <h4>Количество мест</h4>
+        <p id="cashGeneralAdmissionAvailability">Загружаем доступность…</p>
+        <label for="cashGeneralAdmissionQuantity">Сколько билетов продать</label>
+        <input id="cashGeneralAdmissionQuantity" class="input" type="number" min="1" step="1" value="1" inputmode="numeric">
+        <small>Касса автоматически закрепит свободные номера мест.</small>
+      </div>
       <div id="seatmapContainer" style="position:relative; height:640px;">
         <canvas id="cash-seatmap" width="1200" height="800" style="width:100%; height:100%; border:1px solid #e6e6e6; background:#fff; display:block;"></canvas>
       </div>
@@ -771,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function(){
   if (typeof Cashier !== 'undefined' && typeof Cashier.initSell === 'function') {
     Cashier.initSell({
       csrf: csrfToken,
-      currentUserId: <?= json_encode((int)($_SESSION['user_id'] ?? 0), JSON_UNESCAPED_UNICODE) ?>,
+      currentUserId: <?= json_encode((int)($_SESSION['user']['id'] ?? 0), JSON_UNESCAPED_UNICODE) ?>,
       sessionId: sessionId,
       seatmapCanvasId: 'cash-seatmap',
       seatmapRenderer: null,

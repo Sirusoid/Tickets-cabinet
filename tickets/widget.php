@@ -59,7 +59,7 @@ $hide_admin_header = true;
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<link rel="stylesheet" href="/assets/css/bcc-payment-modal.css">
+<link rel="stylesheet" href="/assets/css/bcc-payment-modal.css?ver=<?= h((string)filemtime(__DIR__ . '/../assets/css/bcc-payment-modal.css')) ?>">
 <style>
     .widget-header {
         display: flex;
@@ -194,7 +194,7 @@ require_once __DIR__ . '/../includes/header.php';
             <!-- Step 1: Seat selection -->
             <div class="row bcc-step active" id="bccStepSeats">
                 <div class="col-md-8">
-                    <div class="seatmap-wrapper">
+                    <div id="bccSeatmapWrapper" class="seatmap-wrapper">
                         <div class="seatmap-zoom-controls">
                             <button type="button" id="bccZoomIn" aria-label="Увеличить">+</button>
                             <button type="button" id="bccResetZoom" aria-label="Сбросить">⟲</button>
@@ -202,6 +202,14 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <canvas id="bccSeatmapCanvas"></canvas>
                         <div id="bccLegend" class="legend-inline"></div>
+                    </div>
+                    <div id="bccGeneralAdmission" class="bcc-general-admission" style="display:none;">
+                        <span class="bcc-general-admission__eyebrow">Свободная рассадка</span>
+                        <h4>Выберите количество мест</h4>
+                        <p id="bccGeneralAdmissionAvailability">Загружаем доступность…</p>
+                        <label for="bccGeneralAdmissionQuantity">Количество билетов</label>
+                        <input id="bccGeneralAdmissionQuantity" class="bcc-form-input" type="number" min="1" step="1" value="1" inputmode="numeric">
+                        <div id="bccGeneralAdmissionTotal"></div>
                     </div>
                 </div>
                 <div class="col-md-4">

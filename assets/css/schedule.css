@@ -210,3 +210,52 @@
   border-color: #e74c3c !important;
   transition: box-shadow 160ms ease, border-color 160ms ease;
 }
+.schedule-capacity-panel[hidden] {
+  display: none;
+}
+
+#seatingEditor[hidden],
+#priceEditor[hidden] {
+  display: none !important;
+}
+
+.schedule-capacity-panel {
+  max-width: 560px;
+  margin: 8px 0 14px;
+  padding: 14px 16px;
+  border: 1px solid #dfe8df;
+  border-radius: 10px;
+  background: #f7faf6;
+}
+
+.schedule-capacity-panel > label {
+  display: block;
+  margin-bottom: 7px;
+  color: #33483b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedule-capacity-panel__control {
+  display: flex;
+  max-width: 250px;
+  align-items: center;
+  gap: 9px;
+}
+
+.schedule-capacity-panel__control input {
+  min-width: 0;
+}
+
+.schedule-capacity-panel__control > span {
+  color: #62736a;
+  font-size: 13px;
+}
+
+.schedule-capacity-panel > small {
+  display: block;
+  margin-top: 7px;
+  color: #718079;
+  font-size: 11px;
+  line-height: 1.45;
+}

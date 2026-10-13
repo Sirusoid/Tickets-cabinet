@@ -469,6 +469,7 @@ CREATE TABLE `schedules` (
   `id` int(10) UNSIGNED NOT NULL,
   `event_id` int(10) UNSIGNED NOT NULL,
   `hall_id` int(10) UNSIGNED NOT NULL,
+  `capacity` int(10) UNSIGNED DEFAULT NULL,
   `start_time` datetime NOT NULL,
   `end_time` datetime NOT NULL,
   `sales_start_time` datetime DEFAULT NULL,

@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/payment/bcc_refund.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 
 $order = isset($_GET['order']) ? trim((string)$_GET['order']) : '';
 $token = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
@@ -102,6 +103,11 @@ $formatPublicTime = static function ($datetime) {
 };
 
 $formatPublicSeat = static function ($identifier) {
+    $identifier = trim((string)$identifier);
+    $generalAdmissionNumber = general_admission_identifier_number($identifier);
+    if ($generalAdmissionNumber !== null) {
+        return ['row' => '', 'seat' => 'Свободное место № ' . $generalAdmissionNumber];
+    }
     $parts = preg_split('/\s*[-:\/]\s*/', trim((string)$identifier), 2);
     if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
         return ['row' => $parts[0], 'seat' => $parts[1]];

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/reporting.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 
 require_once __DIR__ . '/../includes/excel.php';
@@ -129,7 +130,7 @@ foreach ($rows as $row) {
         !empty($row['session_start']) ? reporting_format_date($row['session_start'], true) : '',
         (int)($row['schedule_id'] ?? 0),
         (string)($row['ticket_uid'] ?? ''),
-        str_replace(':', ' - ', (string)($row['seat_identifier'] ?? '')),
+        general_admission_display_label(str_replace(':', ' - ', (string)($row['seat_identifier'] ?? ''))),
         reporting_segment_label($row['customer_segment'] ?? ''),
         reporting_discount_label($row),
         $financials['original'],

@@ -18,7 +18,8 @@ if (!$session) {
 $page_scripts = $page_scripts ?? [];
 $page_scripts[] = '/assets/js/schedule-seating-canvas.js';
 $page_scripts[] = '/assets/js/session-price-editor.js';
-$page_scripts[] = '/assets/js/schedule.js';
+$page_scripts[] = '/assets/js/schedule.js?v=' . filemtime(__DIR__ . '/../assets/js/schedule.js');
+$page_scripts[] = '/assets/js/schedule-capacity.js?v=' . filemtime(__DIR__ . '/../assets/js/schedule-capacity.js');
 
 $halls = db_fetch_all('SELECT id, name FROM halls ORDER BY name');
 $events = db_fetch_all("SELECT id, title FROM events WHERE status = 'published' ORDER BY title");
@@ -74,10 +75,11 @@ function _fmt_local($val) {
 
 // Базовая цена — целое число
 $base_price_value = isset($session['base_price']) ? (int)$session['base_price'] : '';
+$capacity_value = isset($session['capacity']) ? (int)$session['capacity'] : '';
 
 ?>
 <link rel="stylesheet" href="/assets/css/forms.css">
-<link rel="stylesheet" href="/assets/css/schedule.css">
+<link rel="stylesheet" href="/assets/css/schedule.css?v=<?= h((string)filemtime(__DIR__ . '/../assets/css/schedule.css')) ?>">
 <link rel="stylesheet" href="/assets/css/seatmap.css">
 
 <div class="form-grid">
@@ -162,6 +164,15 @@ $base_price_value = isset($session['base_price']) ? (int)$session['base_price'] 
         </div>
       </div>
 
+      <section id="generalAdmissionSettings" class="schedule-capacity-panel" hidden>
+        <label for="schedule_capacity">Вместимость сеанса</label>
+        <div class="schedule-capacity-panel__control">
+          <input id="schedule_capacity" name="capacity" type="number" min="1" max="50000" step="1" class="form-control" value="<?= $capacity_value > 0 ? h($capacity_value) : '' ?>" placeholder="Например, 120">
+          <span>мест</span>
+        </div>
+        <small>Для зала без схемы рассадки. Места будут автоматически пронумерованы и распределены между онлайн-кассой и кассой театра.</small>
+      </section>
+
       <small style="color:#666; display:block; margin-bottom:6px;">Если оставить статус пустым, он будет вычислен автоматически.</small>
 
       <input type="hidden" id="seat_map" name="seat_map" value='<?= h($seat_map_value) ?>' />
@@ -169,7 +180,7 @@ $base_price_value = isset($session['base_price']) ? (int)$session['base_price'] 
     </form>
   </div>
 
-  <div class="form-block" style="padding:0 16px 16px 16px;">
+  <div id="seatingEditor" class="form-block" style="padding:0 16px 16px 16px;">
     <h2 style="margin:12px 0 8px 0;">Визуальное редактирование цен</h2>
 
     <section style="width:1350px; max-width:100%; box-sizing:border-box;">
@@ -196,7 +207,7 @@ $base_price_value = isset($session['base_price']) ? (int)$session['base_price'] 
     </div>
   </div>
 
-  <div class="form-block" style="padding:12px 16px;">
+  <div id="priceEditor" class="form-block" style="padding:12px 16px;">
     <div style="width:1228px; max-width:100%; box-sizing:border-box; border:1px solid #e6e6e6; padding:12px; background:#fff;">
       <div style="display:flex; gap:12px; align-items:center; width:100%; flex-wrap:wrap;">
         <div style="display:flex; gap:8px; align-items:center; flex:1; min-width:220px;">
