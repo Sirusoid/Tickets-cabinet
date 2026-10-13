@@ -140,6 +140,12 @@ foreach ($sessions as $session) {
             . '</div></a></div>';
     }
 
+    $hallEsc = htmlspecialchars($hall, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $hallLine = $hall !== ''
+        ? '<div class="zhassahna-hall" style="color:#b7bcc4;font-size:15px;font-weight:500;font-family:TildaSans,Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;line-height:1.3;text-align:center;padding:8px 10px 0;">' . $hallEsc . '</div>'
+        : '';
+    $titlePadTop = $hall !== '' ? '14px' : '20px';
+
     $html .= '
     <div class="t774__col t-col t-col_3 t-align_center t-item" style="margin-bottom:1.5%; margin-top:1.5%; position:relative;">
         <div class="t774__wrapper repertuar-button-buy" role="presentation" style="background-color:#393e46;border-radius:30px;box-shadow:0 0 30px rgba(0,0,0,0.1); position:relative; overflow:hidden;">
@@ -154,8 +160,8 @@ foreach ($sessions as $session) {
                         <div class="t774__uptitle" style="color:#eeeeee;font-size:22px;font-weight:700;font-family:TildaSans,Arial,sans-serif;text-transform:uppercase;text-align:center;">
                             ' . htmlspecialchars($day . ' ' . $month, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '<br>' . htmlspecialchars($time, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '
                         </div>
-
-                        <div class="t774__title" style="color:#eeeeee;font-size:25px;font-family:TildaSans,Arial,sans-serif;text-transform:uppercase;padding:20px 10px 0;text-align:center;">
+                        ' . $hallLine . '
+                        <div class="t774__title" style="color:#eeeeee;font-size:25px;font-family:TildaSans,Arial,sans-serif;text-transform:uppercase;padding:' . $titlePadTop . ' 10px 0;text-align:center;">
                             ' . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '
                         </div>
                     </div>

@@ -22,11 +22,13 @@ if ($order === '' || $token === '' || !ticket_public_token_verify($order, $token
 } elseif (!isset($pdo) || !($pdo instanceof PDO)) {
     $error = 'Ошибка подключения к базе данных.';
 } else {
-    $stmt = $pdo->prepare("SELECT ps.*, e.title AS event_title, s.start_time AS schedule_start, h.name AS hall_name
+    $stmt = $pdo->prepare("SELECT ps.*, e.title AS event_title, s.start_time AS schedule_start,
+            COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h.name), '')) AS hall_name
         FROM payment_sessions ps
         LEFT JOIN events e ON e.id = ps.event_id
         LEFT JOIN schedules s ON s.id = ps.session_id
         LEFT JOIN halls h ON h.id = ps.hall_id
+        LEFT JOIN halls h_schedule ON h_schedule.id = s.hall_id
         WHERE ps.order_number = :order LIMIT 1");
     $stmt->execute([':order' => $order]);
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -45,11 +47,12 @@ if (!$error && $session && $pdo instanceof PDO) {
                         t.status, t.payment_status, t.refund_status, t.refund_at, t.purchased_at,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS schedule_start,
-                        h.name AS hall_name
+                        COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h.name), '')) AS hall_name
                     FROM tickets t
                     LEFT JOIN events e ON e.id = t.event_id
                     LEFT JOIN schedules s ON s.id = t.schedule_id
                     LEFT JOIN halls h ON h.id = t.hall_id
+                    LEFT JOIN halls h_schedule ON h_schedule.id = s.hall_id
                     WHERE t.ticket_uid IN ($placeholders)
                     ORDER BY t.id ASC");
             $stmt->execute($uids);
@@ -265,6 +268,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="ticket-card-info">
                                     <div style="font-size:15px; font-weight:700; margin-bottom:4px;">Билет № / Билет № <?= h($uid) ?></div>
                                     <div style="color:#4b5563;">
+                                        <?php if (!empty($ticket['hall_name'])): ?><strong>Зал: <?= h($ticket['hall_name']) ?></strong><br><?php endif; ?>
                                         <?php if ($publicSeat['row'] !== ''): ?><strong>Ряд: <?= h($publicSeat['row']) ?></strong><br><?php endif; ?>
                                         <strong>Место: <?= h($publicSeat['seat']) ?></strong>
                                     </div>

@@ -903,7 +903,7 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
 
         try {
             $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
-                COALESCE(NULLIF(TRIM(h_ticket.name), ''), NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h_event.name), '')) AS hall_name,
+                COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h_ticket.name), ''), NULLIF(TRIM(h_event.name), '')) AS hall_name,
                 e.title AS event_title, c.full_name AS customer_name
                 FROM tickets t
                 LEFT JOIN schedules s ON s.id = t.schedule_id
