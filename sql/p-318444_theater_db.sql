@@ -431,6 +431,7 @@ CREATE TABLE `promo_codes` (
   `code` varchar(12) NOT NULL,
   `discount_type` enum('percent','fixed') NOT NULL,
   `discount_value` decimal(10,2) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_by` int(10) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),

@@ -15,6 +15,16 @@ $migrationRequired = false;
 $csrfToken = (string)($_SESSION['csrf_token'] ?? '');
 $sessions = [];
 $promoBaseUrl = rtrim((string)(defined('BASE_URL') ? BASE_URL : ''), '/') . '/tickets/widget.php';
+$hasDescriptionColumn = promo_has_description_column($pdo, true);
+
+function promo_read_description(): ?string
+{
+    $description = trim((string)preg_replace('/\s+/u', ' ', (string)($_POST['description'] ?? '')));
+    if (mb_strlen($description, 'UTF-8') > 255) {
+        throw new InvalidArgumentException('Описание не должно быть длиннее 255 символов.');
+    }
+    return $description === '' ? null : $description;
+}
 
 function promo_generate_code(PDO $pdo): string
 {
@@ -40,7 +50,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $action = trim((string)($_POST['action'] ?? ''));
-            if ($action === 'create') {
+            if ($action === 'toggle_feature') {
+                $enable = (string)($_POST['enabled'] ?? '') === '1';
+                if (!promo_set_feature_enabled($pdo, $enable)) {
+                    throw new RuntimeException('Не удалось сохранить настройку промокодов.');
+                }
+                $success = $enable
+                    ? 'Промокоды включены: покупатели снова могут вводить код при оплате.'
+                    : 'Промокоды выключены: поле ввода скрыто, скидки не применяются. Созданные коды сохранены.';
+            } elseif ($action === 'create') {
                 $code = promo_normalize_code((string)($_POST['code'] ?? ''));
                 if ($code === '') {
                     $code = promo_generate_code($pdo);
@@ -60,13 +78,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         : 'Укажите сумму скидки больше 0 тенге.');
                 }
 
-                $insert = $pdo->prepare('INSERT INTO promo_codes (code, discount_type, discount_value, created_by) VALUES (:code, :type, :value, :created_by)');
-                $insert->execute([
-                    ':code' => $code,
-                    ':type' => $type,
-                    ':value' => number_format((float)$value, 2, '.', ''),
-                    ':created_by' => (int)($_SESSION['user']['id'] ?? 0) ?: null,
-                ]);
+                $description = promo_read_description();
+                if ($description !== null && !$hasDescriptionColumn) {
+                    throw new InvalidArgumentException('Поле описания ещё не создано в базе. Выполните sql/migration_promo_description.sql.');
+                }
+
+                $fields = [
+                    'code' => $code,
+                    'discount_type' => $type,
+                    'discount_value' => number_format((float)$value, 2, '.', ''),
+                    'created_by' => (int)($_SESSION['user']['id'] ?? 0) ?: null,
+                ];
+                if ($hasDescriptionColumn) {
+                    $fields['description'] = $description;
+                }
+                $params = [];
+                foreach ($fields as $column => $fieldValue) {
+                    $params[':' . $column] = $fieldValue;
+                }
+                $insert = $pdo->prepare('INSERT INTO promo_codes (' . implode(', ', array_keys($fields)) . ') VALUES (' . implode(', ', array_keys($params)) . ')');
+                $insert->execute($params);
                 $success = 'Промокод ' . $code . ' создан.';
             } elseif ($action === 'update') {
                 $promoId = filter_var($_POST['promo_id'] ?? '', FILTER_VALIDATE_INT);
@@ -99,13 +130,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $update = $pdo->prepare('UPDATE promo_codes SET code = :code, discount_type = :type, discount_value = :value WHERE id = :id');
-                $update->execute([
+                $description = promo_read_description();
+                if ($description !== null && !$hasDescriptionColumn) {
+                    throw new InvalidArgumentException('Поле описания ещё не создано в базе. Выполните sql/migration_promo_description.sql.');
+                }
+                $updateSql = 'UPDATE promo_codes SET code = :code, discount_type = :type, discount_value = :value'
+                    . ($hasDescriptionColumn ? ', description = :description' : '')
+                    . ' WHERE id = :id';
+                $updateParams = [
                     ':code' => $code,
                     ':type' => $type,
                     ':value' => number_format((float)$value, 2, '.', ''),
                     ':id' => $promoId,
-                ]);
+                ];
+                if ($hasDescriptionColumn) {
+                    $updateParams[':description'] = $description;
+                }
+                $update = $pdo->prepare($updateSql);
+                $update->execute($updateParams);
                 $success = 'Промокод ' . $code . ' обновлён.';
             } elseif ($action === 'toggle') {
                 $promoId = filter_var($_POST['promo_id'] ?? '', FILTER_VALIDATE_INT);
@@ -162,12 +204,17 @@ if (!$migrationRequired) {
              ORDER BY s.start_time ASC
              LIMIT 100"
         );
+        $descriptionSelect = $hasDescriptionColumn ? 'p.description' : 'NULL AS description';
         $promos = db_fetch_all(
-            "SELECT p.id, p.code, p.discount_type, p.discount_value, p.is_active, p.created_at,
-                    COUNT(DISTINCT t.payment_session_id) AS used_count
+            "SELECT p.id, p.code, p.discount_type, p.discount_value, {$descriptionSelect}, p.is_active, p.created_at,
+                    COALESCE(u.used_count, 0) AS used_count
              FROM promo_codes p
-             LEFT JOIN tickets t ON t.promo_code = p.code
-             GROUP BY p.id, p.code, p.discount_type, p.discount_value, p.is_active, p.created_at
+             LEFT JOIN (
+                 SELECT promo_code, COUNT(DISTINCT payment_session_id) AS used_count
+                 FROM tickets
+                 WHERE promo_code IS NOT NULL
+                 GROUP BY promo_code
+             ) u ON u.promo_code = p.code
              ORDER BY p.created_at DESC, p.id DESC"
         );
     } catch (Throwable $exception) {
@@ -181,6 +228,7 @@ if (!$migrationRequired) {
     }
 }
 
+$promoFeatureEnabled = promo_feature_enabled($pdo);
 $use_sidebar = true;
 $active_menu = 'promo_codes';
 $page_title_meta = 'Промокоды';
@@ -194,6 +242,26 @@ require_once __DIR__ . '/includes/panel.php';
 <div class="promo-page page container-full">
     <?php if ($success !== ''): ?><div class="alert settings-alert settings-alert--success"><?= h($success) ?></div><?php endif; ?>
     <?php if ($error !== ''): ?><div class="alert alert--danger"><?= h($error) ?></div><?php endif; ?>
+    <?php if (!$hasDescriptionColumn && !$migrationRequired): ?>
+        <div class="alert alert--warning">Описание промокода станет доступно после выполнения <code>sql/migration_promo_description.sql</code> на рабочей базе.</div>
+    <?php endif; ?>
+
+    <section class="promo-feature card<?= $promoFeatureEnabled ? ' is-on' : '' ?>">
+        <div class="promo-feature__text">
+            <span class="promo-eyebrow">Онлайн-покупка</span>
+            <h2>Приём промокодов на сайте</h2>
+            <p><?= $promoFeatureEnabled
+                ? 'Покупатели видят необязательное поле промокода на шаге оплаты, скидка пересчитывает итоговую сумму.'
+                : 'Поле промокода скрыто, скидки не применяются. Созданные коды сохранены и вернутся после включения.' ?></p>
+        </div>
+        <form method="post" class="promo-feature__form">
+            <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>">
+            <input type="hidden" name="action" value="toggle_feature">
+            <input type="hidden" name="enabled" value="<?= $promoFeatureEnabled ? '0' : '1' ?>">
+            <span class="promo-feature__state"><?= $promoFeatureEnabled ? 'Включено' : 'Выключено' ?></span>
+            <button type="submit" class="promo-switch<?= $promoFeatureEnabled ? ' is-on' : '' ?>" role="switch" aria-checked="<?= $promoFeatureEnabled ? 'true' : 'false' ?>" aria-label="Приём промокодов при онлайн-покупке" <?= $migrationRequired ? 'disabled' : '' ?>><span></span></button>
+        </form>
+    </section>
 
     <section class="promo-create card" id="promo-editor">
         <div class="promo-section-heading">
@@ -207,7 +275,7 @@ require_once __DIR__ . '/includes/panel.php';
             <label class="promo-field promo-field--code">
                 <span>Короткий код</span>
                 <div class="promo-code-input">
-                    <input id="promo-code-value" name="code" type="text" maxlength="12" pattern="[A-Za-z0-9]{4,12}" placeholder="Сгенерировать автоматически" autocomplete="off">
+                    <input id="promo-code-value" name="code" type="text" maxlength="12" pattern="[A-Za-z0-9]{4,12}" placeholder="Автоматически" autocomplete="off">
                     <button id="promo-generate" type="button" class="btn btn-ghost">Создать код</button>
                 </div>
                 <small>4–12 латинских букв или цифр, без пробелов</small>
@@ -226,6 +294,11 @@ require_once __DIR__ . '/includes/panel.php';
                     <span id="promo-discount-suffix">%</span>
                 </div>
                 <small id="promo-discount-hint">Не более 100% от суммы заказа</small>
+            </label>
+            <label class="promo-field promo-field--description">
+                <span>Описание <em>(необязательно)</em></span>
+                <input id="promo-description" name="description" type="text" maxlength="255" autocomplete="off" placeholder="Например: скидка для подписчиков Instagram" <?= $hasDescriptionColumn ? '' : 'disabled' ?>>
+                <small>Покупатель увидит текст после применения кода</small>
             </label>
             <div class="promo-form-actions">
                 <button type="submit" id="promo-submit" class="btn btn-primary promo-submit" <?= $migrationRequired ? 'disabled' : '' ?>>Сохранить промокод</button>
@@ -265,12 +338,18 @@ require_once __DIR__ . '/includes/panel.php';
                         ?>
                         <tr class="promo-row" data-id="<?= (int)$promo['id'] ?>" data-code="<?= h($promo['code']) ?>"
                             data-type="<?= h($promo['discount_type']) ?>" data-value="<?= h((string)$promo['discount_value']) ?>"
+                            data-description="<?= h((string)($promo['description'] ?? '')) ?>"
                             data-used="<?= (int)$promo['used_count'] ?>">
                             <td>
                                 <code class="promo-code-badge"><?= h($promo['code']) ?></code>
                                 <button type="button" class="promo-icon-button promo-copy-code" aria-label="Копировать промокод" title="Копировать промокод" data-code="<?= h($promo['code']) ?>">⧉</button>
                             </td>
-                            <td><?= h($discountLabel) ?></td>
+                            <td>
+                                <?= h($discountLabel) ?>
+                                <?php if (trim((string)($promo['description'] ?? '')) !== ''): ?>
+                                    <small class="promo-table-description"><?= h((string)$promo['description']) ?></small>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <strong><?= number_format((int)$promo['used_count'], 0, '.', ' ') ?></strong>
                                 <small class="promo-table-note">оплаченных заказов</small>
@@ -311,6 +390,7 @@ require_once __DIR__ . '/includes/panel.php';
     var suffix = document.getElementById('promo-discount-suffix');
     var hint = document.getElementById('promo-discount-hint');
     var amount = document.getElementById('promo-discount-value');
+    var description = document.getElementById('promo-description');
     var code = document.getElementById('promo-code-value');
     var formAction = document.getElementById('promo-form-action');
     var formId = document.getElementById('promo-form-id');
@@ -376,6 +456,7 @@ require_once __DIR__ . '/includes/panel.php';
         code.readOnly = false;
         code.value = '';
         amount.value = '';
+        description.value = '';
         type.value = 'percent';
         cancelButton.hidden = true;
         updateType();
@@ -405,6 +486,7 @@ require_once __DIR__ . '/includes/panel.php';
             code.readOnly = Number(row.dataset.used) > 0;
             type.value = row.dataset.type;
             amount.value = row.dataset.value;
+            description.value = row.dataset.description || '';
             formTitle.textContent = 'Изменить промокод';
             formEyebrow.textContent = 'Редактирование акции';
             submitButton.textContent = 'Сохранить изменения';

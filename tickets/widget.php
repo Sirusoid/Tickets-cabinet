@@ -5,6 +5,7 @@
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/payment/bcc.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
+require_once __DIR__ . '/../includes/promo_codes.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     @session_start();
@@ -35,7 +36,8 @@ $enabled = bcc_is_enabled($pdo);
 
 $session_id = isset($_GET['session_id']) ? (int)$_GET['session_id'] : 0;
 $initialPromoCode = strtoupper(trim((string)($_GET['promo_code'] ?? '')));
-if (!preg_match('/^[A-Z0-9]{4,12}$/', $initialPromoCode)) {
+$promoEnabled = promo_feature_enabled($pdo);
+if (!$promoEnabled || !preg_match('/^[A-Z0-9]{4,12}$/', $initialPromoCode)) {
     $initialPromoCode = '';
 }
 $openSession = null;
@@ -268,14 +270,34 @@ require_once __DIR__ . '/../includes/header.php';
                         <div id="bccCustomerCartList"></div>
                     </div>
 
+                    <?php if ($promoEnabled): ?>
                     <div class="bcc-promo-box">
-                        <label for="bccPromoCode">Промокод</label>
+                        <label for="bccPromoCode">Промокод <span class="bcc-promo-box__optional">необязательно</span></label>
                         <div class="bcc-promo-box__row">
-                            <input type="text" class="bcc-form-input" id="bccPromoCode" maxlength="12" autocomplete="off" placeholder="Введите короткий код">
+                            <input type="text" class="bcc-form-input" id="bccPromoCode" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Введите код, если он есть">
                             <button type="button" class="bcc-btn-secondary" id="bccApplyPromoBtn">Применить</button>
                         </div>
                         <div id="bccPromoStatus" class="bcc-promo-status" aria-live="polite"></div>
-                        <div id="bccPromoSummary" class="bcc-promo-summary" style="display:none;"></div>
+                        <div id="bccPromoInfo" class="bcc-promo-info" style="display:none;">
+                            <strong id="bccPromoInfoTitle"></strong>
+                            <span id="bccPromoInfoText"></span>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <div class="bcc-order-summary" id="bccOrderSummary" aria-live="polite">
+                        <div class="bcc-order-summary__row">
+                            <span>Билеты: <span id="bccSummaryCount">0</span></span>
+                            <strong id="bccSummarySubtotal">0 ₸</strong>
+                        </div>
+                        <div class="bcc-order-summary__row bcc-order-summary__row--discount" id="bccSummaryDiscountRow" style="display:none;">
+                            <span id="bccSummaryDiscountLabel">Скидка по промокоду</span>
+                            <strong id="bccSummaryDiscount">−0 ₸</strong>
+                        </div>
+                        <div class="bcc-order-summary__total">
+                            <span>Итого к оплате</span>
+                            <strong id="bccSummaryTotal">0 ₸</strong>
+                        </div>
                     </div>
 
                     <button type="button" class="bcc-btn-buy w-100" id="bccPayBtn" disabled>Перейти к оплате</button>

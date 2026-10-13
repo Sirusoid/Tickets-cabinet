@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
     code VARCHAR(12) NOT NULL,
     discount_type ENUM('percent', 'fixed') NOT NULL,
     discount_value DECIMAL(10,2) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_by INT UNSIGNED DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

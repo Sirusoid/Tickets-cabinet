@@ -227,6 +227,9 @@ switch ($action) {
             json_response([
                 'success' => true,
                 'code' => $applied['promo']['code'],
+                'description' => trim((string)($applied['promo']['description'] ?? '')),
+                'discount_type' => (string)$applied['promo']['discount_type'],
+                'discount_label' => promo_discount_label($applied['promo']),
                 'discount_cents' => $applied['discount_cents'],
                 'subtotal_cents' => $subtotalCents,
                 'total_cents' => $subtotalCents - $applied['discount_cents'],
@@ -343,7 +346,7 @@ switch ($action) {
                 $appliedPromo = promo_apply_to_seats($pdo, $promoCode, $seats);
                 $seats = $appliedPromo['seats'];
             } catch (InvalidArgumentException $exception) {
-                json_response(['success' => false, 'message' => $exception->getMessage()]);
+                json_response(['success' => false, 'promo_error' => true, 'message' => $exception->getMessage()]);
             }
         }
 
