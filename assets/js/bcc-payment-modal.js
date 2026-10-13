@@ -33,6 +33,7 @@
     const summaryDiscountLabel = document.getElementById('bccSummaryDiscountLabel');
     const summaryDiscount = document.getElementById('bccSummaryDiscount');
     const summaryTotal = document.getElementById('bccSummaryTotal');
+    const orderSummary = document.getElementById('bccOrderSummary');
     const seatmapWrapper = document.getElementById('bccSeatmapWrapper');
     const generalAdmissionPanel = document.getElementById('bccGeneralAdmission');
     const generalAdmissionAvailability = document.getElementById('bccGeneralAdmissionAvailability');
@@ -428,6 +429,7 @@
                 stepCustomer.style.display = 'flex';
             }
             if (totalBar) totalBar.style.display = 'none';
+            if (stepCustomer) stepCustomer.scrollTop = 0;
             renderCustomerCart();
             renderOrderSummary();
             if (promoInput && getEnteredPromoCode() && !appliedPromoCode) {
@@ -452,6 +454,7 @@
         const discount = appliedPromoCode ? Math.min(subtotal, appliedPromoDiscountCents / 100) : 0;
         summaryCount.textContent = String(selectedSeats.length);
         summarySubtotal.textContent = formatMoney(subtotal) + ' ' + cfg.currencySymbol;
+        if (orderSummary) orderSummary.style.display = discount > 0 ? '' : 'none';
         if (summaryDiscountRow) summaryDiscountRow.style.display = discount > 0 ? '' : 'none';
         if (discount > 0) {
             summaryDiscountLabel.textContent = 'Скидка по промокоду ' + appliedPromoCode;

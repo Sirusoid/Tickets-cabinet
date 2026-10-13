@@ -233,75 +233,83 @@ require_once __DIR__ . '/../includes/header.php';
 
             <!-- Step 2: Customer details -->
             <div class="row bcc-step" id="bccStepCustomer" style="display: none;">
-                <div class="col-md-8" style="max-width: 600px; margin: 0 auto; padding-top: 16px;">
-                    <div class="bcc-step-header">
+                <div class="col-md-8 bcc-checkout">
+                    <div class="bcc-checkout__head">
                         <button type="button" class="bcc-step-back" id="bccBackToSeats">← Назад к выбору мест</button>
-                    </div>
-                    <h2 class="bcc-step-title">Контактные данные</h2>
-                    <p style="color:#6b7280; margin-bottom: 20px;">Введите данные для получения билетов.</p>
-
-                    <div class="bcc-customer-form">
-                        <div class="bcc-form-group">
-                            <label class="bcc-form-label" for="bccCustomerName">Имя <span style="color:#ef4444;">*</span></label>
-                            <input type="text" class="bcc-form-input" id="bccCustomerName" placeholder="Введите имя" required>
-                        </div>
-                        <div class="bcc-form-group">
-                            <label class="bcc-form-label" for="bccCustomerPhone">Телефон <span style="color:#ef4444;">*</span></label>
-                            <input type="tel" class="bcc-form-input" id="bccCustomerPhone" placeholder="+7 (XXX) XXX-XX-XX" required>
-                        </div>
-                        <div class="bcc-form-group">
-                            <label class="bcc-form-label" for="bccCustomerEmail">Email <span style="color:#ef4444;">*</span></label>
-                            <input type="email" class="bcc-form-input" id="bccCustomerEmail" placeholder="email@example.com" required>
-                         </div>
-                         <div class="bcc-form-group">
-                             <label class="bcc-form-label">
-                                 <input type="checkbox" id="bccConsentData" /> Я согласен(на) с <a href="https://zhassahna.kz/personal-policy" target="_blank" rel="noopener">обработкой персональных данных</a>
-                             </label>
-                         </div>
-                         <div class="bcc-form-group">
-                             <label class="bcc-form-label">
-                                 <input type="checkbox" id="bccConsentPayment" /> Я принимаю <a href="https://zhassahna.kz/payment-agreement" target="_blank" rel="noopener">правила онлайн‑платежей и возврата</a>
-                             </label>
-                         </div>
-                     </div>
-
-                    <div class="bcc-cart" style="margin-bottom: 16px;">
-                        <h6>Ваши билеты</h6>
-                        <div id="bccCustomerCartList"></div>
+                        <h2 class="bcc-step-title">Контактные данные</h2>
+                        <p class="bcc-checkout__lead">Введите данные для получения билетов.</p>
                     </div>
 
-                    <?php if ($promoEnabled): ?>
-                    <div class="bcc-promo-box">
-                        <label for="bccPromoCode">Промокод <span class="bcc-promo-box__optional">необязательно</span></label>
-                        <div class="bcc-promo-box__row">
-                            <input type="text" class="bcc-form-input" id="bccPromoCode" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Введите код, если он есть">
-                            <button type="button" class="bcc-btn-secondary" id="bccApplyPromoBtn">Применить</button>
+                    <div class="bcc-checkout__grid">
+                        <div class="bcc-checkout__col">
+                            <div class="bcc-customer-form">
+                                <div class="bcc-form-group">
+                                    <label class="bcc-form-label" for="bccCustomerName">Имя <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" class="bcc-form-input" id="bccCustomerName" placeholder="Введите имя" required>
+                                </div>
+                                <div class="bcc-form-group">
+                                    <label class="bcc-form-label" for="bccCustomerPhone">Телефон <span style="color:#ef4444;">*</span></label>
+                                    <input type="tel" class="bcc-form-input" id="bccCustomerPhone" placeholder="+7 (XXX) XXX-XX-XX" required>
+                                </div>
+                                <div class="bcc-form-group">
+                                    <label class="bcc-form-label" for="bccCustomerEmail">Email <span style="color:#ef4444;">*</span></label>
+                                    <input type="email" class="bcc-form-input" id="bccCustomerEmail" placeholder="email@example.com" required>
+                                </div>
+                                <div class="bcc-form-group bcc-form-group--consent">
+                                    <label class="bcc-form-label">
+                                        <input type="checkbox" id="bccConsentData" /> Я согласен(на) с <a href="https://zhassahna.kz/personal-policy" target="_blank" rel="noopener">обработкой персональных данных</a>
+                                    </label>
+                                </div>
+                                <div class="bcc-form-group bcc-form-group--consent">
+                                    <label class="bcc-form-label">
+                                        <input type="checkbox" id="bccConsentPayment" /> Я принимаю <a href="https://zhassahna.kz/payment-agreement" target="_blank" rel="noopener">правила онлайн‑платежей и возврата</a>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div id="bccPromoStatus" class="bcc-promo-status" aria-live="polite"></div>
-                        <div id="bccPromoInfo" class="bcc-promo-info" style="display:none;">
-                            <strong id="bccPromoInfoTitle"></strong>
-                            <span id="bccPromoInfoText"></span>
+
+                        <div class="bcc-checkout__col">
+                            <div class="bcc-cart">
+                                <h6>Ваши билеты</h6>
+                                <div id="bccCustomerCartList"></div>
+                            </div>
+
+                            <?php if ($promoEnabled): ?>
+                            <div class="bcc-promo-box">
+                                <label for="bccPromoCode">Промокод <span class="bcc-promo-box__optional">необязательно</span></label>
+                                <div class="bcc-promo-box__row">
+                                    <input type="text" class="bcc-form-input" id="bccPromoCode" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Введите код, если он есть">
+                                    <button type="button" class="bcc-btn-secondary" id="bccApplyPromoBtn">Применить</button>
+                                </div>
+                                <div id="bccPromoStatus" class="bcc-promo-status" aria-live="polite"></div>
+                                <div id="bccPromoInfo" class="bcc-promo-info" style="display:none;">
+                                    <strong id="bccPromoInfoTitle"></strong>
+                                    <span id="bccPromoInfoText"></span>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <div class="bcc-order-summary" id="bccOrderSummary" style="display:none;" aria-live="polite">
+                                <div class="bcc-order-summary__row">
+                                    <span>Билеты: <span id="bccSummaryCount">0</span></span>
+                                    <strong id="bccSummarySubtotal">0 ₸</strong>
+                                </div>
+                                <div class="bcc-order-summary__row bcc-order-summary__row--discount" id="bccSummaryDiscountRow" style="display:none;">
+                                    <span id="bccSummaryDiscountLabel">Скидка по промокоду</span>
+                                    <strong id="bccSummaryDiscount">−0 ₸</strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <?php endif; ?>
 
-                    <div class="bcc-order-summary" id="bccOrderSummary" aria-live="polite">
-                        <div class="bcc-order-summary__row">
-                            <span>Билеты: <span id="bccSummaryCount">0</span></span>
-                            <strong id="bccSummarySubtotal">0 ₸</strong>
-                        </div>
-                        <div class="bcc-order-summary__row bcc-order-summary__row--discount" id="bccSummaryDiscountRow" style="display:none;">
-                            <span id="bccSummaryDiscountLabel">Скидка по промокоду</span>
-                            <strong id="bccSummaryDiscount">−0 ₸</strong>
-                        </div>
-                        <div class="bcc-order-summary__total">
+                    <div class="bcc-checkout__footer">
+                        <div id="bccError" class="alert alert-danger small" style="display:none;"></div>
+                        <div class="bcc-checkout__total" aria-live="polite">
                             <span>Итого к оплате</span>
                             <strong id="bccSummaryTotal">0 ₸</strong>
                         </div>
+                        <button type="button" class="bcc-btn-buy" id="bccPayBtn" disabled>Перейти к оплате</button>
                     </div>
-
-                    <button type="button" class="bcc-btn-buy w-100" id="bccPayBtn" disabled>Перейти к оплате</button>
-                    <div id="bccError" class="alert alert-danger mt-3 small" style="display:none;"></div>
                     <div id="bccDebugOutput" class="bcc-debug-output mt-3 small" style="display:none;"></div>
                 </div>
             </div>
