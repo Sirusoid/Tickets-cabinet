@@ -34,8 +34,21 @@ function check_csrf($token) {
 
 function compact_json_encode($data) {
     $s = json_encode($data, JSON_UNESCAPED_UNICODE);
-    if ($s === false) return '';
+    if ($s === false) return null;
     return $s;
+}
+
+// Колонки с CHECK (json_valid(...)) не принимают пустую строку: пустое значение сохраняем как NULL.
+function schedule_json_or_null($raw): ?string
+{
+    if ($raw === null) return null;
+    $raw = trim((string)$raw);
+    if ($raw === '') return null;
+    json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        json_resp(false, 'Неверный формат price_ranges JSON');
+    }
+    return $raw;
 }
 
 function schedule_hall_has_seating(PDO $pdo, int $hallId): bool
@@ -137,7 +150,7 @@ if ($action === 'create') {
     }
 
     $seat_map_raw = $_POST['seat_map'] ?? '';
-    $seat_map_compact = '';
+    $seat_map_compact = null;
     if ($seat_map_raw !== '') {
         $decoded = json_decode($seat_map_raw, true);
         if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
@@ -147,7 +160,7 @@ if ($action === 'create') {
         }
     }
 
-    $price_ranges_raw = $_POST['price_ranges'] ?? '';
+    $price_ranges_raw = schedule_json_or_null($_POST['price_ranges'] ?? '');
 
     $notes = $_POST['notes'] ?? '';
     $base_price = (isset($_POST['base_price']) && $_POST['base_price'] !== '') ? (int)$_POST['base_price'] : null;
@@ -165,7 +178,7 @@ if ($action === 'create') {
 
         $capacity = schedule_capacity_for_save($pdo, $hall_id, $_POST);
         if ($capacity !== null) {
-            $seat_map_compact = '';
+            $seat_map_compact = null;
             $price_ranges_raw = null;
         }
 
@@ -227,7 +240,7 @@ if ($action === 'update') {
     }
 
     $seat_map_raw = $_POST['seat_map'] ?? '';
-    $seat_map_compact = '';
+    $seat_map_compact = null;
     if ($seat_map_raw !== '') {
         $decoded = json_decode($seat_map_raw, true);
         if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
@@ -237,7 +250,7 @@ if ($action === 'update') {
         }
     }
 
-    $price_ranges_raw = $_POST['price_ranges'] ?? '';
+    $price_ranges_raw = schedule_json_or_null($_POST['price_ranges'] ?? '');
     $notes = $_POST['notes'] ?? '';
     $base_price = (isset($_POST['base_price']) && $_POST['base_price'] !== '') ? (int)$_POST['base_price'] : null;
     $status = $_POST['status'] ?? null;
@@ -258,7 +271,7 @@ if ($action === 'update') {
         }
         $capacity = schedule_capacity_for_save($pdo, $hall_id, $_POST, $id);
         if ($capacity !== null) {
-            $seat_map_compact = '';
+            $seat_map_compact = null;
             $price_ranges_raw = null;
         }
 
