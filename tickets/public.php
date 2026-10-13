@@ -106,7 +106,7 @@ $formatPublicSeat = static function ($identifier) {
     $identifier = trim((string)$identifier);
     $generalAdmissionNumber = general_admission_identifier_number($identifier);
     if ($generalAdmissionNumber !== null) {
-        return ['row' => '', 'seat' => 'Свободное место № ' . $generalAdmissionNumber];
+        return ['row' => general_admission_ticket_label(), 'seat' => general_admission_ticket_label()];
     }
     $parts = preg_split('/\s*[-:\/]\s*/', trim((string)$identifier), 2);
     if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {

@@ -5,6 +5,8 @@ if (!function_exists('settings_get_value') && file_exists(__DIR__ . '/settings_m
     require_once __DIR__ . '/settings_manager.php';
 }
 
+require_once __DIR__ . '/general_admission.php';
+
 if (!function_exists('order_email_settings')) {
     function order_email_settings(?PDO $pdo = null): array
     {
@@ -293,7 +295,10 @@ if (!function_exists('order_email_build_order_message')) {
 
         $ticketRows = '';
         foreach ($orderData['tickets'] as $index => $ticket) {
-            $seat = order_email_escape(str_replace([':', '-'], [' / ', ' / '], (string)($ticket['seat_identifier'] ?? '')));
+            $seatIdentifier = (string)($ticket['seat_identifier'] ?? '');
+            $seat = order_email_escape(general_admission_is_identifier($seatIdentifier)
+                ? general_admission_ticket_label()
+                : str_replace([':', '-'], [' / ', ' / '], $seatIdentifier));
             $price = number_format((float)($ticket['final_price'] ?? 0), 2, '.', ' ');
             $ticketLink = '';
             foreach ($assets['links'] as $link) {

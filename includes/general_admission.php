@@ -64,6 +64,20 @@ if (!function_exists('general_admission_identifier_number')) {
     }
 }
 
+if (!function_exists('general_admission_is_identifier')) {
+    function general_admission_is_identifier(string $identifier): bool
+    {
+        return general_admission_identifier_number($identifier) !== null;
+    }
+}
+
+if (!function_exists('general_admission_ticket_label')) {
+    function general_admission_ticket_label(): string
+    {
+        return 'Свободная рассадка';
+    }
+}
+
 if (!function_exists('general_admission_display_label')) {
     function general_admission_display_label(string $identifier): string
     {

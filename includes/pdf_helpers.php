@@ -487,6 +487,8 @@ if (!function_exists('ticket_pdf_render_html')) {
         $hallNameRaw = trim((string)($ticket['hall_name'] ?? ''));
         $hallNameEsc = htmlspecialchars($hallNameRaw !== '' ? $hallNameRaw . ' (Абая 117)' : '—', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seat_raw = trim((string)($ticket['seat_label'] ?? $ticket['seat_identifier'] ?? ''));
+        $isGeneralAdmissionTicket = general_admission_is_identifier($seat_raw)
+            || general_admission_is_identifier(trim((string)($ticket['seat_identifier'] ?? '')));
         $seat_raw = general_admission_display_label($seat_raw);
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -654,7 +656,10 @@ if (!function_exists('ticket_pdf_render_html')) {
         // Row/seat parsing
         $rowValue = '—';
         $seatValue = '—';
-        if ($seat_raw !== '') {
+        if ($isGeneralAdmissionTicket) {
+            $rowValue = general_admission_ticket_label();
+            $seatValue = general_admission_ticket_label();
+        } elseif ($seat_raw !== '') {
             if (preg_match('/(\d+)\s*[:\-\/]\s*(\d+)/u', $seat_raw, $m)) {
                 $rowValue = $m[1];
                 $seatValue = $m[2];
