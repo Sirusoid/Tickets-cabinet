@@ -142,9 +142,13 @@ foreach ($sessions as $session) {
 
     $hallEsc = htmlspecialchars($hall, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $hallLine = $hall !== ''
-        ? '<div class="zhassahna-hall" style="color:#b7bcc4;font-size:15px;font-weight:500;font-family:TildaSans,Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;line-height:1.3;text-align:center;padding:8px 10px 0;">' . $hallEsc . '</div>'
+        ? '<div class="zhassahna-hall-wrap" style="display:flex;justify-content:center;max-width:100%;padding:12px 10px 0;box-sizing:border-box;">'
+            . '<span class="zhassahna-hall" style="display:inline-flex;align-items:center;gap:7px;max-width:100%;box-sizing:border-box;padding:6px 14px;border:1px solid rgba(0,173,181,.55);border-radius:18px;background-color:rgba(0,173,181,.14);color:#7be3e8;font-family:TildaSans,Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:.06em;line-height:1.25;text-transform:uppercase;text-align:center;">'
+            . '<span aria-hidden="true" style="flex:0 0 auto;width:6px;height:6px;border-radius:50%;background-color:#00adb5;"></span>'
+            . '<span>' . $hallEsc . '</span>'
+            . '</span></div>'
         : '';
-    $titlePadTop = $hall !== '' ? '14px' : '20px';
+    $titlePadTop = $hall !== '' ? '16px' : '20px';
 
     $html .= '
     <div class="t774__col t-col t-col_3 t-align_center t-item" style="margin-bottom:1.5%; margin-top:1.5%; position:relative;">
