@@ -362,7 +362,7 @@ var Cashier = (function () {
 
       var info = document.createElement('div');
       info.style.fontWeight = '700';
-      info.textContent = generalAdmission && /^GA-\d+$/i.test(itemKey)
+      info.textContent = generalAdmissionMode && /^GA-\d+$/i.test(itemKey)
         ? 'Свободное место № ' + parseInt(itemKey.slice(3), 10) + ' — ' + (price ? Number(price).toLocaleString() + ' тг.' : '—')
         : 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—') + ' - ' + (price ? Number(price).toLocaleString() + ' тг.' : '—');
 
