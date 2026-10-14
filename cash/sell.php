@@ -780,6 +780,7 @@ document.addEventListener('DOMContentLoaded', function(){
     Cashier.initSell({
       csrf: csrfToken,
       currentUserId: <?= json_encode((int)($_SESSION['user']['id'] ?? 0), JSON_UNESCAPED_UNICODE) ?>,
+      isAdmin: <?= json_encode(function_exists('is_admin') && is_admin()) ?>,
       sessionId: sessionId,
       seatmapCanvasId: 'cash-seatmap',
       seatmapRenderer: null,

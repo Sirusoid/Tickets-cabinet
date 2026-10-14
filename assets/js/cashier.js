@@ -78,6 +78,7 @@ var Cashier = (function () {
     custom_max_amount: 0
   };
   var currentUserId = 0;
+  var isAdmin = false;
 
   // --- Diagnostic guard: prevent accidental crashes from new helpers ---
   (function(){
@@ -438,18 +439,80 @@ var Cashier = (function () {
     return keys.slice(0, 6).join(', ') + ' и ещё ' + (keys.length - 6);
   }
 
+  function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function describeSeatKey(key) {
+    var normalized = normalizeSeatKey(key);
+    if (/^GA-\d+$/i.test(normalized)) return 'Свободное место № ' + parseInt(normalized.slice(3), 10);
+    var parts = splitSeatKey(normalized);
+    return parts.row !== null ? 'Ряд ' + parts.row + ', место ' + parts.seat : normalized;
+  }
+
+  function pluralSeats(n) {
+    var mod10 = n % 10, mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return n + ' место';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return n + ' места';
+    return n + ' мест';
+  }
+
+  function isHeldByOther(key) {
+    var info = heldSeats[key];
+    return !!(info && info.user_id !== currentUserId);
+  }
+
+  function releaseForeignHolds(keys) {
+    ajax('release_reservation', { session_id: sessionId, seats: keys }, function (res) {
+      if (!res || !res.success) {
+        alert(res && res.message ? res.message : 'Не удалось снять резерв');
+        refreshHoldState();
+        return;
+      }
+      showToast(keys.length > 1 ? 'Резервы сняты' : 'Резерв снят');
+      refreshHoldState(function () {
+        syncSelectionToRenderer();
+        redrawLegend();
+      });
+    });
+  }
+
+  // Админ снимает резерв независимо от того, кто его поставил (сервер повторно проверяет роль).
+  function requestForeignRelease(keys) {
+    if (!isAdmin) return;
+    keys = (keys || []).filter(isHeldByOther);
+    if (!keys.length) return;
+
+    var text;
+    if (keys.length === 1) {
+      var holder = heldSeats[keys[0]].holder;
+      text = 'Снять резерв: ' + describeSeatKey(keys[0]) + '?' + (holder ? ' Резерв поставил: ' + holder + '.' : '');
+    } else {
+      text = 'Снять чужие резервы (' + pluralSeats(keys.length) + ')?';
+    }
+    var hasOnlineHold = keys.some(function (k) { return heldSeats[k].user_id === 0; });
+    if (hasOnlineHold) {
+      text += keys.length === 1
+        ? ' Это резерв онлайн-покупателя: возможно, он сейчас оплачивает заказ, а после снятия резерва место можно будет продать другому.'
+        : ' Среди них есть резерв онлайн-покупателя: возможно, он сейчас оплачивает заказ, а после снятия резерва эти места можно будет продать другому.';
+    }
+
+    var run = function () { releaseForeignHolds(keys); };
+    if (typeof window.showConfirmModal === 'function' && document.getElementById('modal-delete-confirm')) {
+      window.showConfirmModal(text, run);
+    } else if (window.confirm(text)) {
+      run();
+    }
+  }
+
   function updateHoldInfo() {
     if (!holdInfoEl) return;
     var keys = Object.keys(heldSeats || {});
     if (!keys.length) {
       holdInfoEl.textContent = 'Если билет в резерве, выберите место и нажмите «Продать». Время резерва можно задать выше.';
       return;
-    }
-
-    function formatSeatKey(key) {
-      if (typeof key !== 'string') return { row: key, seat: key };
-      var parts = key.split(':');
-      return { row: parts[0] || key, seat: parts[1] || '' };
     }
 
     function formatExpires(expiresAt) {
@@ -462,17 +525,14 @@ var Cashier = (function () {
     }
 
     var myLines = [];
-    var otherLines = [];
+    var otherKeys = [];
     var nearest = null;
     keys.forEach(function (k) {
       var info = heldSeats[k] || {};
-      var seat = formatSeatKey(k);
-      var expires = formatExpires(info.expires_at);
-      var line = 'Ряд: ' + seat.row + ', Место: ' + seat.seat + ' | Истекает через: ' + expires;
       if (info.user_id === currentUserId) {
-        myLines.push(line);
+        myLines.push(describeSeatKey(k) + ' | Истекает через: ' + formatExpires(info.expires_at));
       } else {
-        otherLines.push(line);
+        otherKeys.push(k);
       }
       if (info.expires_at) {
         var dt = new Date(info.expires_at);
@@ -480,14 +540,40 @@ var Cashier = (function () {
       }
     });
 
+    var releaseBtn = function (target, label) {
+      return ' <button type="button" class="btn btn-ghost btn-xs" data-release-keys="' + escapeHtml(target) + '">' + label + '</button>';
+    };
+
     var html = [];
     if (myLines.length) {
       html.push('<div><strong>Ваши резервы:</strong></div>');
-      myLines.forEach(function (line) { html.push('<div>' + line + '</div>'); });
+      myLines.forEach(function (line) { html.push('<div>' + escapeHtml(line) + '</div>'); });
     }
-    if (otherLines.length) {
+    if (otherKeys.length) {
       html.push('<div style="margin-top:8px;"><strong>Резерв другими:</strong></div>');
-      otherLines.forEach(function (line) { html.push('<div>' + line + '</div>'); });
+      if (generalAdmissionMode) {
+        var byHolder = {};
+        otherKeys.forEach(function (k) {
+          var name = (isAdmin && heldSeats[k].holder) ? heldSeats[k].holder : 'другой пользователь';
+          byHolder[name] = (byHolder[name] || 0) + 1;
+        });
+        Object.keys(byHolder).forEach(function (name) {
+          html.push('<div>' + escapeHtml(name + ': ' + pluralSeats(byHolder[name])) + '</div>');
+        });
+      } else {
+        otherKeys.forEach(function (k) {
+          var info = heldSeats[k] || {};
+          var text = describeSeatKey(k) + ' | Истекает через: ' + formatExpires(info.expires_at);
+          if (isAdmin && info.holder) text += ' | ' + info.holder;
+          html.push('<div>' + escapeHtml(text) + (isAdmin ? releaseBtn(k, 'Снять') : '') + '</div>');
+        });
+      }
+      if (isAdmin && (generalAdmissionMode || otherKeys.length > 1)) {
+        html.push('<div style="margin-top:6px;">' + releaseBtn('*', 'Снять все чужие резервы (' + otherKeys.length + ')').trim() + '</div>');
+      }
+      if (isAdmin && !generalAdmissionMode) {
+        html.push('<div style="margin-top:6px;color:#555;">Администратор: чужой резерв можно снять кнопкой «Снять» или нажатием на место на схеме.</div>');
+      }
     }
     if (nearest) {
       var delta = Math.max(0, Math.round((nearest.getTime() - Date.now()) / 60000));
@@ -507,7 +593,8 @@ var Cashier = (function () {
         heldSeats[key] = {
           user_id: item.user_id !== undefined ? Number(item.user_id) : null,
           expires_at: item.expires_at || null,
-          meta: item.meta || null
+          meta: item.meta || null,
+          holder: item.holder || null
         };
         reservedKeys.push(key);
         if (heldSeats[key].user_id === currentUserId) ownedKeys.push(key);
@@ -924,6 +1011,17 @@ var Cashier = (function () {
     customDiscountHintEl = document.getElementById(ids.customDiscountHintId);
     var onSessionLoaded = typeof options.onSessionLoaded === 'function' ? options.onSessionLoaded : null;
     currentUserId = Number(options.currentUserId || 0);
+    isAdmin = options.isAdmin === true;
+    if (holdInfoEl && !holdInfoEl.dataset.releaseBound) {
+      holdInfoEl.dataset.releaseBound = '1';
+      holdInfoEl.addEventListener('click', function (ev) {
+        var btn = ev.target && ev.target.closest ? ev.target.closest('[data-release-keys]') : null;
+        if (!btn) return;
+        ev.preventDefault();
+        var target = btn.getAttribute('data-release-keys');
+        requestForeignRelease(target === '*' ? Object.keys(heldSeats).filter(isHeldByOther) : [target]);
+      });
+    }
     if (options.discountConfig && typeof options.discountConfig === 'object') {
       discountConfig = Object.assign({}, discountConfig, options.discountConfig);
       if (!discountConfig.segment_percent) {
@@ -972,6 +1070,7 @@ var Cashier = (function () {
 
       setReservedState(held);
       configureGeneralAdmission(session, sold, held);
+      updateHoldInfo();
 
       if (generalAdmissionMode) {
         renderer = null;
@@ -1002,8 +1101,9 @@ var Cashier = (function () {
               showToast('Место продано, выберите другое место для продажи');
               return;
             }
-            if (heldSeats[key] && heldSeats[key].user_id !== currentUserId) {
-              showToast('Место занято резервом другого кассира');
+            if (isHeldByOther(key)) {
+              if (isAdmin) requestForeignRelease([key]);
+              else showToast('Место занято резервом другого кассира');
               return;
             }
             if (typeof pricedSeats[key] === 'undefined') {
@@ -1039,8 +1139,9 @@ var Cashier = (function () {
               showToast('Место продано, выберите другое место для продажи');
               return;
             }
-            if (heldSeats[key] && heldSeats[key].user_id !== currentUserId) {
-              showToast('Место занято резервом другого кассира');
+            if (isHeldByOther(key)) {
+              if (isAdmin) requestForeignRelease([key]);
+              else showToast('Место занято резервом другого кассира');
               return;
             }
             if (typeof pricedSeats[key] === 'undefined') {

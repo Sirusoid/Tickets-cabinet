@@ -1109,6 +1109,33 @@ case 'sell':
                 $held = [];
             }
 
+            // Админу показываем, кто поставил резерв (имя отдельным запросом, чтобы не влиять на список резервов).
+            if (is_admin() && !empty($held)) {
+                try {
+                    $holderIds = array_values(array_unique(array_filter(array_map(function ($h) {
+                        return (int)($h['user_id'] ?? 0);
+                    }, $held))));
+                    $holderNames = [];
+                    if (!empty($holderIds)) {
+                        $ph = implode(',', array_fill(0, count($holderIds), '?'));
+                        $us = $pdo->prepare("SELECT id, full_name, username FROM users WHERE id IN ($ph)");
+                        $us->execute($holderIds);
+                        while ($u = $us->fetch(PDO::FETCH_ASSOC)) {
+                            $holderNames[(int)$u['id']] = trim((string)$u['full_name']) !== '' ? trim((string)$u['full_name']) : (string)$u['username'];
+                        }
+                    }
+                    foreach ($held as &$holdItem) {
+                        $holderId = (int)($holdItem['user_id'] ?? 0);
+                        $holdItem['holder'] = $holderId === 0
+                            ? 'Онлайн-покупатель (сайт)'
+                            : ($holderNames[$holderId] ?? ('Пользователь #' . $holderId));
+                    }
+                    unset($holdItem);
+                } catch (Exception $e) {
+                    error_log('cash session holder names error: ' . $e->getMessage());
+                }
+            }
+
             // price ranges
             $priceRanges = null;
             try {
@@ -1822,6 +1849,31 @@ case 'sell':
                 // If multiple seat keys - prepare placeholders
                 $placeholders = implode(',', array_fill(0, count($seat_keys), '?'));
 
+                // Админ снимает любой резерв; остальные — только свои (или уже истёкшие).
+                $isAdminUser = function_exists('is_admin') && is_admin();
+                $releaseUserId = current_user_id();
+                $holdOwners = [];
+                if ($holdsTableExists && $holdsHasSeatKey) {
+                    $ownerStmt = $pdo->prepare("SELECT seat_key, user_id, (expires_at > NOW()) AS is_active FROM cash_holds WHERE session_id = ? AND seat_key IN ($placeholders) FOR UPDATE");
+                    $ownerStmt->execute(array_merge([$schedule_id], $seat_keys));
+                    $foreignHolds = [];
+                    while ($ownerRow = $ownerStmt->fetch(PDO::FETCH_ASSOC)) {
+                        $ownerKey = str_replace(':', '-', (string)$ownerRow['seat_key']);
+                        $holdOwners[$ownerKey] = (int)$ownerRow['user_id'];
+                        if (!$isAdminUser && (int)$ownerRow['is_active'] === 1 && (int)$ownerRow['user_id'] !== $releaseUserId) {
+                            $foreignHolds[] = $ownerKey;
+                        }
+                    }
+                    if (!empty($foreignHolds)) {
+                        $pdo->rollBack();
+                        json_response([
+                            'success' => false,
+                            'message' => 'Этот резерв поставил другой пользователь. Снять его может только администратор.',
+                            'foreign' => $foreignHolds
+                        ]);
+                    }
+                }
+
                 // 1) delete from cash_holds if table and column exist
                 if ($holdsTableExists) {
                     try {
@@ -1883,6 +1935,17 @@ case 'sell':
                 }
 
                 $pdo->commit();
+
+                if ($affected > 0) {
+                    $foreignReleased = array_keys(array_filter($holdOwners, function ($ownerId) use ($releaseUserId) {
+                        return $ownerId !== $releaseUserId;
+                    }));
+                    audit_log($pdo, $releaseUserId, 'hold:release', 'session', $schedule_id, json_encode([
+                        'seats' => $seat_keys,
+                        'owners' => $holdOwners,
+                        'admin_override' => $isAdminUser && !empty($foreignReleased),
+                    ], JSON_UNESCAPED_UNICODE));
+                }
 
                 // After changes, recalc counts for this schedule (safe queries)
                 $sold = 0;
