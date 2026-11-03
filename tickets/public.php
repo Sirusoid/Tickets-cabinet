@@ -79,6 +79,7 @@ if (!preg_match('/^https?:\/\//i', $returnUrlTemplate)) {
 }
 $returnUrl = str_replace('{order}', rawurlencode($order), $returnUrlTemplate);
 $orderPageUrl = '/tickets/public.php?order=' . rawurlencode($order) . '&token=' . rawurlencode($token);
+$publicAmountCents = (int)($session['amount_cents'] ?? 0);
 $refundInfo = ['state' => 'unavailable', 'message' => '', 'deadline' => null];
 if (!$error && $session && $pdo instanceof PDO && (string)$session['status'] === 'paid') {
     $refundInfo = bcc_self_refund_status($pdo, $session, $tickets);
@@ -208,7 +209,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <h2 class="order-bilingual order-bilingual--block" style="margin-bottom: 6px;"><span>Оплата прошла успешно!</span><span class="order-bilingual__kz">Төлем сәтті өтті!</span></h2>
                 <p style="color:#6b7280; margin: 0;">
                     Заказ / Тапсырыс <strong><?= h($order) ?></strong> ·
-                    Сумма / Сома <strong><?= number_format((int)$session['amount_cents'] / 100, 2, '.', ' ') ?> ₸</strong>
+                    Сумма / Сома <strong><?= number_format($publicAmountCents / 100, 2, '.', ' ') ?> ₸</strong>
                 </p>
             </div>
 
@@ -341,7 +342,7 @@ require_once __DIR__ . '/../includes/header.php';
             var returnUrl = <?= json_encode($returnUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
             var tildaOrigin = <?= json_encode(defined('TILDA_WIDGET_ORIGIN') ? constant('TILDA_WIDGET_ORIGIN') : 'https://zhassahna.kz') ?>;
             var order = <?= json_encode($order) ?>;
-            var amount = <?= json_encode(number_format((int)$session['amount_cents'] / 100, 2, '.', ' ')) ?>;
+            var amount = <?= json_encode(number_format($publicAmountCents / 100, 2, '.', ' ')) ?>;
             var tickets = <?= json_encode(array_map(function ($t) {
                 return [
                     'uid' => $t['ticket_uid'],
