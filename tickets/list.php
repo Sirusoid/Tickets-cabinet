@@ -52,6 +52,11 @@ require __DIR__ . '/../includes/panel.php';
           </div>
 
           <div>
+            <label>Номер заказа</label>
+            <input id="filter_order_number" class="form-control" placeholder="Номер заказа" autocomplete="off" />
+          </div>
+
+          <div>
             <label>Статус</label>
             <select id="filter_status" class="form-control">
               <option value="">Все</option>

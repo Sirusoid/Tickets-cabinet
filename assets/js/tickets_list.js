@@ -35,6 +35,7 @@
       date_to: qs('filter_date_to') ? qs('filter_date_to').value || '' : '',
       session: sessionValueToSend || '',
       uid: qs('filter_uid') ? qs('filter_uid').value || '' : '',
+      order_number: qs('filter_order_number') ? qs('filter_order_number').value || '' : '',
       customer: qs('filter_customer') ? qs('filter_customer').value || '' : '',
       status: qs('filter_status') ? qs('filter_status').value || '' : '',
       payment_status: qs('filter_payment') ? qs('filter_payment').value || '' : '',
@@ -397,7 +398,7 @@
   }
 
   function resetFilters(){
-    ['filter_date_from','filter_date_to','filter_session','filter_session_raw','filter_uid','filter_customer','filter_status','filter_payment','filter_channel','filter_segment','filter_refund'].forEach(function(id){ var el = qs(id); if (el) el.value = ''; });
+    ['filter_date_from','filter_date_to','filter_session','filter_session_raw','filter_uid','filter_order_number','filter_customer','filter_status','filter_payment','filter_channel','filter_segment','filter_refund'].forEach(function(id){ var el = qs(id); if (el) el.value = ''; });
     hideSuggestions('session');
     hideSuggestions('uid');
     hideSuggestions('customer');
@@ -650,7 +651,7 @@
     }
 
     var immediateFields = [
-      'filter_date_from','filter_date_to','filter_session','filter_uid','filter_customer',
+      'filter_date_from','filter_date_to','filter_session','filter_uid','filter_order_number','filter_customer',
       'filter_status','filter_payment','filter_channel','filter_segment','filter_refund'
     ];
     immediateFields.forEach(function(id){

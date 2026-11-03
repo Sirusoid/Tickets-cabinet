@@ -577,6 +577,7 @@ if ($action === 'list') {
     $date_to = trim((string)($_POST['date_to'] ?? $_GET['date_to'] ?? ''));
     $session_q = trim((string)($_POST['session'] ?? $_GET['session'] ?? ''));
     $uid = trim((string)($_POST['uid'] ?? $_GET['uid'] ?? ''));
+    $order_number = trim((string)($_POST['order_number'] ?? $_GET['order_number'] ?? ''));
     $customer = trim((string)($_POST['customer'] ?? $_GET['customer'] ?? ''));
     $status = trim((string)($_POST['status'] ?? $_GET['status'] ?? ''));
     $payment_status = trim((string)($_POST['payment_status'] ?? $_GET['payment_status'] ?? ''));
@@ -633,6 +634,11 @@ if ($action === 'list') {
         $params['uid'] = '%' . $uid . '%';
     }
 
+    if ($order_number !== '') {
+        $where[] = 'ps.order_number LIKE :order_number';
+        $params['order_number'] = '%' . $order_number . '%';
+    }
+
     if ($customer !== '') {
         $where[] = 'c.full_name LIKE :customer';
         $params['customer'] = '%' . $customer . '%';
@@ -653,6 +659,7 @@ if ($action === 'list') {
                      LEFT JOIN schedules s ON s.id = t.schedule_id
                      LEFT JOIN events e ON e.id = s.event_id
                      LEFT JOIN customers c ON c.id = t.customer_id
+                     LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
                      $where_sql";
         $stmt = $pdo->prepare($countSql);
         $stmt->execute($params);

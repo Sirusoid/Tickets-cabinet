@@ -14,6 +14,7 @@ $filters = [
 	'date_to' => trim((string)($_GET['date_to'] ?? '')),
 	'session' => trim((string)($_GET['session'] ?? '')),
 	'uid' => trim((string)($_GET['uid'] ?? '')),
+	'order_number' => trim((string)($_GET['order_number'] ?? '')),
 	'customer' => trim((string)($_GET['customer'] ?? '')),
 	'status' => trim((string)($_GET['status'] ?? '')),
 	'payment_status' => trim((string)($_GET['payment_status'] ?? '')),
@@ -61,6 +62,10 @@ if ($filters['session'] !== '') {
 if ($filters['uid'] !== '') {
 	$where[] = 't.ticket_uid LIKE :uid';
 	$params[':uid'] = '%' . $filters['uid'] . '%';
+}
+if ($filters['order_number'] !== '') {
+	$where[] = 'ps.order_number LIKE :order_number';
+	$params[':order_number'] = '%' . $filters['order_number'] . '%';
 }
 if ($filters['customer'] !== '') {
 	$where[] = 'c.full_name LIKE :customer';
@@ -130,6 +135,7 @@ $sheet->setTitle('Билеты');
 $filterText = [];
 $filterLabels = [
 	'date_from' => 'Дата от', 'date_to' => 'Дата до', 'session' => 'Сеанс', 'uid' => 'UID',
+	'order_number' => 'Номер заказа',
 	'customer' => 'Клиент', 'status' => 'Статус', 'payment_status' => 'Оплата',
 	'channel' => 'Канал', 'customer_segment' => 'Тип билета', 'refund' => 'Возврат',
 ];
