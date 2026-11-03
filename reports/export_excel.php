@@ -14,6 +14,10 @@ $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $segment = trim((string)($_GET['segment'] ?? ''));
 $eventId = (int)($_GET['event_id'] ?? 0);
+$refundFilter = trim((string)($_GET['refund'] ?? 'all'));
+if (!in_array($refundFilter, ['all', 'without', 'only'], true)) {
+    $refundFilter = 'all';
+}
 $sourceFilter = reporting_normalize_source_filter(
     $_GET['source'] ?? [],
     array_key_exists('source_filter', $_GET)
@@ -45,6 +49,9 @@ if ($eventId > 0) {
     }
 }
 $sourceSql = reporting_source_sql($sourceFilter);
+$refundFilterSql = $refundFilter === 'without'
+    ? " AND COALESCE(t.refund_status, 'none') <> 'refunded' "
+    : ($refundFilter === 'only' ? " AND t.refund_status = 'refunded' " : '');
 
 try {
     $rows = db_fetch_all("SELECT
@@ -76,6 +83,7 @@ try {
             $segmentSql
             $eventSql
             $sourceSql
+            $refundFilterSql
         ORDER BY t.purchased_at DESC, t.id DESC", $params);
 } catch (Throwable $e) {
     error_log('[REPORT] Ошибка подготовки XLSX: ' . $e->getMessage());
@@ -184,6 +192,7 @@ if (isset($pdo) && $pdo instanceof PDO && function_exists('audit_log_event')) {
         'segment' => $segment,
         'event_id' => $eventId,
         'sources' => $sourceFilter,
+        'refund' => $refundFilter,
         'tickets' => $totals['tickets'],
     ]);
 }

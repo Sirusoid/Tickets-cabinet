@@ -21,6 +21,10 @@ $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $segmentFilter = trim((string)($_GET['segment'] ?? ''));
 $eventFilter = (int)($_GET['event_id'] ?? 0);
+$refundFilter = trim((string)($_GET['refund'] ?? 'all'));
+if (!in_array($refundFilter, ['all', 'without', 'only'], true)) {
+		$refundFilter = 'all';
+}
 $sourceFilter = reporting_normalize_source_filter(
 		$_GET['source'] ?? [],
 		array_key_exists('source_filter', $_GET)
@@ -45,6 +49,7 @@ if ($eventFilter > 0) {
 		$params[':event_id'] = $eventFilter;
 }
 $sourceSql = reporting_source_sql($sourceFilter);
+$salesRefundSql = $refundFilter === 'only' ? ' AND 1 = 0 ' : '';
 
 $rows = [];
 $errorText = '';
@@ -81,6 +86,7 @@ try {
 							$segmentSql
 							$eventSql
 							$sourceSql
+							$salesRefundSql
 						ORDER BY t.purchased_at DESC, t.id DESC";
 		$rows = db_fetch_all($sql, $params);
 } catch (Throwable $e) {
@@ -188,6 +194,10 @@ try {
 			$refundParams[':refund_event_id'] = $eventFilter;
 		}
 		$refundSourceSql = reporting_source_sql($sourceFilter);
+		$refundFilterSql = $refundFilter === 'without' ? ' AND 1 = 0 ' : '';
+		if ($refundFilter === 'only') {
+			$refundFilterSql = " AND t.refund_status = 'refunded' ";
+		}
 		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.final_price), 0) AS amount
 			FROM tickets t
 			LEFT JOIN schedules s ON s.id = t.schedule_id
@@ -197,7 +207,8 @@ try {
 				AND t.refund_status = 'refunded'
 				$refundSegmentSql
 				$refundEventSql
-				$refundSourceSql", $refundParams);
+				$refundSourceSql
+				$refundFilterSql", $refundParams);
 		$refundTotals = [
 			'tickets' => (int)($refundRow['tickets'] ?? 0),
 			'amount' => (float)($refundRow['amount'] ?? 0),
@@ -219,6 +230,7 @@ try {
 			$refundSegmentSql
 			$refundEventSql
 			$refundSourceSql
+			$refundFilterSql
 		GROUP BY COALESCE(t.event_id, s.event_id), e.title, s.start_time
 		ORDER BY s.start_time DESC", $refundParams);
 	foreach ($refundRows as $refundItem) {
@@ -261,6 +273,7 @@ $reportQuery = [
 		'event_id' => $eventFilter,
 		'source_filter' => '1',
 		'source' => $sourceFilter,
+		'refund' => $refundFilter,
 ];
 $exportUrl = '/reports/export_excel.php?' . http_build_query($reportQuery);
 $todayUrl = '?' . http_build_query(array_merge($reportQuery, [
@@ -320,6 +333,14 @@ $yesterdayUrl = '?' . http_build_query(array_merge($reportQuery, [
 					</label>
 				<?php endforeach; ?>
 			</fieldset>
+			<div>
+				<label for="report-refund">Возвраты</label>
+				<select id="report-refund" name="refund" class="form-control">
+					<option value="all" <?= $refundFilter === 'all' ? 'selected' : '' ?>>Все</option>
+					<option value="without" <?= $refundFilter === 'without' ? 'selected' : '' ?>>Без возвратов</option>
+					<option value="only" <?= $refundFilter === 'only' ? 'selected' : '' ?>>Только возвраты</option>
+				</select>
+			</div>
 			<div class="reports-filters__actions">
 				<a href="/reports/sales.php" class="btn btn-ghost">Сбросить</a>
 				<a href="<?= h($todayUrl) ?>" class="btn btn-ghost">Сегодня</a>
@@ -409,6 +430,7 @@ $yesterdayUrl = '?' . http_build_query(array_merge($reportQuery, [
 										'session_id' => (int)$item['schedule_id'],
 										'source_filter' => '1',
 										'source' => $sourceFilter,
+										'refund' => $refundFilter,
 									])) ?>">Excel</a>
 								<?php else: ?>
 									—

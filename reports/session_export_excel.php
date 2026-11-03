@@ -15,6 +15,10 @@ $sourceFilter = reporting_normalize_source_filter(
     $_GET['source'] ?? [],
     array_key_exists('source_filter', $_GET)
 );
+$refundFilter = trim((string)($_GET['refund'] ?? 'all'));
+if (!in_array($refundFilter, ['all', 'without', 'only'], true)) {
+    $refundFilter = 'all';
+}
 if ($sessionId <= 0) {
     http_response_code(400);
     exit('Не указан сеанс.');
@@ -33,6 +37,9 @@ try {
     }
 
     $sourceSql = reporting_source_sql($sourceFilter);
+    $refundFilterSql = $refundFilter === 'without'
+        ? " AND COALESCE(t.refund_status, 'none') <> 'refunded' "
+        : ($refundFilter === 'only' ? " AND t.refund_status = 'refunded' " : '');
     $rows = db_fetch_all("SELECT
             t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.promo_code,
             t.customer_segment, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.is_checked_in,
@@ -59,6 +66,7 @@ try {
         WHERE t.schedule_id = :session_id
             AND t.payment_status = 'paid'
             $sourceSql
+            $refundFilterSql
         ORDER BY t.purchased_at ASC, t.id ASC", [':session_id' => $sessionId]);
 } catch (Throwable $e) {
     error_log('[REPORT] Ошибка экспорта сеанса: ' . $e->getMessage());
