@@ -609,10 +609,9 @@ if (!function_exists('ticket_pdf_render_html')) {
 
         $orig_price_display = number_format($orig_price_value, 0, '.', '') . ' тг';
         $paid_price_display = number_format($paid_price_value, 0, '.', '') . ' тг';
-        $giftPriceValue = (int)($ticket['gift_price'] ?? 0);
         $giftNameValue = trim((string)($ticket['gift_name'] ?? ''));
-        $giftLine = !empty($ticket['gift_selected']) && $giftPriceValue > 0
-            ? 'ПОДАРОК / СЫЙЛЫҚ: ' . ($giftNameValue !== '' ? $giftNameValue . ' — ' : '') . number_format($giftPriceValue, 0, '.', '') . ' тг'
+        $giftLine = !empty($ticket['gift_selected'])
+            ? 'С ПОДАРКОМ / СЫЙЛЫҚПЕН' . ($giftNameValue !== '' ? ': ' . $giftNameValue : '')
             : '';
         $discountLine = $discount_amount_display > 0
             ? 'СКИДКА / ЖЕҢІЛДІК: ' . number_format($discount_amount_display, 0, '.', '') . ' тг'

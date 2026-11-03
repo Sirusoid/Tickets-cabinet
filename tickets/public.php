@@ -274,7 +274,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     </div>
                                     <div style="color:#4b5563;">Цена / Бағасы: <?= number_format((float)$ticket['final_price'], 2, '.', ' ') ?> ₸</div>
                                     <?php if (!empty($ticket['gift_selected'])): ?>
-                                        <div style="color:#166534; font-weight:600;">Подарок / Сыйлық: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> ₸)</div>
+                                        <div style="color:#166534; font-weight:600;">С подарком / Сыйлықпен: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> ₸)</div>
                                     <?php endif; ?>
                                     <?php if (($ticket['refund_status'] ?? 'none') === 'refunded'): ?>
                                         <div style="color:#b91c1c; font-weight:600;">Билет возвращён / Билет қайтарылды</div>

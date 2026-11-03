@@ -390,9 +390,17 @@ var Cashier = (function () {
 
       var info = document.createElement('div');
       info.style.fontWeight = '700';
-      info.textContent = generalAdmissionMode && /^GA-\d+$/i.test(itemKey)
-        ? 'Свободное место № ' + parseInt(itemKey.slice(3), 10) + ' — ' + (price ? Number(price).toLocaleString() + ' тг.' : '—')
-        : 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—') + ' - ' + (price ? Number(price).toLocaleString() + ' тг.' : '—');
+      var basePriceLabel = price ? Number(price).toLocaleString() + ' тг.' : '—';
+      var baseSeatLabel = generalAdmissionMode && /^GA-\d+$/i.test(itemKey)
+        ? 'Свободное место № ' + parseInt(itemKey.slice(3), 10)
+        : 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—');
+      var giftSelected = !!giftSelections[itemKey];
+      info.textContent = baseSeatLabel + ' — Билет: ' + basePriceLabel;
+      if (giftSelected && sessionPromotion.enabled) {
+        var giftPriceLabel = Number(sessionPromotion.gift_price).toLocaleString() + ' тг.';
+        info.textContent += ' + Подарок: ' + sessionPromotion.gift_name + ' ' + giftPriceLabel
+          + ' = ' + (Number(price) + Number(sessionPromotion.gift_price)).toLocaleString() + ' тг.';
+      }
 
       left.appendChild(info);
 

@@ -251,7 +251,8 @@
       var giftNote = document.createElement('div');
       giftNote.style.color = '#166534';
       giftNote.style.fontSize = '11px';
-      giftNote.textContent = (t.gift_name || 'Подарок') + ' +' + Number(t.gift_price || 0).toLocaleString() + ' тг';
+      giftNote.textContent = 'С подарком: ' + (t.gift_name || 'Подарок')
+        + ' +' + Number(t.gift_price || 0).toLocaleString() + ' тг';
       priceTd.appendChild(giftNote);
     }
     tr.appendChild(priceTd);

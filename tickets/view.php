@@ -111,7 +111,7 @@ require __DIR__ . '/../includes/panel.php';
             <div style="color:#555;">Место: <?= h(general_admission_is_identifier((string)$ticket['seat_identifier']) ? general_admission_ticket_label() : (string)$ticket['seat_identifier']) ?></div>
             <div style="color:#555;">Клиент: <?= h($ticket['customer_name']) ?></div>
             <?php if (!empty($ticket['gift_selected'])): ?>
-              <div style="color:#166534; font-weight:600;">Подарок: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> тг)</div>
+              <div style="color:#166534; font-weight:600;">С подарком: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> тг)</div>
             <?php endif; ?>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
