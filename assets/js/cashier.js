@@ -285,8 +285,19 @@ var Cashier = (function () {
   function getManualDiscountInputValue() {
     var el = manualDiscountAmountEl || document.getElementById('manualDiscountAmount');
     if (!el) return 0;
-    var v = parseInt(String(el.value).replace(/\D+/g, '') || '0', 10);
-    return isFinite(v) ? Math.max(0, v) : 0;
+    var v = Number(el.value);
+    return isFinite(v) ? Math.max(0, Math.round(v)) : 0;
+  }
+
+  function normalizeManualDiscountInput() {
+    var el = manualDiscountAmountEl || document.getElementById('manualDiscountAmount');
+    if (!el) return;
+    var value = Number(el.value);
+    if (!isFinite(value) || value < 0) {
+      el.value = '0';
+      return;
+    }
+    el.value = String(Math.round(value));
   }
 
   function refreshDiscountUi() {
@@ -1037,10 +1048,24 @@ var Cashier = (function () {
 
     setupPaymentCheckboxes(paymentCashEl, paymentCardEl);
 
-    if (customerSegmentEl) customerSegmentEl.addEventListener('change', refreshDiscountUi);
+    if (customerSegmentEl) customerSegmentEl.addEventListener('change', function () {
+      refreshDiscountUi();
+      normalizeManualDiscountInput();
+    });
     if (manualDiscountAmountEl) manualDiscountAmountEl.addEventListener('input', refreshDiscountUi);
+    if (manualDiscountAmountEl) {
+      manualDiscountAmountEl.addEventListener('blur', function () {
+        normalizeManualDiscountInput();
+        refreshDiscountUi();
+      });
+      manualDiscountAmountEl.addEventListener('change', function () {
+        normalizeManualDiscountInput();
+        refreshDiscountUi();
+      });
+    }
     if (customDiscountTypeEl) customDiscountTypeEl.addEventListener('change', refreshDiscountUi);
     if (customDiscountValueEl) customDiscountValueEl.addEventListener('input', refreshDiscountUi);
+    refreshDiscountUi();
 
     // Load session data
     ajax('session', { session_id: sessionId }, function (res) {

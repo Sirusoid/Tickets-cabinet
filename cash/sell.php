@@ -539,7 +539,7 @@ $jsSession = [
         <?php if ($allowManualDiscount): ?>
         <div style="margin-top:12px;">
           <label class="label">Ручная скидка</label>
-          <input id="manualDiscountAmount" class="input" type="number" min="0" step="1" value="0" disabled />
+          <input id="manualDiscountAmount" class="input" type="number" min="0" step="any" value="0" />
           <small id="manualDiscountHint" style="display:block; margin-top:6px; color:#5d6f83; font-size:12px;">
             Активируется только при выборе пункта «Ручная скидка»
           </small>

@@ -306,7 +306,7 @@ case 'sell':
     $discountPayload = isset($input['discount']) && is_array($input['discount']) ? $input['discount'] : [];
     $discount_input = [
         'manual_amount' => isset($discountPayload['manual_amount']) && is_numeric($discountPayload['manual_amount'])
-            ? max(0.0, (float)$discountPayload['manual_amount'])
+            ? round(max(0.0, (float)$discountPayload['manual_amount']), 0, PHP_ROUND_HALF_UP)
             : 0.0,
     ];
 
@@ -433,14 +433,18 @@ case 'sell':
             $autoAmount = round($base * $segmentPercent / 100, 2);
             $afterAuto = max(0.0, $base - $autoAmount);
 
-            $customValue = $segment === 'manual' ? max(0.0, (float)$discount_input['manual_amount']) : 0.0;
+            $customValue = $segment === 'manual'
+                ? round(max(0.0, (float)$discount_input['manual_amount']), 0, PHP_ROUND_HALF_UP)
+                : 0.0;
             $maxAmount = isset($discountSettings['custom_max_amount']) && is_numeric($discountSettings['custom_max_amount'])
                 ? max(0.0, (float)$discountSettings['custom_max_amount'])
                 : 0.0;
             if ($maxAmount > 0) {
                 $customValue = min($customValue, $maxAmount);
             }
-            $customAmount = $segment === 'manual' ? min($afterAuto, round($customValue, 2)) : 0.0;
+            $customAmount = $segment === 'manual'
+                ? min($afterAuto, round($customValue, 0, PHP_ROUND_HALF_UP))
+                : 0.0;
 
             $finalTotal = max(0.0, round($afterAuto - $customAmount, 2));
             return [
