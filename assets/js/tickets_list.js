@@ -517,7 +517,7 @@
 
   // --- Typeahead helpers with cross-filtering ---
   function showSuggestions(kind, items) {
-    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : 'suggestions_customer');
+    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : (kind === 'order' ? 'suggestions_order' : 'suggestions_customer'));
     var wrap = qs(wrapId);
     if (!wrap) return;
     wrap.innerHTML = '';
