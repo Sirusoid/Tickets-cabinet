@@ -11,6 +11,10 @@ if (!function_exists('excel_autoload') || !excel_autoload()) {
 }
 
 $sessionId = (int)($_GET['session_id'] ?? 0);
+$sourceFilter = reporting_normalize_source_filter(
+    $_GET['source'] ?? [],
+    array_key_exists('source_filter', $_GET)
+);
 if ($sessionId <= 0) {
     http_response_code(400);
     exit('Не указан сеанс.');
@@ -28,6 +32,7 @@ try {
         exit('Сеанс не найден.');
     }
 
+    $sourceSql = reporting_source_sql($sourceFilter);
     $rows = db_fetch_all("SELECT
             t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.promo_code,
             t.customer_segment, t.channel, t.payment_status, t.status, t.is_checked_in,
@@ -53,6 +58,7 @@ try {
         )
         WHERE t.schedule_id = :session_id
             AND t.payment_status = 'paid'
+            $sourceSql
         ORDER BY t.purchased_at ASC, t.id ASC", [':session_id' => $sessionId]);
 } catch (Throwable $e) {
     error_log('[REPORT] Ошибка экспорта сеанса: ' . $e->getMessage());
@@ -74,8 +80,7 @@ foreach ($rows as $row) {
     $isRefunded = (string)($row['refund_status'] ?? '') === 'refunded';
     $refundAmount = $isRefunded ? max(0.0, (float)($row['refund_record_amount'] ?? $financials['paid'])) : 0.0;
     $paymentMethod = reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
-    $purchaseSource = in_array(strtolower((string)($row['channel'] ?? '')), ['web', 'mobile', 'online'], true)
-        || $paymentMethod === 'Карта' ? 'Онлайн' : 'Касса';
+    $purchaseSource = reporting_source_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
     if ($isRefunded) {
         $summary['refunded_tickets']++;
         $summary['refunds'] += $refundAmount;

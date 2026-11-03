@@ -14,6 +14,10 @@ $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $segment = trim((string)($_GET['segment'] ?? ''));
 $eventId = (int)($_GET['event_id'] ?? 0);
+$sourceFilter = reporting_normalize_source_filter(
+    $_GET['source'] ?? [],
+    array_key_exists('source_filter', $_GET)
+);
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
     $dateFrom = date('Y-m-01');
 }
@@ -40,6 +44,7 @@ if ($eventId > 0) {
         $eventTitle = (string)$eventRow['title'];
     }
 }
+$sourceSql = reporting_source_sql($sourceFilter);
 
 try {
     $rows = db_fetch_all("SELECT
@@ -70,6 +75,7 @@ try {
             AND t.payment_status = 'paid'
             $segmentSql
             $eventSql
+            $sourceSql
         ORDER BY t.purchased_at DESC, t.id DESC", $params);
 } catch (Throwable $e) {
     error_log('[REPORT] Ошибка подготовки XLSX: ' . $e->getMessage());
@@ -91,8 +97,7 @@ foreach ($rows as $row) {
     $isRefunded = (string)($row['refund_status'] ?? '') === 'refunded';
     $refundAmount = $isRefunded ? max(0.0, (float)($row['refund_record_amount'] ?? $financials['paid'])) : 0.0;
     $paymentMethod = reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
-    $purchaseSource = in_array(strtolower((string)($row['channel'] ?? '')), ['web', 'mobile', 'online'], true)
-        || $paymentMethod === 'Карта' ? 'Онлайн' : 'Касса';
+    $purchaseSource = reporting_source_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
     $key = (string)($row['session_start'] ?? '') . '|' . (string)($row['event_title'] ?? '');
     if (!isset($summary[$key])) {
         $summary[$key] = [
@@ -155,6 +160,7 @@ if (isset($pdo) && $pdo instanceof PDO && function_exists('audit_log_event')) {
         'date_to' => $dateTo,
         'segment' => $segment,
         'event_id' => $eventId,
+        'sources' => $sourceFilter,
         'tickets' => $totals['tickets'],
     ]);
 }

@@ -21,6 +21,10 @@ $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $segmentFilter = trim((string)($_GET['segment'] ?? ''));
 $eventFilter = (int)($_GET['event_id'] ?? 0);
+$sourceFilter = reporting_normalize_source_filter(
+		$_GET['source'] ?? [],
+		array_key_exists('source_filter', $_GET)
+);
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
 		$dateFrom = date('Y-m-01');
@@ -40,6 +44,7 @@ if ($eventFilter > 0) {
 		$eventSql = ' AND COALESCE(t.event_id, s.event_id) = :event_id ';
 		$params[':event_id'] = $eventFilter;
 }
+$sourceSql = reporting_source_sql($sourceFilter);
 
 $rows = [];
 $errorText = '';
@@ -75,6 +80,7 @@ try {
 							AND COALESCE(t.refund_status, 'none') IN ('none', '', 'no')
 							$segmentSql
 							$eventSql
+							$sourceSql
 						ORDER BY t.purchased_at DESC, t.id DESC";
 		$rows = db_fetch_all($sql, $params);
 } catch (Throwable $e) {
@@ -171,14 +177,17 @@ try {
 			$refundEventSql = ' AND COALESCE(t.event_id, s.event_id) = :refund_event_id ';
 			$refundParams[':refund_event_id'] = $eventFilter;
 		}
+		$refundSourceSql = reporting_source_sql($sourceFilter);
 		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.final_price), 0) AS amount
 			FROM tickets t
 			LEFT JOIN schedules s ON s.id = t.schedule_id
+			LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
 			WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 				AND t.payment_status = 'paid'
 				AND t.refund_status = 'refunded'
 				$refundSegmentSql
-				$refundEventSql", $refundParams);
+				$refundEventSql
+				$refundSourceSql", $refundParams);
 		$refundTotals = [
 			'tickets' => (int)($refundRow['tickets'] ?? 0),
 			'amount' => (float)($refundRow['amount'] ?? 0),
@@ -193,11 +202,13 @@ try {
 		FROM tickets t
 		LEFT JOIN schedules s ON s.id = t.schedule_id
 		LEFT JOIN events e ON e.id = COALESCE(t.event_id, s.event_id)
+		LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
 		WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 			AND t.payment_status = 'paid'
 			AND t.refund_status = 'refunded'
 			$refundSegmentSql
 			$refundEventSql
+			$refundSourceSql
 		GROUP BY COALESCE(t.event_id, s.event_id), e.title, s.start_time
 		ORDER BY s.start_time DESC", $refundParams);
 	foreach ($refundRows as $refundItem) {
@@ -233,12 +244,23 @@ $netAfterRefunds = max(0.0, $totals['net'] - $refundTotals['amount']);
 $today = date('Y-m-d');
 $yesterday = date('Y-m-d', strtotime('-1 day'));
 $displayDateRange = reporting_format_date_range($dateFrom, $dateTo);
-$exportUrl = '/reports/export_excel.php?' . http_build_query([
+$reportQuery = [
 		'date_from' => $dateFrom,
 		'date_to' => $dateTo,
 		'segment' => $segmentFilter,
 		'event_id' => $eventFilter,
-]);
+		'source_filter' => '1',
+		'source' => $sourceFilter,
+];
+$exportUrl = '/reports/export_excel.php?' . http_build_query($reportQuery);
+$todayUrl = '?' . http_build_query(array_merge($reportQuery, [
+		'date_from' => $today,
+		'date_to' => $today,
+]));
+$yesterdayUrl = '?' . http_build_query(array_merge($reportQuery, [
+		'date_from' => $yesterday,
+		'date_to' => $yesterday,
+]));
 
 ?>
 
@@ -250,6 +272,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 			<p>Выберите период и тип билета, чтобы обновить показатели и таблицы.</p>
 		</div>
 		<form method="get" class="reports-filters">
+			<input type="hidden" name="source_filter" value="1">
 			<div>
 				<label for="report-date-from">Дата от</label>
 				<input id="report-date-from" type="date" name="date_from" class="form-control" value="<?= h($dateFrom) ?>">
@@ -278,10 +301,19 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 					<?php endforeach; ?>
 				</select>
 			</div>
+			<fieldset class="reports-source-filter">
+				<legend>Источник оплаты</legend>
+				<?php foreach (reporting_source_options() as $sourceKey => $sourceLabel): ?>
+					<label class="reports-source-filter__option">
+						<input type="checkbox" name="source[]" value="<?= h($sourceKey) ?>" <?= in_array($sourceKey, $sourceFilter, true) ? 'checked' : '' ?>>
+						<span><?= h($sourceLabel) ?></span>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
 			<div class="reports-filters__actions">
 				<a href="/reports/sales.php" class="btn btn-ghost">Сбросить</a>
-				<a href="?date_from=<?= h($today) ?>&date_to=<?= h($today) ?>&segment=<?= h($segmentFilter) ?>&event_id=<?= (int)$eventFilter ?>" class="btn btn-ghost">Сегодня</a>
-				<a href="?date_from=<?= h($yesterday) ?>&date_to=<?= h($yesterday) ?>&segment=<?= h($segmentFilter) ?>&event_id=<?= (int)$eventFilter ?>" class="btn btn-ghost">Вчера</a>
+				<a href="<?= h($todayUrl) ?>" class="btn btn-ghost">Сегодня</a>
+				<a href="<?= h($yesterdayUrl) ?>" class="btn btn-ghost">Вчера</a>
 				<button type="submit" class="btn btn-primary">Показать</button>
 				<a href="<?= h($exportUrl) ?>" class="btn btn-secondary">Скачать XLSX</a>
 			</div>
@@ -356,7 +388,11 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							<td><strong><?= number_format($netPerformance, 2, '.', ' ') ?> тг</strong></td>
 							<td>
 								<?php if ((int)$item['schedule_id'] > 0): ?>
-									<a class="btn btn-secondary btn-sm" href="/reports/session_export_excel.php?session_id=<?= (int)$item['schedule_id'] ?>">Excel</a>
+									<a class="btn btn-secondary btn-sm" href="/reports/session_export_excel.php?<?= h(http_build_query([
+										'session_id' => (int)$item['schedule_id'],
+										'source_filter' => '1',
+										'source' => $sourceFilter,
+									])) ?>">Excel</a>
 								<?php else: ?>
 									—
 								<?php endif; ?>
