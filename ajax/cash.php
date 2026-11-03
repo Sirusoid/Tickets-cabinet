@@ -333,11 +333,6 @@ case 'sell':
         json_response(['success' => false, 'message' => 'Некорректный способ оплаты']);
     }
 
-    // phone required
-    if ($customer_phone === '') {
-        json_response(['success' => false, 'message' => 'Номер телефона клиента обязателен']);
-    }
-
     $now = (new DateTime())->format('Y-m-d H:i:s');
 
     // Получаем данные сеанса (event_id, hall_id)
@@ -707,7 +702,7 @@ case 'sell':
                 }
             }
 
-            if (empty($customer_id)) {
+            if (empty($customer_id) && $customer_phone !== '') {
                 $stmtFind = $pdo->prepare("SELECT id FROM customers WHERE phone = :phone LIMIT 1");
                 $stmtFind->execute([':phone' => $customer_phone]);
                 $row = $stmtFind->fetch(PDO::FETCH_ASSOC);
@@ -742,7 +737,7 @@ case 'sell':
                 }
             }
 
-            if (empty($customer_id)) {
+            if (empty($customer_id) && ($customer_phone !== '' || $customer_full_name !== '' || $customer_email || $customer_gender || $customer_city)) {
                 try { $custUid = bin2hex(random_bytes(8)); } catch (Exception $e) { $custUid = uniqid('c_', true); }
                 $insCust = $pdo->prepare("INSERT INTO customers (customer_uid, full_name, gender, email, phone, city, created_at, updated_at) VALUES (:customer_uid, :full_name, :gender, :email, :phone, :city, NOW(), NOW())");
                 $insCust->execute([
@@ -845,8 +840,8 @@ case 'sell':
                 ':customer_segment' => $customer_segment_store
             ];
 
-            if ($ticket_has_customer_name) $bind[':customer_name'] = is_array($customer_snapshot) && isset($customer_snapshot['full_name']) ? $customer_snapshot['full_name'] : $customer_full_name;
-            if ($ticket_has_customer_phone) $bind[':customer_phone'] = is_array($customer_snapshot) && isset($customer_snapshot['phone']) ? $customer_snapshot['phone'] : $customer_phone;
+            if ($ticket_has_customer_name) $bind[':customer_name'] = is_array($customer_snapshot) && isset($customer_snapshot['full_name']) ? $customer_snapshot['full_name'] : ($customer_full_name !== '' ? $customer_full_name : null);
+            if ($ticket_has_customer_phone) $bind[':customer_phone'] = is_array($customer_snapshot) && isset($customer_snapshot['phone']) ? $customer_snapshot['phone'] : ($customer_phone !== '' ? $customer_phone : null);
             if ($ticket_has_customer_email) $bind[':customer_email'] = is_array($customer_snapshot) && isset($customer_snapshot['email']) ? $customer_snapshot['email'] : $customer_email;
             if ($ticket_has_customer_city) $bind[':customer_city'] = is_array($customer_snapshot) && isset($customer_snapshot['city']) ? $customer_snapshot['city'] : $customer_city;
             if ($ticket_has_customer_gender) $bind[':customer_gender'] = is_array($customer_snapshot) && isset($customer_snapshot['gender']) ? $customer_snapshot['gender'] : $customer_gender;

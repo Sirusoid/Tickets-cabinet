@@ -635,7 +635,6 @@ var Cashier = (function () {
     var data = {
       seats: seatsPayload,
       total_amount: total,
-      customer_id: extra.customer_id || (window.currentCustomerId || null),
       schedule_id: extra.schedule_id || sessionId || null,
       event_id: extra.event_id || null,
       hall_id: extra.hall_id || null,
@@ -1195,19 +1194,6 @@ var Cashier = (function () {
             return;
           }
 
-          // collect customer data and normalize phone
-          function normalizePhone(p) { return (p || '').replace(/\D+/g, ''); }
-          var customer = {
-            full_name: (document.getElementById('custFullName') || {}).value.trim() || '',
-            phone: normalizePhone((document.getElementById('custPhone') || {}).value || ''),
-            email: (document.getElementById('custEmail') || {}).value.trim() || '',
-            gender: (document.getElementById('custGender') || {}).value || '',
-            city: (document.getElementById('custCity') || {}).value.trim() || ''
-          };
-          if (!customer.phone) {
-            showToast('Номер телефона обязателен');
-            return;
-          }
           var customer_segment = (document.getElementById('customer_segment') || {}).value || 'adult';
           var manualDiscountAmount = (customer_segment === 'manual' && discountConfig.custom_enabled) ? getManualDiscountInputValue() : 0;
 
@@ -1217,7 +1203,6 @@ var Cashier = (function () {
             session_id: sessionId,
             seats: seatsPayload,
             payment_method: pm,
-            customer: customer,
             customer_segment: customer_segment,
             discount: { manual_amount: manualDiscountAmount }
           };
