@@ -47,6 +47,8 @@ var Cashier = (function () {
   var generalAdmissionAvailabilityEl = null;
   var generalAdmissionPanelEl = null;
   var cart = [];
+  var giftSelections = {};
+  var sessionPromotion = { enabled: false, gift_name: '', gift_price: 0 };
   var selectedCartSeatKey = null;
   var legendRenderer = null;
 
@@ -227,13 +229,24 @@ var Cashier = (function () {
       }
   }
 
-  function computeCartTotal() {
+  function computeTicketBaseTotal() {
     var total = 0;
     cart.forEach(function (k) {
       var p = getSeatPrice(k);
       if (p != null && !isNaN(Number(p))) total += Math.floor(Number(p));
     });
     return total;
+  }
+
+  function computeGiftTotal() {
+    if (!sessionPromotion.enabled) return 0;
+    return cart.reduce(function (total, key) {
+      return total + (giftSelections[normalizeSeatKey(key)] ? sessionPromotion.gift_price : 0);
+    }, 0);
+  }
+
+  function computeCartTotal() {
+    return computeTicketBaseTotal() + computeGiftTotal();
   }
 
   function formatMoneyTg(value) {
@@ -253,12 +266,14 @@ var Cashier = (function () {
   }
 
   function calculateDiscounts(baseTotal) {
-    var base = Math.max(0, Number(baseTotal) || 0);
+    var ticketBase = Math.max(0, computeTicketBaseTotal());
+    var giftTotal = Math.max(0, computeGiftTotal());
+    var base = ticketBase + giftTotal;
     var segment = getCurrentSegment();
     var manualMode = segment === 'manual';
     var autoPercent = manualMode ? 0 : getSegmentDiscountPercent(segment);
-    var autoAmount = manualMode ? 0 : (Math.round(base * autoPercent) / 100);
-    var afterAuto = Math.max(0, base - autoAmount);
+    var autoAmount = manualMode ? 0 : (Math.round(ticketBase * autoPercent) / 100);
+    var afterAuto = Math.max(0, ticketBase - autoAmount);
 
     var manualAmount = 0;
     if (manualMode && discountConfig.custom_enabled) {
@@ -266,12 +281,14 @@ var Cashier = (function () {
       manualAmount = Math.min(manualAmount, Math.floor(afterAuto));
     }
 
-    var finalTotal = Math.max(0, afterAuto - manualAmount);
+    var finalTotal = Math.max(0, afterAuto - manualAmount) + giftTotal;
     var totalDiscount = Math.max(0, base - finalTotal);
 
     return {
       segment: segment,
       base_total: base,
+      ticket_base_total: ticketBase,
+      gift_total: giftTotal,
       auto_percent: autoPercent,
       auto_amount: autoAmount,
       custom_type: manualMode ? 'fixed' : 'none',
@@ -301,8 +318,7 @@ var Cashier = (function () {
   }
 
   function refreshDiscountUi() {
-    var baseTotal = computeCartTotal();
-    var d = calculateDiscounts(baseTotal);
+    var d = calculateDiscounts(computeCartTotal());
     if (baseTotalOutputEl) baseTotalOutputEl.textContent = formatMoneyTg(d.base_total);
     if (discountTotalOutputEl) discountTotalOutputEl.textContent = formatMoneyTg(d.total_discount);
     if (finalTotalOutputEl) finalTotalOutputEl.textContent = formatMoneyTg(d.final_total);
@@ -313,8 +329,8 @@ var Cashier = (function () {
       manualDiscountAmountEl.disabled = !manualEnabled;
       if (manualEnabled) {
         var currentManual = getManualDiscountInputValue();
-        if (currentManual > d.base_total) {
-          manualDiscountAmountEl.value = String(Math.floor(d.base_total));
+        if (currentManual > d.ticket_base_total) {
+          manualDiscountAmountEl.value = String(Math.floor(d.ticket_base_total));
         }
       }
     }
@@ -388,6 +404,7 @@ var Cashier = (function () {
         ev.preventDefault();
         ev.stopPropagation();
         cart = cart.filter(function (x) { return normalizeSeatKey(x) !== itemKey; });
+        delete giftSelections[itemKey];
         if (generalAdmissionMode && generalAdmissionQuantityEl) {
           generalAdmissionQuantityEl.value = cart.length ? String(cart.length) : '';
         }
@@ -403,6 +420,27 @@ var Cashier = (function () {
       });
 
       item.appendChild(left);
+      if (sessionPromotion.enabled) {
+        var giftSelect = document.createElement('select');
+        giftSelect.className = 'input';
+        giftSelect.style.width = '100%';
+        giftSelect.style.marginTop = '6px';
+        giftSelect.innerHTML = '<option value="0">Без подарка</option>';
+        var giftOption = document.createElement('option');
+        giftOption.value = '1';
+        giftOption.textContent = 'С подарком: ' + sessionPromotion.gift_name + ' +'
+          + Number(sessionPromotion.gift_price).toLocaleString() + ' тг';
+        giftSelect.appendChild(giftOption);
+        giftSelect.value = giftSelections[itemKey] ? '1' : '0';
+        giftSelect.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        giftSelect.addEventListener('change', function (ev) {
+          ev.stopPropagation();
+          giftSelections[itemKey] = giftSelect.value === '1';
+          renderCart();
+          syncSelectionToRenderer();
+        });
+        left.appendChild(giftSelect);
+      }
       item.appendChild(rem);
       container.appendChild(item);
     });
@@ -433,7 +471,8 @@ var Cashier = (function () {
           seats.push({
             id: seatId,
             identifier: (row && seat) ? (row + ':' + seat) : String(k),
-            original_price: price
+            original_price: price,
+            gift_selected: !!giftSelections[normalizeSeatKey(k)]
           });
         } catch (inner) {
         }
@@ -1078,6 +1117,13 @@ var Cashier = (function () {
       var sold = res.data && res.data.sold_seats ? res.data.sold_seats : [];
       var held = res.data && res.data.held_seats ? res.data.held_seats : [];
       if (session) session.general_admission = res.data.general_admission === true;
+      sessionPromotion = session && session.promotion_enabled
+        ? {
+          enabled: true,
+          gift_name: String(session.promotion_gift_name || ''),
+          gift_price: Number(session.promotion_gift_price) || 0
+        }
+        : { enabled: false, gift_name: '', gift_price: 0 };
       try {
         if (onSessionLoaded && session) onSessionLoaded(session);
       } catch (e) {
@@ -1198,6 +1244,7 @@ var Cashier = (function () {
             if (!resp || !resp.success) return alert(resp && resp.message ? resp.message : 'Ошибка создания резерва');
             showToast('Резерв создан');
             cart = [];
+            giftSelections = {};
             selectedCartSeatKey = null;
             renderCart();
             syncSelectionToRenderer();

@@ -321,6 +321,33 @@
         });
       }
 
+      var promotionEnabledEl = document.getElementById('promotion_enabled');
+      var promotionGiftNameEl = document.getElementById('promotion_gift_name');
+      var promotionGiftPriceEl = document.getElementById('promotion_gift_price');
+      function syncPromotionFields() {
+        var enabled = promotionEnabledEl && promotionEnabledEl.value === '1';
+        if (promotionGiftNameEl) promotionGiftNameEl.disabled = !enabled;
+        if (promotionGiftPriceEl) {
+          promotionGiftPriceEl.disabled = !enabled;
+          promotionGiftPriceEl.min = '1';
+          if (!enabled) promotionGiftPriceEl.value = '0';
+        }
+      }
+      if (promotionEnabledEl) {
+        promotionEnabledEl.addEventListener('change', syncPromotionFields);
+        syncPromotionFields();
+      }
+      if (promotionGiftPriceEl) {
+        promotionGiftPriceEl.addEventListener('input', function () {
+          if (this.value === '') return;
+          var value = Number(this.value);
+          this.value = isFinite(value) ? String(Math.max(0, Math.floor(value))) : '0';
+        });
+        promotionGiftPriceEl.addEventListener('blur', function () {
+          this.value = String(Math.max(0, Math.floor(Number(this.value) || 0)));
+        });
+      }
+
       // Listen for changes to start_time, end_time, hall_id to trigger overlap check
       var startEl = document.getElementById('start_time');
       var endEl = document.getElementById('end_time');

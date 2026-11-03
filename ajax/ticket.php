@@ -228,7 +228,7 @@ if ($action === 'get_ticket') {
     if (!$id) json_resp(['success' => false, 'message' => 'Неверный id'], 400);
     try {
         $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                       t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                       t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
                    t.payment_provider, t.payment_session_id,
                    tx.payment_method AS tx_payment_method,
@@ -273,6 +273,9 @@ if ($action === 'get_ticket') {
             'refund_status' => $r['refund_status'] ?? 'none',
             'discount_percent' => (int)($r['discount'] ?? 0),
             'discount_amount' => (float)($r['discount_amount'] ?? 0),
+            'gift_selected' => (bool)($r['gift_selected'] ?? false),
+            'gift_name' => $r['gift_name'] ?? null,
+            'gift_price' => (int)($r['gift_price'] ?? 0),
             'customer_name' => $r['customer_name'],
             'customer_id' => $r['customer_id'],
             'event_title' => $r['event_title'],
@@ -662,7 +665,7 @@ if ($action === 'list') {
     try {
         $sql = "SELECT
                     t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                    t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                    t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                     t.customer_segment, t.payment_transaction_id,
                     tx.payment_method AS tx_payment_method,
                     ps.order_number,
@@ -695,7 +698,7 @@ if ($action === 'list') {
         try {
             $csvSql = "SELECT
                         t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                        t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                        t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                         t.customer_segment, t.payment_transaction_id,
                         tx.payment_method AS tx_payment_method,
                         ps.order_number,
@@ -718,7 +721,7 @@ if ($action === 'list') {
             header('Content-Disposition: attachment; filename="tickets_export.csv"');
             echo "\xEF\xBB\xBF";
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['ID','UID','Ряд - Место','Клиент','Событие','Сеанс','Тип','База, тг','Скидка, тг','Цена, тг','Канал','Форма оплаты','Номер заказа','Статус','Возврат','Покупка']);
+            fputcsv($out, ['ID','UID','Ряд - Место','Клиент','Событие','Сеанс','Тип','Подарок','База, тг','Скидка, тг','Цена, тг','Канал','Форма оплаты','Номер заказа','Статус','Возврат','Покупка']);
             foreach ($all as $a) {
                 $sessionLabel = ($a['event_title'] ?? '') . ($a['session_start'] ? ' / ' . $a['session_start'] : '');
                 $seatOut = $a['seat_label'] ?: ($a['seat_identifier'] ?? '');
@@ -734,6 +737,7 @@ if ($action === 'list') {
                     $a['event_title'],
                     $a['session_start'],
                     $a['customer_segment'],
+                    !empty($a['gift_selected']) ? trim((string)($a['gift_name'] ?? '')) . ' (+' . (int)($a['gift_price'] ?? 0) . ' тг)' : '—',
                     $ticketBasePrice,
                     $ticketDiscount,
                     $ticketFinancials['paid'],
@@ -772,6 +776,9 @@ if ($action === 'list') {
             'original_price' => $ticketFinancials['original'],
             'discount_amount' => $ticketDiscount,
             'final_price' => $priceOut,
+            'gift_selected' => (bool)($r['gift_selected'] ?? false),
+            'gift_name' => $r['gift_name'] ?? null,
+            'gift_price' => (int)($r['gift_price'] ?? 0),
             'channel' => $r['channel'],
             'payment_type' => map_payment_type_display($r['channel'] ?? '', $r['tx_payment_method'] ?? null),
             'tx_payment_method' => $r['tx_payment_method'] ?? null,

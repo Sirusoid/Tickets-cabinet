@@ -109,6 +109,24 @@ require __DIR__ . '/../includes/panel.php';
         </div>
       </div>
 
+      <div style="display:flex; gap:12px; margin-bottom:12px; align-items:flex-end;">
+        <div style="flex:1;">
+          <label for="promotion_enabled">Акция</label>
+          <select id="promotion_enabled" name="promotion_enabled" class="form-control">
+            <option value="0">Без акции</option>
+            <option value="1">Подарок к билету</option>
+          </select>
+        </div>
+        <div style="flex:2;">
+          <label for="promotion_gift_name">Название подарка</label>
+          <input id="promotion_gift_name" name="promotion_gift_name" type="text" class="form-control" maxlength="255" placeholder="Например, памятная открытка">
+        </div>
+        <div style="flex:1;">
+          <label for="promotion_gift_price">Цена подарка, тг</label>
+          <input id="promotion_gift_price" name="promotion_gift_price" type="number" class="form-control" min="1" step="1" value="0" inputmode="numeric">
+        </div>
+      </div>
+
       <section id="generalAdmissionSettings" class="schedule-capacity-panel" hidden>
         <label for="schedule_capacity">Вместимость сеанса</label>
         <div class="schedule-capacity-panel__control">

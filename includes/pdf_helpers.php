@@ -609,6 +609,11 @@ if (!function_exists('ticket_pdf_render_html')) {
 
         $orig_price_display = number_format($orig_price_value, 0, '.', '') . ' тг';
         $paid_price_display = number_format($paid_price_value, 0, '.', '') . ' тг';
+        $giftPriceValue = (int)($ticket['gift_price'] ?? 0);
+        $giftNameValue = trim((string)($ticket['gift_name'] ?? ''));
+        $giftLine = !empty($ticket['gift_selected']) && $giftPriceValue > 0
+            ? 'ПОДАРОК / СЫЙЛЫҚ: ' . ($giftNameValue !== '' ? $giftNameValue . ' — ' : '') . number_format($giftPriceValue, 0, '.', '') . ' тг'
+            : '';
         $discountLine = $discount_amount_display > 0
             ? 'СКИДКА / ЖЕҢІЛДІК: ' . number_format($discount_amount_display, 0, '.', '') . ' тг'
             : '';
@@ -773,6 +778,9 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '<div class="ticket-content"><div class="ticket-main"><div class="ticket-main-left">';
         $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА: / КҮНІ: </strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ: / УАҚЫТ: </strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div></div>';
         $html .= '<div class="ticket-section">';
+        if ($giftLine !== '') {
+            $html .= '<div class="customer-line"><strong>' . htmlspecialchars($giftLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></div>';
+        }
         // Раскомментировать, если нужно показывать строки с ценой и оплатой в билете
         /* $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
         $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';*/

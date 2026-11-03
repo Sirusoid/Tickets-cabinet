@@ -49,7 +49,7 @@ $sourceSql = reporting_source_sql($sourceFilter);
 try {
     $rows = db_fetch_all("SELECT
             t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.promo_code, t.schedule_id,
-            t.customer_segment, t.channel, t.payment_status, t.status,
+            t.customer_segment, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status,
             t.refund_status, t.refund_at, t.payment_provider, t.purchased_at,
             tx.payment_method AS tx_payment_method,
             ps.order_number,
@@ -98,6 +98,9 @@ foreach ($rows as $row) {
     $refundAmount = $isRefunded ? max(0.0, (float)($row['refund_record_amount'] ?? $financials['paid'])) : 0.0;
     $paymentMethod = reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
     $purchaseSource = reporting_source_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
+    $giftLabel = !empty($row['gift_selected'])
+        ? trim((string)($row['gift_name'] ?? '')) . ' (+' . (int)($row['gift_price'] ?? 0) . ' тг)'
+        : '—';
     $key = (string)($row['session_start'] ?? '') . '|' . (string)($row['event_title'] ?? '');
     if (!isset($summary[$key])) {
         $summary[$key] = [
@@ -137,6 +140,7 @@ foreach ($rows as $row) {
         (string)($row['ticket_uid'] ?? ''),
         general_admission_display_label(str_replace(':', ' - ', (string)($row['seat_identifier'] ?? ''))),
         reporting_segment_label($row['customer_segment'] ?? ''),
+        $giftLabel,
         reporting_discount_label($row),
         $financials['original'],
         $financials['discount'],
@@ -197,7 +201,7 @@ $detailSheet = $spreadsheet->createSheet();
 $detailSheet->setTitle('Билеты');
 $detailSheet->fromArray([
     ['Операция', 'Источник', 'Дата покупки', 'Дата возврата', 'Название спектакля', 'Дата спектакля',
-        '№ сеанса', 'UID билета', 'Ряд - Место', 'Тип билета', 'Тип скидки', 'Цена без скидки, тг',
+        '№ сеанса', 'UID билета', 'Ряд - Место', 'Тип билета', 'Подарок', 'Тип скидки', 'Цена без скидки, тг',
         'Скидка, тг', 'Продажа, тг', 'Возврат, тг', 'Итог, тг', 'Форма оплаты', 'Канал',
         'Номер заказа', 'Клиент', 'Оплата', 'Статус', 'Возврат', 'Транзакция возврата'],
 ], null, 'A1');
@@ -205,15 +209,14 @@ $detailRow = 2;
 foreach ($details as $detail) {
     $detailSheet->fromArray([$detail], null, 'A' . $detailRow++);
 }
-$detailSheet->fromArray([[
-    'ИТОГО', null, null, null, null, null, null, null, null, null, null,
-    round($totals['original'], 2),
-    round($totals['discount'], 2),
-    round($totals['paid'], 2),
-    round($totals['refunds'], 2),
-    max(0.0, round($totals['paid'] - $totals['refunds'], 2)),
-    null, null, null, null, null, null, null,
-]], null, 'A' . $detailRow);
+$detailTotal = array_fill(0, 25, null);
+$detailTotal[0] = 'ИТОГО';
+$detailTotal[12] = round($totals['original'], 2);
+$detailTotal[13] = round($totals['discount'], 2);
+$detailTotal[14] = round($totals['paid'], 2);
+$detailTotal[15] = round($totals['refunds'], 2);
+$detailTotal[16] = max(0.0, round($totals['paid'] - $totals['refunds'], 2));
+$detailSheet->fromArray([$detailTotal], null, 'A' . $detailRow);
 
 foreach ([$summarySheet, $detailSheet] as $sheet) {
     $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()->setVertical(
@@ -232,9 +235,9 @@ foreach ([$summarySheet, $detailSheet] as $sheet) {
 }
 $summarySheet->getStyle('D6:H' . max(6, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $summarySheet->getStyle('A10:H' . max(10, $summaryRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('K2:O' . max(2, $detailRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('A' . $detailRow . ':W' . $detailRow)->getFont()->setBold(true);
-$detailSheet->getStyle('L' . $detailRow . ':P' . $detailRow)->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('M2:Q' . max(2, $detailRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('A' . $detailRow . ':Y' . $detailRow)->getFont()->setBold(true);
+$detailSheet->getStyle('M' . $detailRow . ':Q' . $detailRow)->getNumberFormat()->setFormatCode('#,##0.00');
 
 $filename = 'sales-report-' . $dateFrom . '-' . $dateTo . '.xlsx';
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

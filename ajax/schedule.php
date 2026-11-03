@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/general_admission.php';
+require_once __DIR__ . '/../includes/gift_promotion.php';
 require_login();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -167,6 +168,11 @@ if ($action === 'create') {
     $status = $_POST['status'] ?? null;
 
     try {
+        $promotion = gift_promotion_normalize_config(
+            $_POST['promotion_enabled'] ?? '0',
+            $_POST['promotion_gift_name'] ?? '',
+            $_POST['promotion_gift_price'] ?? 0
+        );
         if (!isset($pdo) || !$pdo) {
             if (function_exists('db_connect')) {
                 $pdo = db_connect();
@@ -184,9 +190,9 @@ if ($action === 'create') {
 
         // ВАЖНО: не включаем price_ranges_count в INSERT, чтобы избежать ошибок при несовпадении схемы.
         $sql = "INSERT INTO schedules
-                (event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status, created_at, updated_at)
+                (event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, promotion_enabled, promotion_gift_name, promotion_gift_price, status, created_at, updated_at)
                 VALUES
-                (:event_id, :hall_id, :capacity, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :status, NOW(), NOW())";
+                (:event_id, :hall_id, :capacity, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :promotion_enabled, :promotion_gift_name, :promotion_gift_price, :status, NOW(), NOW())";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':event_id' => $event_id,
@@ -200,6 +206,9 @@ if ($action === 'create') {
             ':price_ranges' => $price_ranges_raw,
             ':seat_map' => $seat_map_compact,
             ':notes' => $notes,
+            ':promotion_enabled' => $promotion['enabled'],
+            ':promotion_gift_name' => $promotion['name'],
+            ':promotion_gift_price' => $promotion['price'],
             ':status' => $status
         ]);
 
@@ -256,6 +265,11 @@ if ($action === 'update') {
     $status = $_POST['status'] ?? null;
 
     try {
+        $promotion = gift_promotion_normalize_config(
+            $_POST['promotion_enabled'] ?? '0',
+            $_POST['promotion_gift_name'] ?? '',
+            $_POST['promotion_gift_price'] ?? 0
+        );
         if (!isset($pdo) || !$pdo) {
             if (function_exists('db_connect')) $pdo = db_connect();
         }
@@ -287,6 +301,9 @@ if ($action === 'update') {
                     price_ranges = :price_ranges,
                     seat_map = :seat_map,
                     notes = :notes,
+                    promotion_enabled = :promotion_enabled,
+                    promotion_gift_name = :promotion_gift_name,
+                    promotion_gift_price = :promotion_gift_price,
                     status = :status,
                     updated_at = NOW()
                 WHERE id = :id";
@@ -303,6 +320,9 @@ if ($action === 'update') {
             ':price_ranges' => $price_ranges_raw,
             ':seat_map' => $seat_map_compact,
             ':notes' => $notes,
+            ':promotion_enabled' => $promotion['enabled'],
+            ':promotion_gift_name' => $promotion['name'],
+            ':promotion_gift_price' => $promotion['price'],
             ':status' => $status,
             ':id' => $id
         ]);
@@ -323,7 +343,7 @@ if ($action === 'update') {
 
 /*
   LIST action
-  Возвращаем: id, event_title, hall_name, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, status
+  Возвращаем: id, event_title, hall_name, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, promotion, status
 */
 if ($action === 'list') {
     try {
@@ -352,6 +372,9 @@ if ($action === 'list') {
                     s.sales_end_time,
                     s.base_price,
                     s.price_ranges,
+                    s.promotion_enabled,
+                    s.promotion_gift_name,
+                    s.promotion_gift_price,
                     s.status
                 FROM schedules s
                 LEFT JOIN events e ON e.id = s.event_id
@@ -463,7 +486,7 @@ if ($action === 'duplicate') {
             if (function_exists('db_connect')) $pdo = db_connect();
         }
         // fetch existing schedule
-        $stmt = $pdo->prepare("SELECT event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status FROM schedules WHERE id = :id LIMIT 1");
+        $stmt = $pdo->prepare("SELECT event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, promotion_enabled, promotion_gift_name, promotion_gift_price, status FROM schedules WHERE id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) json_resp(false, 'Сеанс не найден');
@@ -480,6 +503,9 @@ if ($action === 'duplicate') {
         $new_price_ranges = $row['price_ranges'];
         $new_seat_map = $row['seat_map'];
         $new_notes = $row['notes'];
+        $new_promotion_enabled = $row['promotion_enabled'];
+        $new_promotion_gift_name = $row['promotion_gift_name'];
+        $new_promotion_gift_price = $row['promotion_gift_price'];
         $new_status = $override_status !== null ? $override_status : $row['status'];
 
         // Basic validation: require start/end
@@ -495,9 +521,9 @@ if ($action === 'duplicate') {
         // Insert new schedule in transaction
         $pdo->beginTransaction();
         $ins = $pdo->prepare("INSERT INTO schedules
-            (event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, status, created_at, updated_at)
+            (event_id, hall_id, capacity, start_time, end_time, sales_start_time, sales_end_time, base_price, price_ranges, seat_map, notes, promotion_enabled, promotion_gift_name, promotion_gift_price, status, created_at, updated_at)
             VALUES
-            (:event_id, :hall_id, :capacity, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :status, NOW(), NOW())");
+            (:event_id, :hall_id, :capacity, :start_time, :end_time, :sales_start_time, :sales_end_time, :base_price, :price_ranges, :seat_map, :notes, :promotion_enabled, :promotion_gift_name, :promotion_gift_price, :status, NOW(), NOW())");
         $ins->execute([
             ':event_id' => $new_event_id,
             ':hall_id' => $new_hall_id,
@@ -510,6 +536,9 @@ if ($action === 'duplicate') {
             ':price_ranges' => $new_price_ranges,
             ':seat_map' => $new_seat_map,
             ':notes' => $new_notes,
+            ':promotion_enabled' => $new_promotion_enabled,
+            ':promotion_gift_name' => $new_promotion_gift_name,
+            ':promotion_gift_price' => $new_promotion_gift_price,
             ':status' => $new_status
         ]);
         $newId = (int)$pdo->lastInsertId();

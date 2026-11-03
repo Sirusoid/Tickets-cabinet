@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/general_admission.php';
+require_once __DIR__ . '/../includes/gift_promotion.php';
 require_login();
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -224,7 +225,8 @@ function normalize_seats($seats_raw) {
                     'original_price' => $originalPrice,
                 ];
                 if ($segment !== null) $entry['customer_segment'] = $segment;
-                $result[] = $entry;
+                    if (isset($s['gift_selected'])) $entry['gift_selected'] = gift_promotion_selected($s['gift_selected']);
+                    $result[] = $entry;
             }
         }
     }
@@ -352,11 +354,14 @@ case 'sell':
         json_response(['success' => false, 'message' => 'Сеанс не содержит event_id или hall_id. Невозможно завершить продажу.']);
     }
     $generalAdmission = general_admission_is_session($sessionRow);
+    $promotion = gift_promotion_details($sessionRow);
 
     // Канонический источник цены места — только original_price из payload.
     $baseSeatPrices = [];
     $seenGeneralAdmissionSeats = [];
+    $giftTotal = 0.0;
     foreach ($seats as &$seat) {
+        $seat = gift_promotion_apply_to_seat($seat, $sessionRow);
         $p = isset($seat['original_price']) && is_numeric($seat['original_price'])
             ? (float)$seat['original_price']
             : 0.0;
@@ -377,6 +382,7 @@ case 'sell':
             }
         }
         $baseSeatPrices[] = max(0.0, $p);
+        $giftTotal += (float)$seat['gift_price'];
     }
     unset($seat);
     $baseTotal = array_sum($baseSeatPrices);
@@ -481,7 +487,8 @@ case 'sell':
     $finalSeatPrices = cash_distribute_prices($baseSeatPrices, $discountApplied['final_total']);
 
     // Сумма всегда вычисляется сервером; значение клиента не используется.
-    $amount_cents = (int)round($discountApplied['final_total'] * 100);
+    $finalSaleTotal = round($discountApplied['final_total'] + $giftTotal, 2);
+    $amount_cents = (int)round($finalSaleTotal * 100);
 
     // --- формирование per-seat итогов (seats_final) ---
     $seats_final = [];
@@ -498,8 +505,9 @@ case 'sell':
         $identifier = str_replace(':', '-', $identifier);
 
         // prices
-        $orig = isset($baseSeatPrices[$idx]) ? (float)$baseSeatPrices[$idx] : 0.0;
-        $final = isset($finalSeatPrices[$idx]) ? (float)$finalSeatPrices[$idx] : 0.0;
+        $giftPrice = isset($seat['gift_price']) ? (float)$seat['gift_price'] : 0.0;
+        $orig = (isset($baseSeatPrices[$idx]) ? (float)$baseSeatPrices[$idx] : 0.0) + $giftPrice;
+        $final = (isset($finalSeatPrices[$idx]) ? (float)$finalSeatPrices[$idx] : 0.0) + $giftPrice;
 
         // discount amount in currency (orig - final)
         $discount_amount = round(max(0.0, $orig - $final), 2);
@@ -644,9 +652,10 @@ case 'sell':
             'source' => 'cashier',
             'payment_method' => $payment_method,
             'customer_segment' => $customer_segment_store,
-            'original_total' => round($baseTotal, 2),
+            'original_total' => round($baseTotal + $giftTotal, 2),
             'discount_total' => round($discountApplied['applied']['total_discount'] ?? 0, 2),
-            'final_total' => round($discountApplied['final_total'], 2),
+            'gift_total' => round($giftTotal, 2),
+            'final_total' => $finalSaleTotal,
         ], JSON_UNESCAPED_UNICODE);
         $currency = 'KZT';
         $txStmt->execute([
@@ -776,6 +785,9 @@ case 'sell':
         $ticket_has_original_price = column_exists($pdo, 'tickets', 'original_price');
         $ticket_has_final_price = column_exists($pdo, 'tickets', 'final_price');
         $ticket_has_discount_amount = column_exists($pdo, 'tickets', 'discount_amount');
+        $ticket_has_gift_selected = column_exists($pdo, 'tickets', 'gift_selected');
+        $ticket_has_gift_name = column_exists($pdo, 'tickets', 'gift_name');
+        $ticket_has_gift_price = column_exists($pdo, 'tickets', 'gift_price');
 
         // Extend baseCols to include any existing extra columns (we will not add new DB columns)
         $baseCols = "schedule_id, event_id, hall_id, seat_identifier, seat_id, status, payment_status, payment_transaction_id, ticket_uid, channel, customer_id, customer_segment, purchased_at, created_at, updated_at";
@@ -792,6 +804,9 @@ case 'sell':
         if ($ticket_has_original_price) { $extraCols[] = 'original_price'; $extraVals[] = ':original_price'; }
         if ($ticket_has_final_price) { $extraCols[] = 'final_price'; $extraVals[] = ':final_price'; }
         if ($ticket_has_discount_amount) { $extraCols[] = 'discount_amount'; $extraVals[] = ':discount_amount'; }
+        if ($ticket_has_gift_selected) { $extraCols[] = 'gift_selected'; $extraVals[] = ':gift_selected'; }
+        if ($ticket_has_gift_name) { $extraCols[] = 'gift_name'; $extraVals[] = ':gift_name'; }
+        if ($ticket_has_gift_price) { $extraCols[] = 'gift_price'; $extraVals[] = ':gift_price'; }
 
         if (!empty($extraCols)) {
             $baseCols .= ', ' . implode(', ', $extraCols);
@@ -861,6 +876,9 @@ case 'sell':
             if ($ticket_has_final_price) {
                 $bind[':final_price'] = number_format($final_price, 2, '.', '');
             }
+            if ($ticket_has_gift_selected) $bind[':gift_selected'] = (int)($seat['gift_selected'] ?? 0);
+            if ($ticket_has_gift_name) $bind[':gift_name'] = $seat['gift_name'] ?? null;
+            if ($ticket_has_gift_price) $bind[':gift_price'] = (int)($seat['gift_price'] ?? 0);
 
             $insStmt->execute($bind);
 
@@ -935,7 +953,7 @@ case 'sell':
         if (!empty($generated_ticket_uids)) {
             $in = implode(',', array_fill(0, count($generated_ticket_uids), '?'));
             try {
-                $stmtT = $pdo->prepare("SELECT id, ticket_uid, seat_identifier, original_price, final_price, discount, discount_amount, purchased_at FROM tickets WHERE ticket_uid IN ($in)");
+                $stmtT = $pdo->prepare("SELECT id, ticket_uid, seat_identifier, original_price, final_price, discount, discount_amount, gift_selected, gift_name, gift_price, purchased_at FROM tickets WHERE ticket_uid IN ($in)");
                 $stmtT->execute($generated_ticket_uids);
                 while ($tr = $stmtT->fetch(PDO::FETCH_ASSOC)) {
                     $pdfPath = null;
@@ -955,6 +973,9 @@ case 'sell':
                         'final_price' => (float)$tr['final_price'],
                         'discount_percent' => (int)$tr['discount'],
                         'discount_amount' => (float)$tr['discount_amount'],
+                        'gift_selected' => (bool)$tr['gift_selected'],
+                        'gift_name' => $tr['gift_name'],
+                        'gift_price' => (int)$tr['gift_price'],
                         'purchased_at' => isset($tr['purchased_at']) ? $tr['purchased_at'] : null,
                         'pdf_url' => $pdfUrl
                     ];

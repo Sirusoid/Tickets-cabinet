@@ -43,7 +43,7 @@ if (!$error && $session && $pdo instanceof PDO) {
         $uids = json_decode($session['ticket_uids'] ?? '[]', true);
         if (is_array($uids) && !empty($uids)) {
             $placeholders = implode(',', array_fill(0, count($uids), '?'));
-            $stmt = $pdo->prepare("                        SELECT t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.customer_segment, t.channel,
+            $stmt = $pdo->prepare("                        SELECT t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.customer_segment, t.channel,
                         t.status, t.payment_status, t.refund_status, t.refund_at, t.purchased_at,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS schedule_start,
@@ -273,6 +273,9 @@ require_once __DIR__ . '/../includes/header.php';
                                         <strong>Место: <?= h($publicSeat['seat']) ?></strong>
                                     </div>
                                     <div style="color:#4b5563;">Цена / Бағасы: <?= number_format((float)$ticket['final_price'], 2, '.', ' ') ?> ₸</div>
+                                    <?php if (!empty($ticket['gift_selected'])): ?>
+                                        <div style="color:#166534; font-weight:600;">Подарок / Сыйлық: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> ₸)</div>
+                                    <?php endif; ?>
                                     <?php if (($ticket['refund_status'] ?? 'none') === 'refunded'): ?>
                                         <div style="color:#b91c1c; font-weight:600;">Билет возвращён / Билет қайтарылды</div>
                                     <?php endif; ?>

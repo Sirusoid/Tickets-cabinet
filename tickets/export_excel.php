@@ -96,7 +96,7 @@ $channelNames = ['web' => 'Web', 'mobile' => 'Mobile', 'kassa' => 'Касса', 
 
 $sql = "SELECT
 		t.id, t.ticket_uid, t.seat_identifier, t.purchased_at, t.original_price, t.final_price, t.discount, t.discount_amount,
-		t.channel, t.payment_status, t.status, t.refund_status, t.customer_segment,
+		t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status, t.customer_segment,
 		tx.payment_method AS tx_payment_method,
 		ps.order_number, COALESCE(c.full_name, '') AS customer_name,
 		COALESCE(e.title, '') AS event_title, s.start_time AS session_start
@@ -153,7 +153,7 @@ $sheet->fromArray([
 	['Итоги', null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
 	['Билетов', 0, 'Цена без скидки, тг', 0, 'Скидка, тг', 0, 'Оплачено, тг', 0, null, null, null, null, null, null, null, null, null],
 	[],
-	['№', 'ID', 'Дата заказа', 'Сеанс', 'Клиент', 'Ряд - Место', 'Тип', 'Цена без скидки, тг', 'Скидка, тг', 'Оплачено, тг', 'Канал', 'Форма оплаты', 'Номер заказа', 'UID билета', 'Оплата', 'Статус', 'Возврат'],
+	['№', 'ID', 'Дата заказа', 'Сеанс', 'Клиент', 'Ряд - Место', 'Тип', 'Подарок', 'Цена без скидки, тг', 'Скидка, тг', 'Оплачено, тг', 'Канал', 'Форма оплаты', 'Номер заказа', 'UID билета', 'Оплата', 'Статус', 'Возврат'],
 ], null, 'A1');
 
 $rowNumber = 7;
@@ -173,6 +173,7 @@ foreach ($rows as $index => $row) {
 		$index + 1, (int)$row['id'], !empty($row['purchased_at']) ? date('d.m.Y H:i', strtotime($row['purchased_at'])) : '',
 		$session, (string)($row['customer_name'] ?? ''), $seat,
 		$segmentNames[(string)($row['customer_segment'] ?? '')] ?? (string)($row['customer_segment'] ?? '—'),
+		!empty($row['gift_selected']) ? trim((string)($row['gift_name'] ?? '')) . ' (+' . (int)($row['gift_price'] ?? 0) . ' тг)' : '—',
 		$base, $discount, $price, $channelNames[(string)($row['channel'] ?? '')] ?? (string)($row['channel'] ?? ''),
 		ticket_export_payment_label($row['channel'] ?? '', $row['tx_payment_method'] ?? ''), (string)($row['order_number'] ?? ''),
 		(string)($row['ticket_uid'] ?? ''), $paymentNames[(string)($row['payment_status'] ?? '')] ?? (string)($row['payment_status'] ?? ''),
@@ -185,16 +186,16 @@ $sheet->setCellValue('B4', $totals['tickets']);
 $sheet->setCellValue('D4', $totals['base']);
 $sheet->setCellValue('F4', $totals['discount']);
 $sheet->setCellValue('H4', $totals['price']);
-$sheet->mergeCells('A1:Q1');
-$sheet->mergeCells('B2:Q2');
-$sheet->getStyle('A1:Q1')->getFont()->setBold(true)->setSize(16);
+$sheet->mergeCells('A1:R1');
+$sheet->mergeCells('B2:R2');
+$sheet->getStyle('A1:R1')->getFont()->setBold(true)->setSize(16);
 $sheet->getStyle('A3:H4')->getFont()->setBold(true);
-$sheet->getStyle('A6:Q6')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$sheet->getStyle('A6:Q6')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
+$sheet->getStyle('A6:R6')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+$sheet->getStyle('A6:R6')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
 $sheet->getStyle('D4:H4')->getNumberFormat()->setFormatCode('#,##0.00');
 $sheet->getStyle('H7:J' . max(7, $rowNumber - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 $sheet->freezePane('A7');
-foreach (range('A', 'Q') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
+foreach (range('A', 'R') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
 $sheet->getColumnDimension('D')->setWidth(34);
 $sheet->getColumnDimension('E')->setWidth(28);
 $sheet->getColumnDimension('M')->setWidth(22);

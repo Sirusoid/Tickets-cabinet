@@ -35,7 +35,7 @@ if ($ticket_id > 0) {
     redirect('/tickets/list.php');
 }
 
-$sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, t.customer_segment, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.status, t.payment_status, t.purchased_at,
+$sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, t.customer_segment, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.status, t.payment_status, t.purchased_at,
                COALESCE(c.full_name, '') AS customer_name,
                COALESCE(e.title, '') AS event_title,
                s.start_time AS schedule_start,
@@ -110,6 +110,9 @@ require __DIR__ . '/../includes/panel.php';
             <?php if ($ticket['hall_name'] !== ''): ?><div style="color:#555;">Зал: <?= h($ticket['hall_name']) ?></div><?php endif; ?>
             <div style="color:#555;">Место: <?= h(general_admission_is_identifier((string)$ticket['seat_identifier']) ? general_admission_ticket_label() : (string)$ticket['seat_identifier']) ?></div>
             <div style="color:#555;">Клиент: <?= h($ticket['customer_name']) ?></div>
+            <?php if (!empty($ticket['gift_selected'])): ?>
+              <div style="color:#166534; font-weight:600;">Подарок: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> тг)</div>
+            <?php endif; ?>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <a href="<?= h($previewUrl) ?>" target="_blank" class="btn btn-ghost btn-sm">Открыть PDF</a>

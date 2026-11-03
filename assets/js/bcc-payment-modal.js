@@ -451,10 +451,15 @@
     function renderOrderSummary() {
         if (!summaryTotal) return;
         const subtotal = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
+        const giftTotal = selectedSeats.reduce(function (sum, s) {
+            return sum + (s.gift_selected && currentSession && currentSession.promotion_enabled
+                ? Number(currentSession.promotion_gift_price) || 0
+                : 0);
+        }, 0);
         const discount = appliedPromoCode ? Math.min(subtotal, appliedPromoDiscountCents / 100) : 0;
         summaryCount.textContent = String(selectedSeats.length);
-        summarySubtotal.textContent = formatMoney(subtotal) + ' ' + cfg.currencySymbol;
-        if (orderSummary) orderSummary.style.display = discount > 0 ? '' : 'none';
+        summarySubtotal.textContent = formatMoney(subtotal + giftTotal) + ' ' + cfg.currencySymbol;
+        if (orderSummary) orderSummary.style.display = discount > 0 || giftTotal > 0 ? '' : 'none';
         if (summaryDiscountRow) summaryDiscountRow.style.display = discount > 0 ? '' : 'none';
         if (discount > 0) {
             summaryDiscountLabel.textContent = 'Скидка по промокоду ' + appliedPromoCode;
@@ -465,7 +470,12 @@
 
     function updateTotal() {
         const subtotal = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
-        const total = Math.max(0, subtotal - (appliedPromoCode ? appliedPromoDiscountCents / 100 : 0));
+        const giftTotal = selectedSeats.reduce(function (sum, s) {
+            return sum + (s.gift_selected && currentSession && currentSession.promotion_enabled
+                ? Number(currentSession.promotion_gift_price) || 0
+                : 0);
+        }, 0);
+        const total = Math.max(0, subtotal + giftTotal - (appliedPromoCode ? appliedPromoDiscountCents / 100 : 0));
         const count = selectedSeats.length;
         const overLimit = count > maxTicketsPerUser;
         if (totalEl) totalEl.textContent = formatMoney(total) + ' ' + cfg.currencySymbol;
@@ -823,7 +833,27 @@
         right.style.alignItems = 'center';
         const price = document.createElement('span');
         price.className = 'bcc-seat-card-price';
-        price.textContent = formatMoney(s.original_price) + ' ' + cfg.currencySymbol;
+        const giftPrice = s.gift_selected && currentSession && currentSession.promotion_enabled
+            ? Number(currentSession.promotion_gift_price) || 0
+            : 0;
+        price.textContent = formatMoney(Number(s.original_price) + giftPrice) + ' ' + cfg.currencySymbol;
+        if (currentSession && currentSession.promotion_enabled) {
+            const giftSelect = document.createElement('select');
+            giftSelect.className = 'form-control';
+            giftSelect.style.marginTop = '6px';
+            giftSelect.innerHTML = '<option value="0">Без подарка</option>';
+            const giftOption = document.createElement('option');
+            giftOption.value = '1';
+            giftOption.textContent = 'С подарком: ' + String(currentSession.promotion_gift_name || 'Подарок')
+                + ' +' + formatMoney(Number(currentSession.promotion_gift_price) || 0) + ' ' + cfg.currencySymbol;
+            giftSelect.appendChild(giftOption);
+            giftSelect.value = s.gift_selected ? '1' : '0';
+            giftSelect.addEventListener('change', function () {
+                s.gift_selected = giftSelect.value === '1';
+                updateCart();
+            });
+            info.appendChild(giftSelect);
+        }
         const remove = document.createElement('button');
         remove.className = 'bcc-seat-card-remove';
         remove.setAttribute('aria-label', 'Убрать билет');
@@ -870,7 +900,28 @@
             info.appendChild(meta);
             const price = document.createElement('span');
             price.className = 'bcc-seat-card-price';
-            price.textContent = formatMoney(s.original_price) + ' ' + cfg.currencySymbol;
+            const giftPrice = s.gift_selected && currentSession && currentSession.promotion_enabled
+                ? Number(currentSession.promotion_gift_price) || 0
+                : 0;
+            price.textContent = formatMoney(Number(s.original_price) + giftPrice) + ' ' + cfg.currencySymbol;
+            if (currentSession && currentSession.promotion_enabled) {
+                const giftSelect = document.createElement('select');
+                giftSelect.className = 'form-control';
+                giftSelect.style.marginTop = '6px';
+                giftSelect.innerHTML = '<option value="0">Без подарка</option>';
+                const giftOption = document.createElement('option');
+                giftOption.value = '1';
+                giftOption.textContent = 'С подарком: ' + String(currentSession.promotion_gift_name || 'Подарок')
+                    + ' +' + formatMoney(Number(currentSession.promotion_gift_price) || 0) + ' ' + cfg.currencySymbol;
+                giftSelect.appendChild(giftOption);
+                giftSelect.value = s.gift_selected ? '1' : '0';
+                giftSelect.addEventListener('change', function () {
+                    s.gift_selected = giftSelect.value === '1';
+                    renderCustomerCart();
+                    updateTotal();
+                });
+                info.appendChild(giftSelect);
+            }
             card.appendChild(info);
             card.appendChild(price);
             customerCartList.appendChild(card);
@@ -944,7 +995,13 @@
         const payload = {
                 action: 'create_bcc_session',
                 session_id: currentSession.id || currentSession.session_id,
-                seats: selectedSeats.map(function (s) { return { identifier: s.identifier, original_price: s.original_price }; }),
+                seats: selectedSeats.map(function (s) {
+                    return {
+                        identifier: s.identifier,
+                        original_price: s.original_price,
+                        gift_selected: !!s.gift_selected
+                    };
+                }),
                 customer_name: customer.name,
                 customer_phone: customer.phone,
                 customer_email: customer.email,

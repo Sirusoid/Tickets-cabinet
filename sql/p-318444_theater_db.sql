@@ -483,6 +483,9 @@ CREATE TABLE `schedules` (
   `seat_map` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`seat_map`)),
   `price_ranges` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`price_ranges`)),
   `notes` text DEFAULT NULL,
+  `promotion_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `promotion_gift_name` varchar(255) DEFAULT NULL,
+  `promotion_gift_price` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -693,6 +696,9 @@ CREATE TABLE `tickets` (
   `discount` int(11) NOT NULL DEFAULT 0,
   `discount_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `promo_code` varchar(12) DEFAULT NULL,
+  `gift_selected` tinyint(1) NOT NULL DEFAULT 0,
+  `gift_name` varchar(255) DEFAULT NULL,
+  `gift_price` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `status` enum('issued','cancelled','used') NOT NULL DEFAULT 'issued',
   `payment_status` enum('pending','paid','failed') NOT NULL DEFAULT 'pending',
   `payment_provider` varchar(100) DEFAULT NULL,

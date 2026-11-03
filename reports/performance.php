@@ -28,7 +28,7 @@ if (!$session) {
 $tickets = db_fetch_all(
     "SELECT
         t.id, t.ticket_uid, t.seat_identifier, t.customer_name, t.customer_email, t.customer_phone,
-        t.customer_segment, t.channel, t.payment_transaction_id,
+        t.customer_segment, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_transaction_id,
         t.original_price, t.final_price, t.discount_amount,
         t.payment_status, t.status, t.refund_status, t.is_checked_in,
         t.purchased_at,
@@ -274,6 +274,7 @@ require __DIR__ . '/../includes/panel.php';
                         <th>Место</th>
                         <th>Цена</th>
                         <th>Название тарифа</th>
+                        <th>Подарок</th>
                         <th>Тип билета</th>
                         <th>№ продажи</th>
                         <th>Внешний ID заказа</th>
@@ -289,7 +290,7 @@ require __DIR__ . '/../includes/panel.php';
                 </thead>
                 <tbody>
                 <?php if (!$soldTickets): ?>
-                    <tr><td colspan="21" class="reports-empty">Проданных билетов пока нет.</td></tr>
+                    <tr><td colspan="22" class="reports-empty">Проданных билетов пока нет.</td></tr>
                 <?php else: foreach ($soldTickets as $ticket): ?>
                     <?php $ticketFinancials = reporting_ticket_financials($ticket); ?>
                     <?php
@@ -300,6 +301,9 @@ require __DIR__ . '/../includes/panel.php';
                     $saleChannel = strtolower(trim((string)($ticket['channel'] ?? '')));
                     $saleType = $saleTypeLabels[$saleChannel] ?? 'Продажа';
                     $tariffName = trim((string)($ticket['seat_type'] ?? '')) ?: 'Стандартный';
+                    $giftLabel = !empty($ticket['gift_selected'])
+                        ? trim((string)($ticket['gift_name'] ?? '')) . ' (+' . (int)($ticket['gift_price'] ?? 0) . ' тг)'
+                        : '—';
                     $sectorName = trim((string)($ticket['seat_zone'] ?? ''));
                     if ($sectorName === '') {
                         $sectorName = trim((string)($ticket['seat_group'] ?? ''));
@@ -322,6 +326,7 @@ require __DIR__ . '/../includes/panel.php';
                         <td><?= h($seatNumber !== '' ? $seatNumber : '—') ?></td>
                         <td><?= number_format($ticketFinancials['paid'], 2, '.', ' ') ?> тг</td>
                         <td><?= h($tariffName) ?></td>
+                        <td><?= h($giftLabel) ?></td>
                         <td><?= h(reporting_segment_label($ticket['customer_segment'] ?? '')) ?></td>
                         <td><?= h($saleNumber !== '' ? $saleNumber : '—') ?></td>
                         <td><?= h($orderNumber !== '' ? $orderNumber : '—') ?></td>

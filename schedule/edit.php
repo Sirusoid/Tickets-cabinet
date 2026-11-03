@@ -76,6 +76,9 @@ function _fmt_local($val) {
 // Базовая цена — целое число
 $base_price_value = isset($session['base_price']) ? (int)$session['base_price'] : '';
 $capacity_value = isset($session['capacity']) ? (int)$session['capacity'] : '';
+$promotion_enabled_value = !empty($session['promotion_enabled']) ? '1' : '0';
+$promotion_gift_name_value = (string)($session['promotion_gift_name'] ?? '');
+$promotion_gift_price_value = max(0, (int)($session['promotion_gift_price'] ?? 0));
 
 ?>
 <link rel="stylesheet" href="/assets/css/forms.css">
@@ -161,6 +164,24 @@ $capacity_value = isset($session['capacity']) ? (int)$session['capacity'] : '';
             <option value="archive" <?= ($session['status'] === 'archive') ? 'selected' : '' ?>>Архивный</option>
             <option value="cancelled" <?= ($session['status'] === 'cancelled') ? 'selected' : '' ?>>Отменён</option>
           </select>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; margin-bottom:12px; align-items:flex-end;">
+        <div style="flex:1;">
+          <label for="promotion_enabled">Акция</label>
+          <select id="promotion_enabled" name="promotion_enabled" class="form-control">
+            <option value="0" <?= $promotion_enabled_value === '0' ? 'selected' : '' ?>>Без акции</option>
+            <option value="1" <?= $promotion_enabled_value === '1' ? 'selected' : '' ?>>Подарок к билету</option>
+          </select>
+        </div>
+        <div style="flex:2;">
+          <label for="promotion_gift_name">Название подарка</label>
+          <input id="promotion_gift_name" name="promotion_gift_name" type="text" class="form-control" maxlength="255" value="<?= h($promotion_gift_name_value) ?>" placeholder="Например, памятная открытка">
+        </div>
+        <div style="flex:1;">
+          <label for="promotion_gift_price">Цена подарка, тг</label>
+          <input id="promotion_gift_price" name="promotion_gift_price" type="number" class="form-control" min="1" step="1" value="<?= h((string)$promotion_gift_price_value) ?>" inputmode="numeric">
         </div>
       </div>
 

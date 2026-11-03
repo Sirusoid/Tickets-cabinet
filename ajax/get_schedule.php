@@ -31,7 +31,8 @@ try {
     }
 
     $sql = "SELECT id, event_id, hall_id, start_time, end_time, sales_start_time, sales_end_time,
-                   base_price, min_price, max_price, status, is_sold_out, seat_map, price_ranges, notes, created_at, updated_at
+                   base_price, min_price, max_price, status, is_sold_out, seat_map, price_ranges, notes,
+                   promotion_enabled, promotion_gift_name, promotion_gift_price, created_at, updated_at
             FROM schedules
             WHERE id = :id
             LIMIT 1";
@@ -76,6 +77,9 @@ try {
         'seat_map' => $seatMap,
         'price_ranges' => $priceRanges,
         'notes' => $row['notes'],
+        'promotion_enabled' => (bool)$row['promotion_enabled'],
+        'promotion_gift_name' => $row['promotion_gift_name'],
+        'promotion_gift_price' => (int)$row['promotion_gift_price'],
         'created_at' => $row['created_at'],
         'updated_at' => $row['updated_at'],
     ];

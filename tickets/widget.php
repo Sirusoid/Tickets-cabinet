@@ -291,7 +291,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                             <div class="bcc-order-summary" id="bccOrderSummary" style="display:none;" aria-live="polite">
                                 <div class="bcc-order-summary__row">
-                                    <span>Билеты: <span id="bccSummaryCount">0</span></span>
+                                    <span>Билеты и подарки: <span id="bccSummaryCount">0</span></span>
                                     <strong id="bccSummarySubtotal">0 ₸</strong>
                                 </div>
                                 <div class="bcc-order-summary__row bcc-order-summary__row--discount" id="bccSummaryDiscountRow" style="display:none;">

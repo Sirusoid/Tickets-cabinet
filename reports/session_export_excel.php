@@ -35,7 +35,7 @@ try {
     $sourceSql = reporting_source_sql($sourceFilter);
     $rows = db_fetch_all("SELECT
             t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.promo_code,
-            t.customer_segment, t.channel, t.payment_status, t.status, t.is_checked_in,
+            t.customer_segment, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.is_checked_in,
             t.customer_email, t.customer_phone, t.payment_transaction_id,
             t.refund_status, t.refund_at, t.purchased_at,
             seat.zone_name AS seat_zone, seat.seat_group, seat.seat_type,
@@ -81,6 +81,9 @@ foreach ($rows as $row) {
     $refundAmount = $isRefunded ? max(0.0, (float)($row['refund_record_amount'] ?? $financials['paid'])) : 0.0;
     $paymentMethod = reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
     $purchaseSource = reporting_source_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
+    $giftLabel = !empty($row['gift_selected'])
+        ? trim((string)($row['gift_name'] ?? '')) . ' (+' . (int)($row['gift_price'] ?? 0) . ' тг)'
+        : '—';
     if ($isRefunded) {
         $summary['refunded_tickets']++;
         $summary['refunds'] += $refundAmount;
@@ -131,6 +134,7 @@ foreach ($rows as $row) {
         $seatNumber !== '' ? $seatNumber : '—',
         $financials['paid'],
         $tariffName,
+        $giftLabel,
         trim((string)($row['promo_code'] ?? '')) !== ''
             ? 'Промокод ' . (string)$row['promo_code']
             : reporting_segment_label($row['customer_segment'] ?? ''),
@@ -180,7 +184,7 @@ $detailSheet->setTitle('Билеты');
 $detailSheet->fromArray([
     ['Отчет по продажам билетов'],
     ['№ билета', 'Место проведения', 'Событие', 'Сеанс', 'Зал', 'Сектор', 'Ряд', 'Место',
-        'Цена', 'Название тарифа', 'Тип билета', '№ продажи', 'Внешний ID заказа',
+        'Цена', 'Название тарифа', 'Подарок', 'Тип билета', '№ продажи', 'Внешний ID заказа',
         'Дата и время продажи', 'Тип продажи', '№ внешнего билета', 'Клиент', 'Почта клиента',
         'Телефон клиента', 'Метод оплаты', 'Статус валидации', 'Комментарий'],
 ], null, 'A1');
@@ -188,7 +192,7 @@ foreach ($details as $index => $detail) {
     $detailSheet->fromArray([$detail], null, 'A' . ($index + 3));
 }
 $sessionDetailTotalRow = count($details) + 3;
-$detailTotal = array_fill(0, 22, null);
+$detailTotal = array_fill(0, 23, null);
 $detailTotal[0] = 'ИТОГО';
 $detailTotal[8] = round($summary['sales'], 2);
 $detailSheet->fromArray([$detailTotal], null, 'A' . $sessionDetailTotalRow);
@@ -196,12 +200,12 @@ $detailSheet->fromArray([$detailTotal], null, 'A' . $sessionDetailTotalRow);
 $summarySheet->getStyle('A1:B1')->getFont()->setBold(true)->setSize(15);
 $summarySheet->getStyle('A7:B7')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
 $summarySheet->getStyle('A7:B7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
-$detailSheet->getStyle('A1:V1')->getFont()->setBold(true)->setSize(14);
-$detailSheet->getStyle('A2:V2')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$detailSheet->getStyle('A2:V2')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
+$detailSheet->getStyle('A1:W1')->getFont()->setBold(true)->setSize(14);
+$detailSheet->getStyle('A2:W2')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+$detailSheet->getStyle('A2:W2')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
 $summarySheet->getStyle('B9:B14')->getNumberFormat()->setFormatCode('#,##0.00');
 $detailSheet->getStyle('I3:I' . max(3, count($details) + 2))->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':V' . $sessionDetailTotalRow)->getFont()->setBold(true);
+$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':W' . $sessionDetailTotalRow)->getFont()->setBold(true);
 $detailSheet->getStyle('I' . $sessionDetailTotalRow)->getNumberFormat()->setFormatCode('#,##0.00');
 $summarySheet->freezePane('A8');
 $detailSheet->freezePane('A3');

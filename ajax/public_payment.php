@@ -30,6 +30,7 @@ require_once __DIR__ . '/../includes/payment/bcc.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
 require_once __DIR__ . '/../includes/promo_codes.php';
 require_once __DIR__ . '/../includes/general_admission.php';
+require_once __DIR__ . '/../includes/gift_promotion.php';
 
 function json_response($data)
 {
@@ -67,6 +68,7 @@ function public_payment_normalize_seats(array $seatsRaw, array $session): array
                 'identifier' => general_admission_identifier($number),
                 'original_price' => round($price, 2),
                 'final_price' => round($price, 2),
+                'gift_selected' => gift_promotion_selected(is_array($seatRaw) ? ($seatRaw['gift_selected'] ?? false) : false),
             ];
         }
         return $normalized;
@@ -171,6 +173,7 @@ function public_payment_normalize_seats(array $seatsRaw, array $session): array
             'identifier' => $identifier,
             'original_price' => round($price, 2),
             'final_price' => round($price, 2),
+            'gift_selected' => gift_promotion_selected(is_array($seatRaw) ? ($seatRaw['gift_selected'] ?? false) : false),
         ];
     }
 
@@ -350,7 +353,15 @@ switch ($action) {
             }
         }
 
-        $amountCents = (int)round(array_sum(array_column($seats, 'final_price')) * 100);
+        $giftedSeats = [];
+        foreach ($seats as $seat) {
+            $giftedSeats[] = gift_promotion_apply_to_seat($seat, $session);
+        }
+        $seats = $giftedSeats;
+        $amountCents = 0;
+        foreach ($seats as $seat) {
+            $amountCents += (int)round(((float)($seat['final_price'] ?? 0) + (int)($seat['gift_price'] ?? 0)) * 100);
+        }
         if ($amountCents <= 0) {
             json_response(['success' => false, 'message' => 'Сумма заказа должна быть больше 0']);
         }
