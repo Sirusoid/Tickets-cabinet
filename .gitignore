@@ -6,6 +6,9 @@ uploads/tickets/*
 !uploads/tickets/.gitkeep
 qr-ticket-scanner-android/keys/
 qr-ticket-scanner-android/keystore.properties
+# Android/Gradle generated files
+qr-ticket-scanner-android/.gradle/
+qr-ticket-scanner-android/build/
 package-lock.json
 package.json
 assets/js/bcc-payment-modal.js
