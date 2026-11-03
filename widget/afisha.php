@@ -155,7 +155,7 @@ foreach ($sessions as $session) {
         <div class="t774__wrapper repertuar-button-buy" role="presentation" style="background-color:#393e46;border-radius:30px;box-shadow:0 0 30px rgba(0,0,0,0.1); position:relative; overflow:hidden;">
             <div class="t774__imgwrapper" style="padding-bottom:10%;">' . $imgWrapper . '</div>
 
-            <div class="t774__content" style="height:420px; max-height:480px; display:flex; flex-direction:column; justify-content:space-between;">
+            <div class="t774__content" style="height:470px; max-height:480px; display:flex; flex-direction:column; justify-content:space-between;">
                 <div>
                     <div style="color:#eeeeee;font-size:16px;font-family:TildaSans,Arial,sans-serif;text-transform:uppercase;line-height:14px;padding-bottom:18px;"></div>
 
