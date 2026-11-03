@@ -183,6 +183,43 @@ if ($action === 'suggest_q') {
             if (!empty($r['ticket_uid'])) $out[] = ['type' => 'uid', 'value' => $r['ticket_uid']];
         }
 
+        $sqlOrder = "SELECT DISTINCT ps.order_number
+                     FROM payment_sessions ps
+                     JOIN tickets t ON t.payment_session_id = ps.id
+                     LEFT JOIN schedules s ON s.id = t.schedule_id
+                     LEFT JOIN events e ON e.id = s.event_id
+                     LEFT JOIN customers c ON c.id = t.customer_id
+                     WHERE ps.order_number LIKE :q_order
+                       AND ps.order_number IS NOT NULL
+                       AND ps.order_number <> ''";
+        $paramsOrder = ['q_order' => '%' . $q . '%'];
+
+        if ($filter_session !== '') {
+            if (is_numeric($filter_session)) {
+                $sqlOrder .= " AND t.schedule_id = :fsched_o";
+                $paramsOrder['fsched_o'] = (int)$filter_session;
+            } else {
+                $sqlOrder .= " AND (e.title LIKE :fsession_o OR s.start_time LIKE :fsession2_o)";
+                $paramsOrder['fsession_o'] = '%' . $filter_session . '%';
+                $paramsOrder['fsession2_o'] = '%' . $filter_session . '%';
+            }
+        }
+        if ($filter_uid !== '') {
+            $sqlOrder .= " AND t.ticket_uid LIKE :fuid_o";
+            $paramsOrder['fuid_o'] = '%' . $filter_uid . '%';
+        }
+        if ($filter_customer !== '') {
+            $sqlOrder .= " AND c.full_name LIKE :fcust_o";
+            $paramsOrder['fcust_o'] = '%' . $filter_customer . '%';
+        }
+
+        $sqlOrder .= " ORDER BY ps.order_number ASC LIMIT 20";
+        $sOrder = $pdo->prepare($sqlOrder);
+        $sOrder->execute($paramsOrder);
+        while ($r = $sOrder->fetch(PDO::FETCH_ASSOC)) {
+            if (!empty($r['order_number'])) $out[] = ['type' => 'order', 'value' => $r['order_number']];
+        }
+
         $sqlCust = "SELECT DISTINCT c.full_name
                     FROM customers c
                     JOIN tickets t ON t.customer_id = c.id

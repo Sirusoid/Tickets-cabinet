@@ -10,6 +10,7 @@
   var page = 1, perPage = 25, totalPages = 1, totalCount = 0;
   var sessionSuggestTimer = null;
   var uidSuggestTimer = null;
+  var orderSuggestTimer = null;
   var customerSuggestTimer = null;
   var filterDebounceTimer = null;
 
@@ -541,6 +542,9 @@
         } else if (kind === 'uid') {
           var el = qs('filter_uid');
           if (el) el.value = this.dataset.raw || this.dataset.display || '';
+        } else if (kind === 'order') {
+          var el = qs('filter_order_number');
+          if (el) el.value = this.dataset.raw || this.dataset.display || '';
         } else {
           var el = qs('filter_customer');
           if (el) el.value = this.dataset.raw || this.dataset.display || '';
@@ -555,7 +559,7 @@
   }
 
   function hideSuggestions(kind) {
-    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : 'suggestions_customer');
+    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : (kind === 'order' ? 'suggestions_order' : 'suggestions_customer'));
     var wrap = qs(wrapId);
     if (!wrap) return;
     wrap.style.display = 'none';
@@ -607,6 +611,27 @@
         });
         showSuggestions('uid', items);
       }).catch(function(){ showSuggestions('uid', []); });
+  }
+
+  function fetchOrderSuggestions(q) {
+    if (!q || q.length < 1) { showSuggestions('order', []); return; }
+    var other = getFilters();
+    var params = 'q=' + encodeURIComponent(q) + '&session=' + encodeURIComponent(other.session || '')
+      + '&uid=' + encodeURIComponent(other.uid || '') + '&customer=' + encodeURIComponent(other.customer || '');
+    fetch('/ajax/ticket.php?action=suggest_q&' + params, { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(json){
+        if (!json || !json.success) { showSuggestions('order', []); return; }
+        var items = (json.data || []).filter(function(it){ return it.type === 'order'; }).map(function(it){
+          return {
+            labelHtml: '<strong>Заказ:</strong> ' + escapeHtml(it.value),
+            displayValue: it.value,
+            rawValue: it.value,
+            extra: it.type
+          };
+        });
+        showSuggestions('order', items);
+      }).catch(function(){ showSuggestions('order', []); });
   }
 
   function fetchCustomerSuggestions(q) {
@@ -692,6 +717,17 @@
       uidInput.addEventListener('blur', function(){ setTimeout(function(){ hideSuggestions('uid'); }, 180); });
     }
 
+    var orderInput = qs('filter_order_number');
+    if (orderInput) {
+      orderInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); } });
+      orderInput.addEventListener('input', function(){
+        clearTimeout(orderSuggestTimer);
+        var v = this.value.trim();
+        orderSuggestTimer = setTimeout(function(){ fetchOrderSuggestions(v); }, 180);
+      });
+      orderInput.addEventListener('blur', function(){ setTimeout(function(){ hideSuggestions('order'); }, 180); });
+    }
+
     var customerInput = qs('filter_customer');
     if (customerInput) {
       customerInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); } });
@@ -704,10 +740,11 @@
     }
 
     document.addEventListener('click', function(e){
-      var s1 = qs('suggestions_session'), s2 = qs('suggestions_uid'), s3 = qs('suggestions_customer');
+      var s1 = qs('suggestions_session'), s2 = qs('suggestions_uid'), s3 = qs('suggestions_customer'), s4 = qs('suggestions_order');
       if (s1 && !s1.contains(e.target) && e.target !== qs('filter_session')) hideSuggestions('session');
       if (s2 && !s2.contains(e.target) && e.target !== qs('filter_uid')) hideSuggestions('uid');
       if (s3 && !s3.contains(e.target) && e.target !== qs('filter_customer')) hideSuggestions('customer');
+      if (s4 && !s4.contains(e.target) && e.target !== qs('filter_order_number')) hideSuggestions('order');
     });
 
     var refundClose = qs('refundModalClose');

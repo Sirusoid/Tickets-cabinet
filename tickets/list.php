@@ -53,7 +53,10 @@ require __DIR__ . '/../includes/panel.php';
 
           <div>
             <label>Номер заказа</label>
-            <input id="filter_order_number" class="form-control" placeholder="Номер заказа" autocomplete="off" />
+            <div style="position:relative;">
+              <input id="filter_order_number" class="form-control" placeholder="Номер заказа" autocomplete="off" />
+              <div id="suggestions_order" class="typeahead-dropdown" style="position:absolute; left:0; right:0; z-index:1400; display:none;"></div>
+            </div>
           </div>
 
           <div>
