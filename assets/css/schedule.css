@@ -183,6 +183,12 @@
 
 /* --- Typeahead dropdown styles (минимальные) --- */
 .typeahead-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1400;
+  margin-top: 4px;
   background: #fff;
   border: 1px solid #e6e6e6;
   border-radius: 6px;
