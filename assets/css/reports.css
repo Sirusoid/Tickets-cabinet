@@ -121,6 +121,13 @@
   margin-bottom: 14px;
 }
 
+.reports-source-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 .reports-kpi {
   position: relative;
   min-height: 124px;
@@ -169,6 +176,12 @@
 .reports-kpi--discount strong { color: #b45309; }
 .reports-kpi--dark { border-top-color: #334155; }
 .reports-kpi--dark strong { color: #1e293b; }
+.reports-kpi--cash { border-top-color: #16a34a; }
+.reports-kpi--cash strong { color: #15803d; }
+.reports-kpi--card { border-top-color: #2563eb; }
+.reports-kpi--card strong { color: #1d4ed8; }
+.reports-kpi--online { border-top-color: #9333ea; }
+.reports-kpi--online strong { color: #7e22ce; }
 
 .reports-meta-row {
   display: grid;
@@ -324,6 +337,7 @@
   .dashboard-toolbar { grid-template-columns: 1fr; }
   .dashboard-actions { justify-content: flex-start; }
   .reports-kpi-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  .reports-source-kpi-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
   .dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
 }
 
@@ -337,6 +351,7 @@
 
 @media (max-width: 520px) {
   .reports-kpi-grid,
+  .reports-source-kpi-grid,
   .reports-filters { grid-template-columns: 1fr; }
   .reports-filters__actions { flex-direction: column; }
   .reports-filters__actions .btn { width: 100%; }
