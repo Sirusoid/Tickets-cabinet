@@ -240,16 +240,18 @@ require __DIR__ . '/../includes/panel.php';
 </div>
 
 <div id="ticketPreviewModal" style="display:none; position:fixed; inset:0; z-index:2200; align-items:center; justify-content:center; background:rgba(0,0,0,0.65);">
-  <div style="position:relative; width:90%; max-width:1120px; height:90%; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+  <div style="position:relative; width:90%; max-width:1120px; max-height:90vh; min-height:320px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:#f7f7f7; border-bottom:1px solid #ddd;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm">Скачать</button>
+        <button id="ticketPreviewDownloadAll" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать все билеты</button>
+        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать</button>
         <button id="ticketPreviewOpenNewTab" type="button" class="btn btn-ghost btn-sm">Открыть в новой вкладке</button>
         <button id="ticketPreviewClose" type="button" class="btn btn-ghost btn-xs">✕</button>
       </div>
     </div>
-    <iframe id="ticketPreviewIframe" src="about:blank" style="flex:1; width:100%; border:none; min-height:0;"></iframe>
+    <div id="ticketPreviewList" style="display:none; overflow:auto; padding:16px; background:#f7f9fc;"></div>
+    <iframe id="ticketPreviewIframe" src="about:blank" style="display:none; flex:1; width:100%; border:none; min-height:520px;"></iframe>
   </div>
 </div>
 
