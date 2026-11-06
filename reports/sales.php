@@ -67,6 +67,7 @@ try {
 								t.promo_code,
 								t.seat_identifier,
 								t.customer_segment,
+								t.channel,
 								t.purchased_at,
 								t.payment_status,
 								t.status,
