@@ -239,7 +239,7 @@ require __DIR__ . '/../includes/panel.php';
 </div>
 
 <div id="ticketPreviewModal" style="display:none; position:fixed; inset:0; z-index:2200; align-items:center; justify-content:center; background:rgba(0,0,0,0.65);">
-  <div style="position:relative; width:90%; max-width:1120px; max-height:90vh; min-height:320px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+  <div style="position:relative; width:96%; max-width:1280px; height:96vh; max-height:96vh; min-height:320px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:#f7f7f7; border-bottom:1px solid #ddd;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
