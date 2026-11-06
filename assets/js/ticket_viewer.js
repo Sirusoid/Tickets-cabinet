@@ -124,10 +124,12 @@
     listEl.style.display = 'block';
   }
 
-  function openTicketBatchPreview(tickets) {
+  function openTicketBatchPreview(tickets, orderNumber) {
     if (!modal || !listEl) return;
     batchTickets = Array.isArray(tickets) ? tickets : [];
-    titleEl.textContent = 'Продажа завершена · билетов: ' + batchTickets.length;
+    titleEl.textContent = 'Продажа завершена'
+      + (orderNumber ? ' · заказ ' + String(orderNumber) : '')
+      + ' · билетов: ' + batchTickets.length;
     if (iframe) {
       iframe.src = 'about:blank';
       iframe.style.display = 'none';

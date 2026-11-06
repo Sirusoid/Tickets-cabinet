@@ -37,7 +37,7 @@ try {
     if ($id > 0) {
         $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
             COALESCE(NULLIF(TRIM(h.name), ''), NULLIF(TRIM(h_ticket.name), '')) AS hall_name,
-            e.title AS event_title, c.full_name AS customer_name
+            e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
             FROM tickets t
             LEFT JOIN schedules s ON s.id = t.schedule_id
             LEFT JOIN halls h ON h.id = s.hall_id
@@ -49,7 +49,7 @@ try {
     } else {
         $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
             COALESCE(NULLIF(TRIM(h.name), ''), NULLIF(TRIM(h_ticket.name), '')) AS hall_name,
-            e.title AS event_title, c.full_name AS customer_name
+            e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
             FROM tickets t
             LEFT JOIN schedules s ON s.id = t.schedule_id
             LEFT JOIN halls h ON h.id = s.hall_id

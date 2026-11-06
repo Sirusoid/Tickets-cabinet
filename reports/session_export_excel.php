@@ -47,8 +47,8 @@ try {
             t.refund_status, t.refund_at, t.purchased_at,
             seat.zone_name AS seat_zone, seat.seat_group, seat.seat_type,
             tx.payment_method AS tx_payment_method,
-            ps.order_number,
-            COALESCE(c.full_name, '') AS customer_name,
+            COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+            COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
             r.refund_amount AS refund_record_amount,
             r.refund_transaction_id AS refund_record_transaction_id,
             r.processed_by AS refund_processed_by

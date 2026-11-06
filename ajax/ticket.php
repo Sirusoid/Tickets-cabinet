@@ -116,7 +116,7 @@ if ($action === 'suggest_sessions') {
         }
 
         if ($filter_customer !== '') {
-            $sql .= " AND EXISTS (SELECT 1 FROM tickets t3 JOIN customers c3 ON c3.id = t3.customer_id WHERE t3.schedule_id = s.id AND c3.full_name LIKE :fcust)";
+            $sql .= " AND EXISTS (SELECT 1 FROM tickets t3 LEFT JOIN customers c3 ON c3.id = t3.customer_id WHERE t3.schedule_id = s.id AND COALESCE(NULLIF(c3.full_name, ''), NULLIF(t3.customer_name, ''), '') LIKE :fcust)";
             $params['fcust'] = '%' . $filter_customer . '%';
         }
 
@@ -172,7 +172,7 @@ if ($action === 'suggest_q') {
         }
 
         if ($filter_customer !== '') {
-            $sqlUid .= " AND c.full_name LIKE :fcust";
+            $sqlUid .= " AND COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :fcust";
             $paramsUid['fcust'] = '%' . $filter_customer . '%';
         }
 
@@ -183,15 +183,18 @@ if ($action === 'suggest_q') {
             if (!empty($r['ticket_uid'])) $out[] = ['type' => 'uid', 'value' => $r['ticket_uid']];
         }
 
-        $sqlOrder = "SELECT DISTINCT ps.order_number
-                     FROM payment_sessions ps
-                     JOIN tickets t ON t.payment_session_id = ps.id
+        $sqlOrder = "SELECT DISTINCT COALESCE(ps.order_number, CASE
+                         WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+                     END) AS order_number
+                     FROM tickets t
+                     LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                     LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
                      LEFT JOIN schedules s ON s.id = t.schedule_id
                      LEFT JOIN events e ON e.id = s.event_id
                      LEFT JOIN customers c ON c.id = t.customer_id
-                     WHERE ps.order_number LIKE :q_order
-                       AND ps.order_number IS NOT NULL
-                       AND ps.order_number <> ''";
+                     WHERE COALESCE(ps.order_number, CASE
+                         WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+                     END, '') LIKE :q_order";
         $paramsOrder = ['q_order' => '%' . $q . '%'];
 
         if ($filter_session !== '') {
@@ -209,23 +212,23 @@ if ($action === 'suggest_q') {
             $paramsOrder['fuid_o'] = '%' . $filter_uid . '%';
         }
         if ($filter_customer !== '') {
-            $sqlOrder .= " AND c.full_name LIKE :fcust_o";
+            $sqlOrder .= " AND COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :fcust_o";
             $paramsOrder['fcust_o'] = '%' . $filter_customer . '%';
         }
 
-        $sqlOrder .= " ORDER BY ps.order_number ASC LIMIT 20";
+        $sqlOrder .= " ORDER BY order_number ASC LIMIT 20";
         $sOrder = $pdo->prepare($sqlOrder);
         $sOrder->execute($paramsOrder);
         while ($r = $sOrder->fetch(PDO::FETCH_ASSOC)) {
             if (!empty($r['order_number'])) $out[] = ['type' => 'order', 'value' => $r['order_number']];
         }
 
-        $sqlCust = "SELECT DISTINCT c.full_name
-                    FROM customers c
-                    JOIN tickets t ON t.customer_id = c.id
+        $sqlCust = "SELECT DISTINCT COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, '')) AS full_name
+                    FROM tickets t
+                    LEFT JOIN customers c ON c.id = t.customer_id
                     LEFT JOIN schedules s ON s.id = t.schedule_id
                     LEFT JOIN events e ON e.id = s.event_id
-                    WHERE c.full_name LIKE :q_cust";
+                    WHERE COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :q_cust";
         $paramsCust = ['q_cust' => '%' . $q . '%'];
 
         if ($filter_session !== '') {
@@ -269,9 +272,10 @@ if ($action === 'get_ticket') {
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
                    t.payment_provider, t.payment_session_id,
                    tx.payment_method AS tx_payment_method,
-                   ps.order_number, ps.amount_cents AS payment_amount_cents, ps.provider_response,
+                   COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+                   ps.amount_cents AS payment_amount_cents, ps.provider_response,
                    ps.merch_rn_id,
-                       COALESCE(c.full_name, '') AS customer_name,
+                       COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                        COALESCE(e.title, '') AS event_title,
                        s.start_time AS session_start
                 FROM tickets t
@@ -462,7 +466,7 @@ if ($action === 'checkin') {
                     t.refund_status, t.is_checked_in, t.checked_in_at,
                     COALESCE(e.title, '') AS event_title,
                     s.start_time AS session_start,
-                    COALESCE(c.full_name, '') AS customer_name
+                    COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
              FROM tickets t
              LEFT JOIN events e ON e.id = t.event_id
              LEFT JOIN schedules s ON s.id = t.schedule_id
@@ -672,12 +676,12 @@ if ($action === 'list') {
     }
 
     if ($order_number !== '') {
-        $where[] = 'ps.order_number LIKE :order_number';
+        $where[] = "COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') LIKE :order_number";
         $params['order_number'] = '%' . $order_number . '%';
     }
 
     if ($customer !== '') {
-        $where[] = 'c.full_name LIKE :customer';
+        $where[] = "COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :customer";
         $params['customer'] = '%' . $customer . '%';
     }
 
@@ -697,6 +701,7 @@ if ($action === 'list') {
                      LEFT JOIN events e ON e.id = s.event_id
                      LEFT JOIN customers c ON c.id = t.customer_id
                      LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                     LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
                      $where_sql";
         $stmt = $pdo->prepare($countSql);
         $stmt->execute($params);
@@ -712,8 +717,8 @@ if ($action === 'list') {
                     t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                     t.customer_segment, t.payment_transaction_id,
                     tx.payment_method AS tx_payment_method,
-                    ps.order_number,
-                    COALESCE(c.full_name, '') AS customer_name,
+                    COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+                    COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                     COALESCE(e.title, '') AS event_title,
                     s.start_time AS session_start
                 FROM tickets t
@@ -745,8 +750,8 @@ if ($action === 'list') {
                         t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                         t.customer_segment, t.payment_transaction_id,
                         tx.payment_method AS tx_payment_method,
-                        ps.order_number,
-                        COALESCE(c.full_name, '') AS customer_name,
+                        COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+                        COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS session_start
                     FROM tickets t

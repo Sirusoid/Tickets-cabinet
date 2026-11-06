@@ -64,11 +64,11 @@ if ($filters['uid'] !== '') {
 	$params[':uid'] = '%' . $filters['uid'] . '%';
 }
 if ($filters['order_number'] !== '') {
-	$where[] = 'ps.order_number LIKE :order_number';
+	$where[] = "COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') LIKE :order_number";
 	$params[':order_number'] = '%' . $filters['order_number'] . '%';
 }
 if ($filters['customer'] !== '') {
-	$where[] = 'c.full_name LIKE :customer';
+	$where[] = "COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :customer";
 	$params[':customer'] = '%' . $filters['customer'] . '%';
 }
 if ($filters['refund'] === 'yes') {
@@ -103,7 +103,8 @@ $sql = "SELECT
 		t.id, t.ticket_uid, t.seat_identifier, t.purchased_at, t.original_price, t.final_price, t.discount, t.discount_amount,
 		t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status, t.customer_segment,
 		tx.payment_method AS tx_payment_method,
-		ps.order_number, COALESCE(c.full_name, '') AS customer_name,
+		COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+		COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
 		COALESCE(e.title, '') AS event_title, s.start_time AS session_start
 	FROM tickets t
 	LEFT JOIN customers c ON c.id = t.customer_id

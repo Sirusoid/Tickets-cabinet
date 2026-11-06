@@ -668,6 +668,19 @@ case 'sell':
             ':payload' => $payload
         ]);
         $transaction_id = $pdo->lastInsertId();
+        $cash_order_number = 'cash_' . (string)$transaction_id;
+        $cashPayload = json_decode((string)$payload, true);
+        if (!is_array($cashPayload)) {
+            throw new RuntimeException('Не удалось подготовить данные кассового заказа.');
+        }
+        $cashPayload['order_number'] = $cash_order_number;
+        $cashPayload['customer_name'] = $customer_full_name !== '' ? $customer_full_name : null;
+        $payload = json_encode($cashPayload, JSON_UNESCAPED_UNICODE);
+        if ($payload === false) {
+            throw new RuntimeException('Не удалось сериализовать данные кассового заказа.');
+        }
+        $updateCashPayload = $pdo->prepare('UPDATE cash_transactions SET payload = :payload WHERE id = :id');
+        $updateCashPayload->execute([':payload' => $payload, ':id' => $transaction_id]);
 		
         // --- find or create customer (by phone, fallback email) ---
         $customer_id = null;
@@ -750,7 +763,7 @@ case 'sell':
                 }
             }
 
-            if (empty($customer_id) && ($customer_phone !== '' || $customer_full_name !== '' || $customer_email || $customer_gender || $customer_city)) {
+            if (empty($customer_id) && ($customer_phone !== '' || $customer_email || $customer_gender || $customer_city)) {
                 try { $custUid = bin2hex(random_bytes(8)); } catch (Exception $e) { $custUid = uniqid('c_', true); }
                 $insCust = $pdo->prepare("INSERT INTO customers (customer_uid, full_name, gender, email, phone, city, created_at, updated_at) VALUES (:customer_uid, :full_name, :gender, :email, :phone, :city, NOW(), NOW())");
                 $insCust->execute([
@@ -986,13 +999,14 @@ case 'sell':
             }
         }
 
-        audit_log($pdo, $user_id, 'sale:create', 'session', $session_id, json_encode(['seats' => $seat_keys, 'tx_id' => $transaction_id, 'amount' => $amount_cents, 'uids' => $generated_ticket_uids, 'customer_id' => $customer_id, 'discount' => $discountApplied], JSON_UNESCAPED_UNICODE));
+        audit_log($pdo, $user_id, 'sale:create', 'session', $session_id, json_encode(['seats' => $seat_keys, 'tx_id' => $transaction_id, 'order_number' => $cash_order_number, 'amount' => $amount_cents, 'uids' => $generated_ticket_uids, 'customer_id' => $customer_id, 'discount' => $discountApplied], JSON_UNESCAPED_UNICODE));
 
         $response = [
             'success' => true,
             'message' => 'Продано',
             'sold' => $seat_keys,
             'transaction_id' => $transaction_id,
+            'order_number' => $cash_order_number,
             'ticket_uids' => $generated_ticket_uids,
             'tickets' => $sold_tickets,
             'customer_id' => $customer_id,

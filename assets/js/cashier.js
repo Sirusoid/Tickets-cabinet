@@ -1335,7 +1335,7 @@ var Cashier = (function () {
                     gift_name: found.gift_name || ''
                   };
                 });
-                window.openTicketBatchPreview(batchTickets);
+                window.openTicketBatchPreview(batchTickets, resp.order_number || '');
               } else if (window.openTicketPreview && typeof window.openTicketPreview === 'function') {
                 window.openTicketPreview('/tickets/generate.php?uid=' + encodeURIComponent(ticketUids[0]), 'Билет ' + ticketUids[0]);
               } else {

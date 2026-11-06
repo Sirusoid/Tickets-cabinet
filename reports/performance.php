@@ -34,7 +34,7 @@ $tickets = db_fetch_all(
         t.purchased_at,
         seat.zone_name AS seat_zone, seat.seat_group, seat.seat_type,
         COALESCE(tx.payment_method, CASE WHEN t.channel IN ('web', 'mobile') THEN 'card' ELSE 'cash' END) AS payment_method,
-        COALESCE(ps.order_number, '') AS order_number
+        COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number
      FROM tickets t
      LEFT JOIN schedules s ON s.id = t.schedule_id
      LEFT JOIN seats seat

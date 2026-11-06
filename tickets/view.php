@@ -36,7 +36,7 @@ if ($ticket_id > 0) {
 }
 
 $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, t.customer_segment, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.status, t.payment_status, t.purchased_at,
-               COALESCE(c.full_name, '') AS customer_name,
+               COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                COALESCE(e.title, '') AS event_title,
                s.start_time AS schedule_start,
                COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h_ticket.name), ''), '') AS hall_name
