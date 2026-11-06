@@ -7,6 +7,7 @@
   function qs(id) { return document.getElementById(id); }
 
   var modal = qs('ticketPreviewModal');
+  var dialog = modal ? modal.firstElementChild : null;
   var iframe = qs('ticketPreviewIframe');
   var listEl = qs('ticketPreviewList');
   var titleEl = qs('ticketPreviewTitle');
@@ -130,6 +131,11 @@
     if (!modal || !listEl) return;
     batchTickets = Array.isArray(tickets) ? tickets : [];
     batchOrderNumber = String(orderNumber || '');
+    if (dialog) {
+      dialog.style.height = 'auto';
+      dialog.style.maxHeight = '90vh';
+      dialog.style.minHeight = '320px';
+    }
     titleEl.textContent = 'Продажа завершена'
       + (orderNumber ? ' · заказ ' + String(orderNumber) : '')
       + ' · билетов: ' + batchTickets.length;
@@ -162,6 +168,11 @@
       return;
     }
     currentUrl = url || '';
+    if (dialog) {
+      dialog.style.height = '96vh';
+      dialog.style.maxHeight = '96vh';
+      dialog.style.minHeight = '320px';
+    }
     if (listEl) {
       listEl.innerHTML = '';
       listEl.style.display = 'none';
