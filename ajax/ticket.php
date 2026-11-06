@@ -262,6 +262,53 @@ if ($action === 'suggest_q') {
     }
 }
 
+// --- GET all tickets by order number ---
+if ($action === 'order_tickets') {
+        $orderNumber = trim((string)($_GET['order_number'] ?? $_POST['order_number'] ?? ''));
+        if ($orderNumber === '') {
+            json_resp(['success' => false, 'message' => 'Не указан номер заказа'], 400);
+        }
+
+        try {
+            $orderExpression = "COALESCE(ps.order_number, CASE
+                WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+            END, '')";
+            $stmt = $pdo->prepare("SELECT
+                    t.ticket_uid,
+                    t.seat_identifier,
+                    t.final_price,
+                    t.gift_selected,
+                    t.gift_name,
+                    t.refund_status,
+                    {$orderExpression} AS order_number
+                FROM tickets t
+                LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                WHERE {$orderExpression} = :order_number
+                ORDER BY t.id ASC");
+            $stmt->execute([':order_number' => $orderNumber]);
+            $tickets = [];
+            while ($ticket = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $tickets[] = [
+                    'ticket_uid' => (string)$ticket['ticket_uid'],
+                    'seat_identifier' => (string)($ticket['seat_identifier'] ?? ''),
+                    'final_price' => $ticket['final_price'] !== null ? (float)$ticket['final_price'] : null,
+                    'gift_selected' => (bool)$ticket['gift_selected'],
+                    'gift_name' => $ticket['gift_name'],
+                    'refund_status' => $ticket['refund_status'] ?? 'none',
+                ];
+            }
+            json_resp([
+                'success' => true,
+                'order_number' => $orderNumber,
+                'tickets' => $tickets,
+            ]);
+        } catch (Throwable $e) {
+            error_log('ajax/ticket.php order_tickets error: ' . $e->getMessage());
+            json_resp(['success' => false, 'message' => 'Ошибка загрузки заказа']);
+        }
+}
+
 // --- GET single ticket details for modal ---
 if ($action === 'get_ticket') {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;

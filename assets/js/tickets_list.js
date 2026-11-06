@@ -268,7 +268,23 @@
     tr.appendChild(paymentTypeTd);	  
 
     var orderTd = document.createElement('td');
-    orderTd.textContent = t.order_number || '—';
+    if (t.order_number) {
+      var orderLink = document.createElement('button');
+      orderLink.type = 'button';
+      orderLink.className = 'btn btn-ghost btn-sm';
+      orderLink.style.padding = '4px 8px';
+      orderLink.style.color = '#2563eb';
+      orderLink.style.textDecoration = 'underline';
+      orderLink.textContent = t.order_number;
+      orderLink.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openOrderTickets(t.order_number);
+      });
+      orderTd.appendChild(orderLink);
+    } else {
+      orderTd.textContent = '—';
+    }
     tr.appendChild(orderTd);
 	  
     var uidTd = document.createElement('td');
@@ -423,6 +439,33 @@
         showRefundModal();
       }).catch(function(err){
         showToast('Ошибка сети при получении билета', 'error');
+      });
+  }
+
+  function openOrderTickets(orderNumber) {
+    fetch('/ajax/ticket.php?action=order_tickets&order_number=' + encodeURIComponent(orderNumber), {
+      credentials: 'same-origin'
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (json) {
+        if (!json || !json.success) {
+          showToast(json && json.message ? json.message : 'Ошибка загрузки заказа', 'error');
+          return;
+        }
+        if (!json.tickets || !json.tickets.length) {
+          showToast('Билеты по этому заказу не найдены', 'error');
+          return;
+        }
+        if (typeof window.openTicketBatchPreview === 'function') {
+          window.openTicketBatchPreview(json.tickets, json.order_number || orderNumber);
+          return;
+        }
+        window.open('/tickets/view.php?uids=' + json.tickets.map(function (ticket) {
+          return encodeURIComponent(ticket.ticket_uid);
+        }).join(','), '_blank');
+      })
+      .catch(function () {
+        showToast('Ошибка сети при загрузке заказа', 'error');
       });
   }
 
