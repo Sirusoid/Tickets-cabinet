@@ -9,6 +9,7 @@ if (!is_array($rawUids)) {
 }
 $uids = array_values(array_unique(array_filter(array_map('trim', $rawUids))));
 $uids = array_slice($uids, 0, 100);
+$orderNumber = trim((string)($_GET['order_number'] ?? ''));
 
 if ($uids === []) {
     http_response_code(400);
@@ -65,7 +66,9 @@ try {
 }
 
 header('Content-Type: application/zip');
-header('Content-Disposition: attachment; filename="tickets-' . date('Y-m-d-His') . '.zip"');
+$safeOrderNumber = preg_replace('/[^A-Za-z0-9_-]+/', '_', $orderNumber);
+$archiveName = $safeOrderNumber !== '' ? 'ticket_' . $safeOrderNumber . '.zip' : 'tickets-' . date('Y-m-d-His') . '.zip';
+header('Content-Disposition: attachment; filename="' . $archiveName . '"');
 header('Content-Length: ' . filesize($tempPath));
 header('Cache-Control: no-store');
 readfile($tempPath);

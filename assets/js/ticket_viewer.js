@@ -16,6 +16,7 @@
   var closeBtn = qs('ticketPreviewClose');
   var currentUrl = '';
   var batchTickets = [];
+  var batchOrderNumber = '';
 
   function closePreview() {
     if (!modal) return;
@@ -32,6 +33,7 @@
     if (downloadAllBtn) downloadAllBtn.style.display = 'none';
     currentUrl = '';
     batchTickets = [];
+    batchOrderNumber = '';
   }
 
   function setActionButtons(url) {
@@ -127,6 +129,7 @@
   function openTicketBatchPreview(tickets, orderNumber) {
     if (!modal || !listEl) return;
     batchTickets = Array.isArray(tickets) ? tickets : [];
+    batchOrderNumber = String(orderNumber || '');
     titleEl.textContent = 'Продажа завершена'
       + (orderNumber ? ' · заказ ' + String(orderNumber) : '')
       + ' · билетов: ' + batchTickets.length;
@@ -142,7 +145,8 @@
         var uids = batchTickets.map(function (ticket) {
           return String(ticket.ticket_uid || '');
         }).filter(Boolean);
-        window.location.href = '/tickets/download_batch.php?uids=' + encodeURIComponent(uids.join(','));
+        window.location.href = '/tickets/download_batch.php?uids=' + encodeURIComponent(uids.join(','))
+          + '&order_number=' + encodeURIComponent(batchOrderNumber);
       };
     }
     renderBatchCards(batchTickets);
