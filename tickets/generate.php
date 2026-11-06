@@ -37,25 +37,31 @@ try {
     if ($id > 0) {
         $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
             COALESCE(NULLIF(TRIM(h.name), ''), NULLIF(TRIM(h_ticket.name), '')) AS hall_name,
-            e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
+            e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
+            COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number
             FROM tickets t
             LEFT JOIN schedules s ON s.id = t.schedule_id
             LEFT JOIN halls h ON h.id = s.hall_id
             LEFT JOIN halls h_ticket ON h_ticket.id = t.hall_id
             LEFT JOIN events e ON e.id = t.event_id
             LEFT JOIN customers c ON c.id = t.customer_id
+            LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+            LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
             WHERE t.id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
     } else {
         $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
             COALESCE(NULLIF(TRIM(h.name), ''), NULLIF(TRIM(h_ticket.name), '')) AS hall_name,
-            e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
+            e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
+            COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number
             FROM tickets t
             LEFT JOIN schedules s ON s.id = t.schedule_id
             LEFT JOIN halls h ON h.id = s.hall_id
             LEFT JOIN halls h_ticket ON h_ticket.id = t.hall_id
             LEFT JOIN events e ON e.id = t.event_id
             LEFT JOIN customers c ON c.id = t.customer_id
+            LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+            LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
             WHERE t.ticket_uid = :uid LIMIT 1");
         $stmt->execute([':uid' => $uid]);
     }

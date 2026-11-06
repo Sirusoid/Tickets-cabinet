@@ -618,6 +618,7 @@ if (!function_exists('ticket_pdf_render_html')) {
             : '';
 
         $channel_raw = trim((string)($ticket['channel'] ?? ''));
+        $order_number = trim((string)($ticket['order_number'] ?? ''));
         $segment_raw = trim((string)($ticket['customer_segment'] ?? ''));
         $purchased_at = !empty($ticket['purchased_at']) ? date('d.m.Y H:i', strtotime($ticket['purchased_at'])) : '';
 
@@ -777,6 +778,9 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '<div class="ticket-content"><div class="ticket-main"><div class="ticket-main-left">';
         $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА: / КҮНІ: </strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ: / УАҚЫТ: </strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div></div>';
         $html .= '<div class="ticket-section">';
+        if ($order_number !== '') {
+            $html .= '<div class="customer-line"><strong>ЗАКАЗ / ТАПСЫРЫС:</strong> ' . htmlspecialchars($order_number, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div>';
+        }
         if ($giftLine !== '') {
             $html .= '<div class="customer-line"><strong>' . htmlspecialchars($giftLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></div>';
         }
@@ -912,7 +916,8 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
         try {
             $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
                 COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h_ticket.name), ''), NULLIF(TRIM(h_event.name), '')) AS hall_name,
-                e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
+                e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
+                COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number
                 FROM tickets t
                 LEFT JOIN schedules s ON s.id = t.schedule_id
                 LEFT JOIN halls h_ticket ON h_ticket.id = t.hall_id
@@ -920,6 +925,8 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
                 LEFT JOIN events e ON e.id = t.event_id
                 LEFT JOIN halls h_event ON h_event.id = e.hall_id
                 LEFT JOIN customers c ON c.id = t.customer_id
+                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
                 WHERE t.ticket_uid = :uid LIMIT 1");
             $stmt->execute([':uid' => $ticket_uid]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
