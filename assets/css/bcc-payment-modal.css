@@ -148,6 +148,7 @@
     overflow: hidden;
     display: flex;
     min-height: 0;
+    overscroll-behavior: contain;
 }
 
 .bcc-modal-body > .row {
@@ -191,6 +192,8 @@
     overflow: hidden;
     position: relative;
     box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+    overscroll-behavior: contain;
+    touch-action: none;
 }
 
 .seatmap-zoom-controls {
@@ -234,6 +237,9 @@
     background: #fff;
     border-radius: 12px;
     cursor: grab;
+    touch-action: none;
+    overscroll-behavior: contain;
+    user-select: none;
 }
 
 #bccSeatmapCanvas:active {
