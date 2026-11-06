@@ -571,16 +571,18 @@ $jsSession = [
 </div>
 
 <div id="ticketPreviewModal" style="display:none; position:fixed; inset:0; z-index:2200; align-items:center; justify-content:center; background:rgba(0,0,0,0.65);">
-  <div style="position:relative; width:min(1120px,100%); max-height:90vh; background:#fff; border-radius:10px; box-shadow:0 18px 48px rgba(0,0,0,0.28); overflow:hidden; display:flex; flex-direction:column; min-height:calc(100vh - 120px);">
+  <div style="position:relative; width:min(1120px,96%); max-height:90vh; background:#fff; border-radius:10px; box-shadow:0 18px 48px rgba(0,0,0,0.28); overflow:hidden; display:flex; flex-direction:column; min-height:320px;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid #e9ecef; background:#fafafa;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm">Скачать</button>
+        <button id="ticketPreviewDownloadAll" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать все билеты</button>
+        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать</button>
         <button id="ticketPreviewOpenNewTab" type="button" class="btn btn-ghost btn-sm">Открыть в новой вкладке</button>
         <button id="ticketPreviewClose" type="button" class="btn btn-ghost btn-xs">✕</button>
       </div>
     </div>
-    <iframe id="ticketPreviewIframe" src="about:blank" style="flex:1; width:100%; border:none; min-height:0;"></iframe>
+    <div id="ticketPreviewList" style="display:none; overflow:auto; padding:16px; background:#f7f9fc;"></div>
+    <iframe id="ticketPreviewIframe" src="about:blank" style="display:none; flex:1; width:100%; border:none; min-height:520px;"></iframe>
   </div>
 </div>
 

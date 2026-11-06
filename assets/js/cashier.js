@@ -1320,9 +1320,23 @@ var Cashier = (function () {
 
             if (resp.ticket_uids && Array.isArray(resp.ticket_uids) && resp.ticket_uids.length) {
               var ticketUids = resp.ticket_uids;
-              var previewUrl = '/tickets/generate.php?uid=' + encodeURIComponent(ticketUids[0]);
-              if (window.openTicketPreview && typeof window.openTicketPreview === 'function') {
-                window.openTicketPreview(previewUrl, 'Билет ' + ticketUids[0]);
+              if (window.openTicketBatchPreview && typeof window.openTicketBatchPreview === 'function') {
+                var responseTickets = Array.isArray(resp.tickets) ? resp.tickets : [];
+                var batchTickets = ticketUids.map(function (uid) {
+                  var found = responseTickets.filter(function (ticket) {
+                    return String(ticket.ticket_uid || '') === String(uid);
+                  })[0] || {};
+                  return {
+                    ticket_uid: uid,
+                    seat_identifier: found.seat_identifier || '',
+                    final_price: found.final_price,
+                    gift_selected: !!found.gift_selected,
+                    gift_name: found.gift_name || ''
+                  };
+                });
+                window.openTicketBatchPreview(batchTickets);
+              } else if (window.openTicketPreview && typeof window.openTicketPreview === 'function') {
+                window.openTicketPreview('/tickets/generate.php?uid=' + encodeURIComponent(ticketUids[0]), 'Билет ' + ticketUids[0]);
               } else {
                 var viewUrl = '/tickets/view.php?uids=' + ticketUids.map(encodeURIComponent).join(',');
                 window.open(viewUrl, '_blank');
