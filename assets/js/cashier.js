@@ -537,9 +537,8 @@ var Cashier = (function () {
     });
   }
 
-  // Админ снимает резерв независимо от того, кто его поставил (сервер повторно проверяет роль).
+  // Любой кассир может снять резерв независимо от того, кто его поставил.
   function requestForeignRelease(keys) {
-    if (!isAdmin) return;
     keys = (keys || []).filter(isHeldByOther);
     if (!keys.length) return;
 
@@ -612,7 +611,7 @@ var Cashier = (function () {
       if (generalAdmissionMode) {
         var byHolder = {};
         otherKeys.forEach(function (k) {
-          var name = (isAdmin && heldSeats[k].holder) ? heldSeats[k].holder : 'другой пользователь';
+          var name = heldSeats[k].holder || 'другой пользователь';
           byHolder[name] = (byHolder[name] || 0) + 1;
         });
         Object.keys(byHolder).forEach(function (name) {
@@ -622,15 +621,15 @@ var Cashier = (function () {
         otherKeys.forEach(function (k) {
           var info = heldSeats[k] || {};
           var text = describeSeatKey(k) + ' | Истекает через: ' + formatExpires(info.expires_at);
-          if (isAdmin && info.holder) text += ' | ' + info.holder;
-          html.push('<div>' + escapeHtml(text) + (isAdmin ? releaseBtn(k, 'Снять') : '') + '</div>');
+          if (info.holder) text += ' | ' + info.holder;
+          html.push('<div>' + escapeHtml(text) + releaseBtn(k, 'Снять') + '</div>');
         });
       }
-      if (isAdmin && (generalAdmissionMode || otherKeys.length > 1)) {
+      if (generalAdmissionMode || otherKeys.length > 1) {
         html.push('<div style="margin-top:6px;">' + releaseBtn('*', 'Снять все чужие резервы (' + otherKeys.length + ')').trim() + '</div>');
       }
-      if (isAdmin && !generalAdmissionMode) {
-        html.push('<div style="margin-top:6px;color:#555;">Администратор: чужой резерв можно снять кнопкой «Снять» или нажатием на место на схеме.</div>');
+      if (!generalAdmissionMode) {
+        html.push('<div style="margin-top:6px;color:#555;">Чужой резерв можно снять кнопкой «Снять» или нажатием на место на схеме.</div>');
       }
     }
     if (nearest) {
@@ -1180,8 +1179,7 @@ var Cashier = (function () {
               return;
             }
             if (isHeldByOther(key)) {
-              if (isAdmin) requestForeignRelease([key]);
-              else showToast('Место занято резервом другого кассира');
+              requestForeignRelease([key]);
               return;
             }
             if (typeof pricedSeats[key] === 'undefined') {
@@ -1218,8 +1216,7 @@ var Cashier = (function () {
               return;
             }
             if (isHeldByOther(key)) {
-              if (isAdmin) requestForeignRelease([key]);
-              else showToast('Место занято резервом другого кассира');
+              requestForeignRelease([key]);
               return;
             }
             if (typeof pricedSeats[key] === 'undefined') {

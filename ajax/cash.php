@@ -1869,7 +1869,7 @@ case 'sell':
                 // If multiple seat keys - prepare placeholders
                 $placeholders = implode(',', array_fill(0, count($seat_keys), '?'));
 
-                // Админ снимает любой резерв; остальные — только свои (или уже истёкшие).
+                // Любой авторизованный кассир может снять резерв независимо от владельца.
                 $isAdminUser = function_exists('is_admin') && is_admin();
                 $releaseUserId = current_user_id();
                 $holdOwners = [];
@@ -1880,17 +1880,6 @@ case 'sell':
                     while ($ownerRow = $ownerStmt->fetch(PDO::FETCH_ASSOC)) {
                         $ownerKey = str_replace(':', '-', (string)$ownerRow['seat_key']);
                         $holdOwners[$ownerKey] = (int)$ownerRow['user_id'];
-                        if (!$isAdminUser && (int)$ownerRow['is_active'] === 1 && (int)$ownerRow['user_id'] !== $releaseUserId) {
-                            $foreignHolds[] = $ownerKey;
-                        }
-                    }
-                    if (!empty($foreignHolds)) {
-                        $pdo->rollBack();
-                        json_response([
-                            'success' => false,
-                            'message' => 'Этот резерв поставил другой пользователь. Снять его может только администратор.',
-                            'foreign' => $foreignHolds
-                        ]);
                     }
                 }
 
