@@ -1273,6 +1273,8 @@ var Cashier = (function () {
 
           var customer_segment = (document.getElementById('customer_segment') || {}).value || 'adult';
           var manualDiscountAmount = (customer_segment === 'manual' && discountConfig.custom_enabled) ? getManualDiscountInputValue() : 0;
+          var customerNameInput = document.getElementById('cashCustomerName');
+          var customerName = customerNameInput ? customerNameInput.value.trim() : '';
 
           // Build payload safely: structured seats + legacy keys
           var seatsPayload = buildSeatsPayload();
@@ -1280,6 +1282,7 @@ var Cashier = (function () {
             session_id: sessionId,
             seats: seatsPayload,
             payment_method: pm,
+            customer: { full_name: customerName },
             customer_segment: customer_segment,
             discount: { manual_amount: manualDiscountAmount }
           };
@@ -1290,6 +1293,7 @@ var Cashier = (function () {
             if (!resp || !resp.success) {
               return alert(resp && resp.message ? resp.message : 'Ошибка продажи');
             }
+            if (customerNameInput) customerNameInput.value = '';
             cart.forEach(function (k) { soldSeats[k] = true; });
             cart = [];
             if (generalAdmissionMode && generalAdmissionQuantityEl) generalAdmissionQuantityEl.value = '';

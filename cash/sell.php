@@ -513,6 +513,10 @@ $jsSession = [
           <?php endif; ?>
         </select>
       </div>
+      <div style="margin-bottom:12px;">
+        <label class="label" for="cashCustomerName">Имя клиента (необязательно)</label>
+        <input id="cashCustomerName" name="customer_name" class="input" type="text" maxlength="255" autocomplete="name" placeholder="Имя клиента">
+      </div>
       <div id="cartList" style="min-height:60px; margin-bottom:8px;">
         <div style="color:#666;">Пусто</div>
       </div>
