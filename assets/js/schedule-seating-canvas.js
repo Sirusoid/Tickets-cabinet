@@ -674,38 +674,6 @@
         startOffsetX: 0,
         startOffsetY: 0
       };
-      var touchState = {
-        active: false,
-        pinch: false,
-        startX: 0,
-        startY: 0,
-        startDistance: 0,
-        startScale: 1,
-        startOffsetX: 0,
-        startOffsetY: 0
-      };
-
-      function touchPoint(touch) {
-        var rect = canvas.getBoundingClientRect();
-        return {
-          x: touch.clientX - rect.left,
-          y: touch.clientY - rect.top
-        };
-      }
-
-      function touchDistance(first, second) {
-        var dx = second.clientX - first.clientX;
-        var dy = second.clientY - first.clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-      }
-
-      function touchCenter(first, second) {
-        var rect = canvas.getBoundingClientRect();
-        return {
-          x: (first.clientX + second.clientX) / 2 - rect.left,
-          y: (first.clientY + second.clientY) / 2 - rect.top
-        };
-      }
 
       function panBy(dx, dy) {
         var fit = internal._fit || { scale: internal.scale || 1, offsetX: 0, offsetY: 0 };
@@ -782,69 +750,6 @@
         var step = delta > 0 ? 0.1 : -0.1;
         var newScale = Math.max(0.3, Math.min(4, (fit.scale || 1) + step));
         zoomTo(newScale, e.clientX - canvas.getBoundingClientRect().left, e.clientY - canvas.getBoundingClientRect().top);
-      }, { passive: false });
-
-      canvas.addEventListener('touchstart', function (e) {
-        if (!e.touches || !e.touches.length || internal.disablePan) return;
-        var fit = internal._fit || { scale: internal.scale || 1, offsetX: 0, offsetY: 0 };
-        if (e.touches.length >= 2) {
-          e.preventDefault();
-          var center = touchCenter(e.touches[0], e.touches[1]);
-          touchState.active = true;
-          touchState.pinch = true;
-          touchState.startDistance = Math.max(1, touchDistance(e.touches[0], e.touches[1]));
-          touchState.startScale = fit.scale || 1;
-          touchState.startOffsetX = fit.offsetX || 0;
-          touchState.startOffsetY = fit.offsetY || 0;
-          touchState.startX = center.x;
-          touchState.startY = center.y;
-          return;
-        }
-
-        var point = touchPoint(e.touches[0]);
-        if (getSeatAt(e.touches[0].clientX, e.touches[0].clientY)) return;
-        touchState.active = true;
-        touchState.pinch = false;
-        touchState.startX = point.x;
-        touchState.startY = point.y;
-        touchState.startOffsetX = fit.offsetX || 0;
-        touchState.startOffsetY = fit.offsetY || 0;
-      }, { passive: false });
-
-      canvas.addEventListener('touchmove', function (e) {
-        if (!touchState.active || !e.touches || !e.touches.length || internal.disablePan) return;
-        e.preventDefault();
-        var fit = internal._fit || { scale: internal.scale || 1, offsetX: 0, offsetY: 0 };
-        if (e.touches.length >= 2) {
-          var center = touchCenter(e.touches[0], e.touches[1]);
-          var distance = Math.max(1, touchDistance(e.touches[0], e.touches[1]));
-          var scale = Math.max(0.3, Math.min(4, touchState.startScale * distance / touchState.startDistance));
-          var ratio = scale / touchState.startScale;
-          fit.scale = scale;
-          fit.offsetX = center.x - (touchState.startX - touchState.startOffsetX) * ratio;
-          fit.offsetY = center.y - (touchState.startY - touchState.startOffsetY) * ratio;
-          internal.scale = scale;
-          internal._fit = fit;
-          draw();
-          return;
-        }
-
-        var point = touchPoint(e.touches[0]);
-        fit.offsetX = touchState.startOffsetX + point.x - touchState.startX;
-        fit.offsetY = touchState.startOffsetY + point.y - touchState.startY;
-        internal._fit = fit;
-        draw();
-      }, { passive: false });
-
-      canvas.addEventListener('touchend', function (e) {
-        if (e.touches && e.touches.length >= 2) return;
-        touchState.active = false;
-        touchState.pinch = false;
-      }, { passive: false });
-
-      canvas.addEventListener('touchcancel', function () {
-        touchState.active = false;
-        touchState.pinch = false;
       }, { passive: false });
 
       // инициализация
