@@ -227,6 +227,12 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div id="bccReservationHint" style="margin-top:8px; color:#6b7280; font-size:12px; line-height:1.4;"></div>
                             </div>
                         </div>
+                        <div class="bcc-total-bar" id="bccTotalBar">
+                            <div class="bcc-total-amount">
+                                <span id="bccTotal">0 ₸</span>
+                                <button type="button" class="bcc-btn-buy" id="bccBuyBtn" disabled>Купить</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -315,13 +321,6 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- Bottom total bar -->
-        <div class="bcc-total-bar" id="bccTotalBar">
-            <div class="bcc-total-amount">
-                <span id="bccTotal">0 ₸</span>
-                <button type="button" class="bcc-btn-buy" id="bccBuyBtn" disabled>Купить</button>
-            </div>
-        </div>
     </div>
 </div>
 
