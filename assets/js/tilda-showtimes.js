@@ -83,7 +83,7 @@
       return;
     }
     var script = document.createElement('script');
-    script.src = 'https://cabinet.zhassahna.kz/assets/js/widget.js?v=2';
+    script.src = 'https://cabinet.zhassahna.kz/assets/js/widget.js?v=3';
     script.onload = callback;
     script.onerror = callback;
     document.head.appendChild(script);
