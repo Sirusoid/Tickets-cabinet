@@ -107,16 +107,19 @@
   }
 
   function load() {
-    var block = createBlock();
-    mount(block);
     var params = [];
     if (eventId) params.push('event_id=' + encodeURIComponent(eventId));
     if (eventTitle) params.push('event_title=' + encodeURIComponent(eventTitle));
     if (eventUrl) params.push('event_url=' + encodeURIComponent(eventUrl));
     fetch(apiUrl + '?' + params.join('&'), { credentials: 'omit' })
       .then(function (response) { return response.json(); })
-      .then(function (payload) { render(block, payload); })
-      .catch(function () { render(block, { success: true, available: false }); });
+      .then(function (payload) {
+        if (!payload || payload.event_found !== true) return;
+        var block = createBlock();
+        mount(block);
+        render(block, payload);
+      })
+      .catch(function () {});
   }
 
   if (document.readyState === 'loading') {

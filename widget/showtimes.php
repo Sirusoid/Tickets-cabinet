@@ -111,6 +111,19 @@ if ($eventId > 0) {
 }
 
 $whereSql = implode(' AND ', $where);
+$eventStmt = $pdo->prepare("SELECT e.id, e.title FROM events e WHERE {$whereSql} LIMIT 1");
+$eventStmt->execute($params);
+$matchedEvent = $eventStmt->fetch(PDO::FETCH_ASSOC);
+if (!$matchedEvent) {
+    showtimes_response([
+        'success' => true,
+        'event_found' => false,
+        'available' => false,
+        'message' => '',
+        'sessions' => [],
+    ]);
+}
+
 $stmt = $pdo->prepare("SELECT
         s.id AS session_id,
         s.start_time,
@@ -134,7 +147,10 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $widgetBaseUrl = defined('PUBLIC_BASE_URL') ? rtrim((string)constant('PUBLIC_BASE_URL'), '/') : 'https://cabinet.zhassahna.kz';
 $sessions = [];
-$resolvedEvent = ['id' => $eventId, 'title' => $eventTitle];
+$resolvedEvent = [
+    'id' => (int)$matchedEvent['id'],
+    'title' => (string)$matchedEvent['title'],
+];
 
 foreach ($rows as $row) {
     $prices = showtimes_price_values($row['price_ranges'] ?? null);
@@ -174,6 +190,7 @@ foreach ($rows as $row) {
 
 showtimes_response([
     'success' => true,
+    'event_found' => true,
     'available' => $sessions !== [],
     'event' => $resolvedEvent,
     'message' => $sessions === [] ? 'Билетов на продажу нет' : '',
