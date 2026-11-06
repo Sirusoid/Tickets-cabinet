@@ -3,9 +3,10 @@
 
   var config = window.ZhassahnaShowtimes || {};
   var apiUrl = config.api || 'https://cabinet.zhassahna.kz/widget/showtimes.php';
+  var canonicalLink = document.querySelector('link[rel="canonical"]');
   var eventId = config.eventId || document.body.getAttribute('data-event-id') || '';
   var eventTitle = config.eventTitle || document.body.getAttribute('data-event-title') || '';
-  var eventUrl = config.eventUrl || window.location.href;
+  var eventUrl = config.eventUrl || (canonicalLink && canonicalLink.href) || window.location.href;
   var target = config.target ? document.querySelector(config.target) : null;
 
   function escapeHtml(value) {
@@ -70,9 +71,39 @@
         '<div><div class="zhassahna-showtimes__date">' + escapeHtml(session.date_label) + '</div>' +
         '<div class="zhassahna-showtimes__time">Начало: ' + escapeHtml(session.time_label) + '</div>' +
         '<div class="zhassahna-showtimes__price">' + escapeHtml(session.price.label) + '</div></div>' +
-        '<a class="zhassahna-showtimes__buy" href="' + escapeHtml(session.widget_url) + '" target="_blank" rel="noopener">Купить билет</a>' +
+        '<a class="zhassahna-showtimes__buy zhassahna-buy-btn" href="' + escapeHtml(session.widget_url) + '" data-widget-url="' + escapeHtml(session.widget_url) + '">Купить билет</a>' +
         '</div>';
     }).join('') + '</div>';
+    bindPurchaseButtons(block);
+  }
+
+  function loadModalScript(callback) {
+    if (typeof window.openZhassahnaTicketModal === 'function') {
+      callback();
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = 'https://cabinet.zhassahna.kz/assets/js/widget.js?v=2';
+    script.onload = callback;
+    script.onerror = callback;
+    document.head.appendChild(script);
+  }
+
+  function bindPurchaseButtons(block) {
+    block.addEventListener('click', function (event) {
+      var button = event.target.closest('.zhassahna-buy-btn');
+      if (!button) return;
+      event.preventDefault();
+      var url = button.getAttribute('data-widget-url');
+      if (!url) return;
+      loadModalScript(function () {
+        if (typeof window.openZhassahnaTicketModal === 'function') {
+          window.openZhassahnaTicketModal(url);
+        } else {
+          window.location.href = url;
+        }
+      });
+    });
   }
 
   function load() {
