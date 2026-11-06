@@ -141,6 +141,14 @@ require __DIR__ . '/../includes/panel.php';
       </div>
 
       <div class="profile-card" style="padding:12px;">
+        <div id="ticketsPager" class="table-pagination" style="margin:0 0 10px;">
+          <div id="ticketsSummary" class="table-pagination__summary" style="color:#666;">—</div>
+          <div class="table-pagination__controls">
+            <button id="prevPage" class="btn btn-ghost">←</button>
+            <span id="currentPage">1 / 1</span>
+            <button id="nextPage" class="btn btn-ghost">→</button>
+          </div>
+        </div>
 
         <div style="margin-top:8px; overflow:auto;">
           <table id="ticketsTable" class="admin-table table--compact" style="width:100%; border-collapse:collapse;">
@@ -168,15 +176,6 @@ require __DIR__ . '/../includes/panel.php';
               <tr><td colspan="15" style="text-align:center; color:#666; padding:18px;">Загрузка...</td></tr>
             </tbody>
           </table>
-        </div>
-
-        <div id="ticketsPager" class="table-pagination">
-          <div id="ticketsSummary" class="table-pagination__summary" style="color:#666;">—</div>
-          <div class="table-pagination__controls">
-            <button id="prevPage" class="btn btn-ghost">←</button>
-            <span id="currentPage">1 / 1</span>
-            <button id="nextPage" class="btn btn-ghost">→</button>
-          </div>
         </div>
       </div>
     </div>
