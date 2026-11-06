@@ -9,7 +9,10 @@ $page_title_meta = 'Список билетов';
 $panel_title = 'Билеты';
 $panel_subtitle = 'Список проданных билетов, управление возвратами, просмотр и печать билетов';
 
-$page_scripts = ['/assets/js/tickets_list.js', '/assets/js/ticket_viewer.js'];
+$page_scripts = [
+  '/assets/js/tickets_list.js?v=' . filemtime(__DIR__ . '/../assets/js/tickets_list.js'),
+  '/assets/js/ticket_viewer.js?v=' . filemtime(__DIR__ . '/../assets/js/ticket_viewer.js'),
+];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
