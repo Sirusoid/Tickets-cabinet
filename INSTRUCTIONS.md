@@ -100,11 +100,25 @@ php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
 
 Перед выключением режима обслуживания проверьте афишу и тестовый выбор мест.
 
+## Окончание продаж (`sales_end_time`)
+
+Поле «Окончание продаж» в `schedule/edit.php` хранится как `schedules.sales_end_time` (datetime).
+
+Правило: если `sales_end_time` установлен и уже прошёл, публичные запросы не находят сессию. Проверка `(s.sales_end_time IS NULL OR s.sales_end_time >= NOW())` присутствует в:
+
+- `tickets/widget.php` — начальный поиск сессии (без фильтра, чтобы модалка открывалась);
+- `ajax/public_cash.php` — список мест и бронирование;
+- `ajax/public_payment.php` — создание BCC-сессии и проверка;
+- `promo_codes.php` — проверка промокода.
+
+При прошедшем `sales_end_time` виджет показывает модалку с названием спектакля, скрывает канвас рассадки и выводит «Билетов на продажу нет».
+
 ## Работа с BCC
 
 Основные точки:
 
 - `tickets/widget.php` — форма покупки;
+- `assets/js/bcc-payment-modal.js` — логика модалки, выбор мест, обработка ошибок;
 - `ajax/public_payment.php` — создание платежной сессии;
 - `payment/bcc/return.php` — возврат покупателя из банка;
 - `payment/bcc/notify.php` — серверное уведомление;

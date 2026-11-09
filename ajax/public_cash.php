@@ -72,7 +72,7 @@ switch ($action) {
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$session) {
-            json_response(['success' => false, 'message' => 'Сеанс не найден или продажа недоступна']);
+            json_response(['success' => false, 'message' => 'Билетов на продажу нет']);
         }
 
         if (!empty($session['hall_seatmap']) && is_string($session['hall_seatmap'])) {

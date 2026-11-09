@@ -109,8 +109,9 @@ flowchart LR
 ## Публичный виджет и BCC
 
 - `widget/afisha.php` — JSON/HTML афиша для Tilda.
-- `tickets/widget.php` — iframe выбора мест и покупки.
-- `ajax/public_cash.php` — публичная схема зала, доступность и клиентский резерв.
+- `tickets/widget.php` — iframe выбора мест и покупки; при прошедшем `sales_end_time` показывает «Билетов на продажу нет» вместо канваса.
+- `assets/js/bcc-payment-modal.js` — логика модалки: выбор мест, обработка ошибок, скрытие канваса при закрытых продажах.
+- `ajax/public_cash.php` — публичная схема зала, доступность и клиентский резерв; проверяет `sales_end_time`.
 - `ajax/public_payment.php` — создание BCC payment session.
 - `ajax/public_refund.php` — публичный возврат.
 - `payment/bcc/return.php` — возврат пользователя из банка.
