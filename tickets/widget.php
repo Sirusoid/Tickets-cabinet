@@ -47,7 +47,7 @@ if ($session_id > 0) {
         FROM schedules s
         LEFT JOIN events e ON s.event_id = e.id
         LEFT JOIN halls h ON s.hall_id = h.id
-        WHERE s.id = :id AND s.status IN ('upcoming','active') AND s.start_time >= NOW() AND (s.sales_end_time IS NULL OR s.sales_end_time >= NOW())
+        WHERE s.id = :id AND s.status IN ('upcoming','active') AND s.start_time >= NOW()
         LIMIT 1");
     $stmt->execute([':id' => $session_id]);
     $openSession = $stmt->fetch(PDO::FETCH_ASSOC);

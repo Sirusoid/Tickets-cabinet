@@ -555,6 +555,8 @@
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
+                    if (seatmapWrapper) seatmapWrapper.style.display = 'none';
+                    if (generalAdmissionPanel) generalAdmissionPanel.style.display = 'none';
                     showError(data.message || 'Не удалось загрузить сеанс');
                     return;
                 }
