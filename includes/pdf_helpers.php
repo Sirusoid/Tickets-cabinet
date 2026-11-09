@@ -779,14 +779,14 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА: / КҮНІ: </strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ: / УАҚЫТ: </strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div></div>';
         $html .= '<div class="ticket-section">';
         if ($order_number !== '') {
-            $html .= '<div class="customer-line"><strong>№ ЗАКАЗА / ТАПСЫРЫС:</strong> ' . htmlspecialchars($order_number, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div>';
+            $html .= '<div class="customer-line" style="font-size:8px;"><strong>№ ЗАКАЗА / ТАПСЫРЫС:</strong> ' . htmlspecialchars($order_number, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div>';
         }
         if ($giftLine !== '') {
             $html .= '<div class="customer-line"><strong>' . htmlspecialchars($giftLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></div>';
         }
         // Раскомментировать, если нужно показывать строки с ценой и оплатой в билете
-        /* $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
-        $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';*/
+        /* $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';*/
+        $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';
 
 		// Раскомментировать, если нужно показывать строку со скидкой в билете вида "СКИДКА / ЖЕҢІЛДІК: 50%"
 		/*        if ($discountLine !== '') {
