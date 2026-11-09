@@ -556,6 +556,11 @@
             .then(data => {
                 if (!data.success) {
                     var msg = data.message || 'Не удалось загрузить сеанс';
+                    var subtitleEl = document.querySelector('.bcc-modal-subtitle[data-session-datetime]');
+                    if (subtitleEl) {
+                        var dtAttr = subtitleEl.getAttribute('data-session-datetime');
+                        if (dtAttr) subtitleEl.textContent = formatSessionDate(dtAttr);
+                    }
                     if (canvas) canvas.style.display = 'none';
                     var zoomControls = seatmapWrapper ? seatmapWrapper.querySelector('.seatmap-zoom-controls') : null;
                     if (zoomControls) zoomControls.style.display = 'none';
