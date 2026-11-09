@@ -556,11 +556,19 @@
             .then(data => {
                 if (!data.success) {
                     var msg = data.message || 'Не удалось загрузить сеанс';
-                    if (seatmapWrapper) {
-                        seatmapWrapper.style.display = '';
-                        seatmapWrapper.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:200px;font-size:1.1rem;color:#000;">' + msg + '</div>';
-                    }
+                    if (canvas) canvas.style.display = 'none';
+                    var zoomControls = seatmapWrapper ? seatmapWrapper.querySelector('.seatmap-zoom-controls') : null;
+                    if (zoomControls) zoomControls.style.display = 'none';
+                    if (legend) legend.style.display = 'none';
                     if (generalAdmissionPanel) generalAdmissionPanel.style.display = 'none';
+                    var msgEl = document.getElementById('bccNoTicketsMsg');
+                    if (!msgEl && seatmapWrapper) {
+                        msgEl = document.createElement('div');
+                        msgEl.id = 'bccNoTicketsMsg';
+                        msgEl.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:200px;font-size:1.1rem;color:#000;';
+                        seatmapWrapper.appendChild(msgEl);
+                    }
+                    if (msgEl) { msgEl.textContent = msg; msgEl.style.display = 'flex'; }
                     showError(msg);
                     return;
                 }
@@ -578,6 +586,11 @@
                     currentSession.hall_seatmap = payload.hall_seatmap;
                 }
                 configureGeneralAdmission(payload, currentSession);
+                var noTicketsMsg = document.getElementById('bccNoTicketsMsg');
+                if (noTicketsMsg) noTicketsMsg.style.display = 'none';
+                if (canvas) canvas.style.display = '';
+                var zoomControls2 = seatmapWrapper ? seatmapWrapper.querySelector('.seatmap-zoom-controls') : null;
+                if (zoomControls2) zoomControls2.style.display = '';
                 updateHeaderDate(currentSession);
                 updateReservationUi();
                 if (!generalAdmission) initSeatmap(currentSession);
