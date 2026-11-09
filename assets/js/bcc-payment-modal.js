@@ -555,9 +555,13 @@
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
-                    if (seatmapWrapper) seatmapWrapper.style.display = 'none';
+                    var msg = data.message || 'Не удалось загрузить сеанс';
+                    if (seatmapWrapper) {
+                        seatmapWrapper.style.display = '';
+                        seatmapWrapper.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:200px;font-size:1.1rem;color:#000;">' + msg + '</div>';
+                    }
                     if (generalAdmissionPanel) generalAdmissionPanel.style.display = 'none';
-                    showError(data.message || 'Не удалось загрузить сеанс');
+                    showError(msg);
                     return;
                 }
                 const payload = data.data || data;
