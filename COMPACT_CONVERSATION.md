@@ -14,7 +14,7 @@ PHP 8.4+, PDO, MariaDB/MySQL. Публичный сайт: `https://zhassahna.kz
 
 MAC: строка строится как последовательность `длина + значение` в документированном порядке; HEX-ключ переводится в binary через `hex2bin`/`pack("H*", ...)`; затем HMAC-SHA1, uppercase HEX. Документированный пример TRTYPE=14 проверен и совпал.
 
-Тестирование банка остановлено из-за временной недоступности/лимитов BCC. После восстановления продолжить с кейса 2.1 и заполнить таблицу 2.1-2.5 плюс TRTYPE=14.
+Тестирование банка после восстановления завершено: проверены кейсы покупки 2.1–2.5, `TRTYPE=14`, BACKREF/NOTIFY, создание билетов и PDF, `cash_transactions`, отчёты и освобождение мест.
 
 ## Текущая реализация
 
@@ -25,6 +25,19 @@ MAC: строка строится как последовательность `
 - `includes/payment/bcc_refund.php`, `ajax/public_refund.php`: самостоятельный возврат через TRTYPE=14.
 - `tickets/public.php`: двуязычная страница заказа, QR, PDF, возврат, памятка RU/KZ.
 - `reports/sales.php`: продажи считаются по `tickets`; разрезы карта/наличные и возвраты; `cash_transactions` используется для способа оплаты и сверки.
+
+Текущий фокус завершён: BCC, самостоятельный возврат, публичная страница заказа, касса/виджет и production-деплой проверены.
+
+## UI изменения
+
+- `assets/css/admin.css`: заголовок sticky, кнопка сайдбара внутри header, видна при свернутом сайдбаре.
+- `assets/js/tickets_list.js` (строка 299): кнопка «Возврат» скрыта для билетов со статусом `used` («Использован»). Условие: `if (!isRefunded && t.status !== 'used')`. Для `cancelled` — disabled, но видна.
+
+## BCC e-Commerce WEBVIEW — текущее состояние
+
+- Production credentials настроены через `settings/payment.php` и `config.php`.
+- Исходящий MAC (подпись запроса к банку): корректно реализован в `includes/payment/bcc.php` (`bcc_build_mac_string` / `bcc_sign`). Порядок полей фиксирован, формат `<len><value>`, HMAC-SHA1 → uppercase HEX.
+- Входящий MAC (валидация ответа от банка): **TODO**. Функция `bcc_validate_response_signature` — placeholder. Требуется для production безопасности.
 
 ## Важная модель данных
 

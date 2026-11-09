@@ -9,7 +9,8 @@ $active_menu = $reportsEmbedded ? 'dashboard' : 'reports';
 $page_title_meta = $reportsEmbedded ? 'Панель' : 'Отчёты — продажи';
 $panel_title = $reportsEmbedded ? 'Панель' : 'Отчёты';
 $panel_subtitle = 'Выручка, скидки и чистая сумма по проданным билетам';
-$page_styles = ['/assets/css/reports.css'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-3'];
+$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-3'];
 
 if (!$reportsEmbedded) {
 	require __DIR__ . '/../includes/header.php';
@@ -20,6 +21,14 @@ $dateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-01')));
 $dateTo = trim((string)($_GET['date_to'] ?? date('Y-m-d')));
 $segmentFilter = trim((string)($_GET['segment'] ?? ''));
 $eventFilter = (int)($_GET['event_id'] ?? 0);
+$refundFilter = trim((string)($_GET['refund'] ?? 'all'));
+if (!in_array($refundFilter, ['all', 'without', 'only'], true)) {
+		$refundFilter = 'all';
+}
+$sourceFilter = reporting_normalize_source_filter(
+		$_GET['source'] ?? [],
+		array_key_exists('source_filter', $_GET)
+);
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
 		$dateFrom = date('Y-m-01');
@@ -39,6 +48,8 @@ if ($eventFilter > 0) {
 		$eventSql = ' AND COALESCE(t.event_id, s.event_id) = :event_id ';
 		$params[':event_id'] = $eventFilter;
 }
+$sourceSql = reporting_source_sql($sourceFilter);
+$salesRefundSql = $refundFilter === 'only' ? ' AND 1 = 0 ' : '';
 
 $rows = [];
 $errorText = '';
@@ -53,8 +64,10 @@ try {
 								t.final_price,
 								t.discount,
 								t.discount_amount,
+								t.promo_code,
 								t.seat_identifier,
 								t.customer_segment,
+								t.channel,
 								t.purchased_at,
 								t.payment_status,
 								t.status,
@@ -73,6 +86,8 @@ try {
 							AND COALESCE(t.refund_status, 'none') IN ('none', '', 'no')
 							$segmentSql
 							$eventSql
+							$sourceSql
+							$salesRefundSql
 						ORDER BY t.purchased_at DESC, t.id DESC";
 		$rows = db_fetch_all($sql, $params);
 } catch (Throwable $e) {
@@ -91,6 +106,11 @@ $byPaymentMethod = [
 		'card' => ['label' => 'Карта', 'tickets' => 0, 'net' => 0.0],
 		'cash' => ['label' => 'Наличные', 'tickets' => 0, 'net' => 0.0],
 		'other' => ['label' => 'Другое', 'tickets' => 0, 'net' => 0.0],
+];
+$bySalesSource = [
+		'cash_cash' => ['label' => 'Наличные', 'tickets' => 0, 'net' => 0.0, 'class' => 'reports-kpi--cash'],
+		'cash_card' => ['label' => 'Картой', 'tickets' => 0, 'net' => 0.0, 'class' => 'reports-kpi--card'],
+		'online' => ['label' => 'Онлайн', 'tickets' => 0, 'net' => 0.0, 'class' => 'reports-kpi--online'],
 ];
 $refundTotals = ['tickets' => 0, 'amount' => 0.0];
 $refundByPerformance = [];
@@ -130,6 +150,11 @@ foreach ($rows as $row) {
 		}
 		$byPaymentMethod[$paymentMethod]['tickets']++;
 		$byPaymentMethod[$paymentMethod]['net'] += $price;
+		$sourceKey = reporting_source_key($row['payment_method'] ?? '', $row['channel'] ?? '');
+		if (isset($bySalesSource[$sourceKey])) {
+				$bySalesSource[$sourceKey]['tickets']++;
+				$bySalesSource[$sourceKey]['net'] += $price;
+		}
 
 		$bySegment[$segmentKey]['tickets']++;
 		$bySegment[$segmentKey]['gross'] += $base;
@@ -169,14 +194,22 @@ try {
 			$refundEventSql = ' AND COALESCE(t.event_id, s.event_id) = :refund_event_id ';
 			$refundParams[':refund_event_id'] = $eventFilter;
 		}
+		$refundSourceSql = reporting_source_sql($sourceFilter);
+		$refundFilterSql = $refundFilter === 'without' ? ' AND 1 = 0 ' : '';
+		if ($refundFilter === 'only') {
+			$refundFilterSql = " AND t.refund_status = 'refunded' ";
+		}
 		$refundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.final_price), 0) AS amount
 			FROM tickets t
 			LEFT JOIN schedules s ON s.id = t.schedule_id
+			LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
 			WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 				AND t.payment_status = 'paid'
 				AND t.refund_status = 'refunded'
 				$refundSegmentSql
-				$refundEventSql", $refundParams);
+				$refundEventSql
+				$refundSourceSql
+				$refundFilterSql", $refundParams);
 		$refundTotals = [
 			'tickets' => (int)($refundRow['tickets'] ?? 0),
 			'amount' => (float)($refundRow['amount'] ?? 0),
@@ -191,11 +224,14 @@ try {
 		FROM tickets t
 		LEFT JOIN schedules s ON s.id = t.schedule_id
 		LEFT JOIN events e ON e.id = COALESCE(t.event_id, s.event_id)
+		LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
 		WHERE t.refund_at BETWEEN :refund_date_from AND :refund_date_to
 			AND t.payment_status = 'paid'
 			AND t.refund_status = 'refunded'
 			$refundSegmentSql
 			$refundEventSql
+			$refundSourceSql
+			$refundFilterSql
 		GROUP BY COALESCE(t.event_id, s.event_id), e.title, s.start_time
 		ORDER BY s.start_time DESC", $refundParams);
 	foreach ($refundRows as $refundItem) {
@@ -231,12 +267,24 @@ $netAfterRefunds = max(0.0, $totals['net'] - $refundTotals['amount']);
 $today = date('Y-m-d');
 $yesterday = date('Y-m-d', strtotime('-1 day'));
 $displayDateRange = reporting_format_date_range($dateFrom, $dateTo);
-$exportUrl = '/reports/export_excel.php?' . http_build_query([
+$reportQuery = [
 		'date_from' => $dateFrom,
 		'date_to' => $dateTo,
 		'segment' => $segmentFilter,
 		'event_id' => $eventFilter,
-]);
+		'source_filter' => '1',
+		'source' => $sourceFilter,
+		'refund' => $refundFilter,
+];
+$exportUrl = '/reports/export_excel.php?' . http_build_query($reportQuery);
+$todayUrl = '?' . http_build_query(array_merge($reportQuery, [
+		'date_from' => $today,
+		'date_to' => $today,
+]));
+$yesterdayUrl = '?' . http_build_query(array_merge($reportQuery, [
+		'date_from' => $yesterday,
+		'date_to' => $yesterday,
+]));
 
 ?>
 
@@ -248,6 +296,7 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 			<p>Выберите период и тип билета, чтобы обновить показатели и таблицы.</p>
 		</div>
 		<form method="get" class="reports-filters">
+			<input type="hidden" name="source_filter" value="1">
 			<div>
 				<label for="report-date-from">Дата от</label>
 				<input id="report-date-from" type="date" name="date_from" class="form-control" value="<?= h($dateFrom) ?>">
@@ -276,10 +325,27 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 					<?php endforeach; ?>
 				</select>
 			</div>
+			<fieldset class="reports-source-filter">
+				<legend>Источник оплаты</legend>
+				<?php foreach (reporting_source_options() as $sourceKey => $sourceLabel): ?>
+					<label class="reports-source-filter__option">
+						<input type="checkbox" name="source[]" value="<?= h($sourceKey) ?>" <?= in_array($sourceKey, $sourceFilter, true) ? 'checked' : '' ?>>
+						<span><?= h($sourceLabel) ?></span>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
+			<div>
+				<label for="report-refund">Возвраты</label>
+				<select id="report-refund" name="refund" class="form-control">
+					<option value="all" <?= $refundFilter === 'all' ? 'selected' : '' ?>>Все</option>
+					<option value="without" <?= $refundFilter === 'without' ? 'selected' : '' ?>>Без возвратов</option>
+					<option value="only" <?= $refundFilter === 'only' ? 'selected' : '' ?>>Только возвраты</option>
+				</select>
+			</div>
 			<div class="reports-filters__actions">
 				<a href="/reports/sales.php" class="btn btn-ghost">Сбросить</a>
-				<a href="?date_from=<?= h($today) ?>&date_to=<?= h($today) ?>&segment=<?= h($segmentFilter) ?>&event_id=<?= (int)$eventFilter ?>" class="btn btn-ghost">Сегодня</a>
-				<a href="?date_from=<?= h($yesterday) ?>&date_to=<?= h($yesterday) ?>&segment=<?= h($segmentFilter) ?>&event_id=<?= (int)$eventFilter ?>" class="btn btn-ghost">Вчера</a>
+				<a href="<?= h($todayUrl) ?>" class="btn btn-ghost">Сегодня</a>
+				<a href="<?= h($yesterdayUrl) ?>" class="btn btn-ghost">Вчера</a>
 				<button type="submit" class="btn btn-primary">Показать</button>
 				<a href="<?= h($exportUrl) ?>" class="btn btn-secondary">Скачать XLSX</a>
 			</div>
@@ -295,6 +361,13 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 		<div class="card reports-kpi reports-kpi--discount"><span>Скидки</span><strong>-<?= number_format((float)$totals['discount'], 2, '.', ' ') ?> <em>тг</em></strong><small>за выбранный период</small></div>
 		<div class="card reports-kpi reports-kpi--success"><span>Чистая выручка</span><strong><?= number_format((float)$totals['net'], 2, '.', ' ') ?> <em>тг</em></strong><small>после скидок</small></div>
 		<div class="card reports-kpi reports-kpi--dark"><span>После возвратов</span><strong><?= number_format((float)$netAfterRefunds, 2, '.', ' ') ?> <em>тг</em></strong><small><?= number_format((float)$refundTotals['tickets'], 0, '.', ' ') ?> возвращённых билетов</small></div>
+			<?php foreach ($bySalesSource as $source): ?>
+				<div class="card reports-kpi <?= h($source['class']) ?>">
+					<span><?= h($source['label']) ?></span>
+					<strong><?= number_format((float)$source['net'], 2, '.', ' ') ?> <em>тг</em></strong>
+					<small><?= number_format((float)$source['tickets'], 0, '.', ' ') ?> билетов</small>
+				</div>
+			<?php endforeach; ?>
 		</div>
 
 		<div class="reports-meta-row">
@@ -343,8 +416,8 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							$refundItem = $refundByPerformance[$performanceKey] ?? ['tickets' => 0, 'amount' => 0.0];
 							$netPerformance = max(0.0, (float)$item['paid'] - (float)$refundItem['amount']);
 					?>
-						<tr>
-							<td><strong><?= h($item['event_title']) ?></strong></td>
+						<tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$item['schedule_id'] ?>" tabindex="0" role="link">
+							<td><a class="reports-performance-link" href="/reports/performance.php?session_id=<?= (int)$item['schedule_id'] ?>"><strong><?= h($item['event_title']) ?></strong></a></td>
 							<td><?= $item['schedule_start'] !== '' ? h(reporting_format_date($item['schedule_start'], true)) : '—' ?></td>
 							<td><?= number_format((float)$item['tickets'], 0, '.', ' ') ?></td>
 							<td><?= number_format((float)$item['original'], 2, '.', ' ') ?> тг</td>
@@ -354,7 +427,12 @@ $exportUrl = '/reports/export_excel.php?' . http_build_query([
 							<td><strong><?= number_format($netPerformance, 2, '.', ' ') ?> тг</strong></td>
 							<td>
 								<?php if ((int)$item['schedule_id'] > 0): ?>
-									<a class="btn btn-secondary btn-sm" href="/reports/session_export_excel.php?session_id=<?= (int)$item['schedule_id'] ?>">Excel</a>
+									<a class="btn btn-secondary btn-sm" href="/reports/session_export_excel.php?<?= h(http_build_query([
+										'session_id' => (int)$item['schedule_id'],
+										'source_filter' => '1',
+										'source' => $sourceFilter,
+										'refund' => $refundFilter,
+									])) ?>">Excel</a>
 								<?php else: ?>
 									—
 								<?php endif; ?>

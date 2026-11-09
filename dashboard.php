@@ -2,16 +2,27 @@
 // Компактная рабочая панель кассира и администратора.
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/includes/reporting.php';
-require_login();
+ require_login();
+ // Redirect scanner role to scanner page
+ $userRole = strtolower(trim((string)($_SESSION['user']['role'] ?? '')));
+ if ($userRole === 'scanner') {
+     redirect('/scanner.php');
+ }
 
 $use_sidebar = true;
 $active_menu = 'dashboard';
 $page_title_meta = 'Панель';
-$page_styles = ['/assets/css/reports.css'];
+$page_styles = ['/assets/css/reports.css?v=visual-performance-20260927-3'];
+$page_scripts = ['/assets/js/report-drilldown.js?v=visual-performance-20260927-3'];
 
 $todaySales = ['tickets' => 0, 'amount' => 0.0];
 $todayRefunds = ['tickets' => 0, 'amount' => 0.0];
 $todayDiscounts = 0.0;
+$todaySalesSources = [
+    'cash_cash' => ['label' => 'Наличные', 'tickets' => 0, 'amount' => 0.0, 'class' => 'reports-kpi--cash'],
+    'cash_card' => ['label' => 'Картой', 'tickets' => 0, 'amount' => 0.0, 'class' => 'reports-kpi--card'],
+    'online' => ['label' => 'Онлайн', 'tickets' => 0, 'amount' => 0.0, 'class' => 'reports-kpi--online'],
+];
 $todaySessions = [];
 $dashboardError = '';
 
@@ -29,6 +40,24 @@ try {
         'amount' => (float)($todaySalesRow['amount'] ?? 0),
     ];
     $todayDiscounts = (float)($todaySalesRow['discounts'] ?? 0);
+
+    $todaySourceRows = db_fetch_all("SELECT
+            t.final_price,
+            t.channel,
+            COALESCE(tx.payment_method, CASE WHEN t.channel IN ('web', 'mobile') THEN 'card' ELSE 'cash' END) AS payment_method
+        FROM tickets t
+        LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+        WHERE DATE(t.purchased_at) = CURDATE()
+            AND t.payment_status = 'paid'
+            AND t.status <> 'cancelled'
+            AND COALESCE(t.refund_status, 'none') NOT IN ('refunded')");
+    foreach ($todaySourceRows as $sourceRow) {
+        $sourceKey = reporting_source_key($sourceRow['payment_method'] ?? '', $sourceRow['channel'] ?? '');
+        if (isset($todaySalesSources[$sourceKey])) {
+            $todaySalesSources[$sourceKey]['tickets']++;
+            $todaySalesSources[$sourceKey]['amount'] += (float)($sourceRow['final_price'] ?? 0);
+        }
+    }
 
     $todayRefundRow = db_fetch_one("SELECT COUNT(*) AS tickets, COALESCE(SUM(t.final_price), 0) AS amount
         FROM tickets t
@@ -59,7 +88,6 @@ try {
         LEFT JOIN tickets t ON t.schedule_id = s.id
             AND t.payment_status = 'paid'
             AND t.status <> 'cancelled'
-            AND COALESCE(t.refund_status, 'none') <> 'refunded'
         WHERE s.start_time >= NOW()
             AND s.start_time < DATE_ADD(NOW(), INTERVAL 14 DAY)
             AND s.status IN ('upcoming', 'active')
@@ -115,6 +143,13 @@ require __DIR__ . '/includes/header.php';
             <strong><?= number_format(max(0.0, $todaySales['amount'] - $todayRefunds['amount']), 2, '.', ' ') ?> <em>тг</em></strong>
             <small>продажи минус возвраты</small>
         </div>
+        <?php foreach ($todaySalesSources as $source): ?>
+            <div class="card reports-kpi <?= h($source['class']) ?>">
+                <span><?= h($source['label']) ?></span>
+                <strong><?= number_format((float)$source['amount'], 2, '.', ' ') ?> <em>тг</em></strong>
+                <small><?= number_format((float)$source['tickets'], 0, '.', ' ') ?> билетов</small>
+            </div>
+        <?php endforeach; ?>
     </div>
 
     <section class="card reports-section reports-section--wide">
@@ -141,9 +176,9 @@ require __DIR__ . '/includes/header.php';
                     <?php if (!$todaySessions): ?>
                         <tr><td colspan="7" class="reports-empty">На ближайшие 14 дней сеансов нет.</td></tr>
                     <?php else: foreach ($todaySessions as $session): ?>
-                        <tr>
+                        <tr class="reports-session-row" data-report-url="/reports/performance.php?session_id=<?= (int)$session['id'] ?>" tabindex="0" role="link">
                             <td><?= h(reporting_format_date($session['start_time'], true)) ?></td>
-                            <td><strong><?= h($session['event_title'] ?? 'Без названия') ?></strong></td>
+                            <td><a class="reports-performance-link" href="/reports/performance.php?session_id=<?= (int)$session['id'] ?>"><strong><?= h($session['event_title'] ?? 'Без названия') ?></strong></a></td>
                             <td><?= h($session['hall_name'] ?? '—') ?></td>
                             <td><?= number_format((int)$session['sold_tickets'], 0, '.', ' ') ?></td>
                             <td><?= number_format((float)$session['sold_amount'], 2, '.', ' ') ?> тг</td>

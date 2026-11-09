@@ -1,6 +1,8 @@
 <?php
 
 if (!function_exists('bcc_finalize_payment_session')) {
+    require_once __DIR__ . '/../gift_promotion.php';
+
     function bcc_finalize_payment_session(PDO $pdo, array $session, array $data, string $source = 'bcc_notify'): array
     {
         $paymentSessionId = (int)($session['id'] ?? 0);
@@ -20,11 +22,14 @@ if (!function_exists('bcc_finalize_payment_session')) {
             $hasOrderEmailSentAt = false;
         }
 
-        $emailSentSelect = $hasOrderEmailSentAt ? ', order_email_sent_at' : '';
+        $emailSentSelect = $hasOrderEmailSentAt ? ', ps.order_email_sent_at' : '';
         $pdo->beginTransaction();
         try {
-            $lockStmt = $pdo->prepare("SELECT id, session_id, event_id, hall_id, status, amount_cents, seats_payload, ticket_uids, customer_phone, customer_name, customer_email, order_number{$emailSentSelect}
-                FROM payment_sessions WHERE id = :id LIMIT 1 FOR UPDATE");
+            $lockStmt = $pdo->prepare("SELECT ps.id, ps.session_id, ps.event_id, ps.hall_id, ps.status, ps.amount_cents, ps.seats_payload, ps.ticket_uids, ps.customer_phone, ps.customer_name, ps.customer_email, ps.order_number,
+                    s.promotion_enabled, s.promotion_gift_name, s.promotion_gift_price{$emailSentSelect}
+                FROM payment_sessions ps
+                LEFT JOIN schedules s ON s.id = ps.session_id
+                WHERE ps.id = :id LIMIT 1 FOR UPDATE");
             $lockStmt->execute([':id' => $paymentSessionId]);
             $lockedSession = $lockStmt->fetch(PDO::FETCH_ASSOC);
             if (!$lockedSession) {
@@ -41,6 +46,11 @@ if (!function_exists('bcc_finalize_payment_session')) {
             if (!is_array($seats) || empty($seats)) {
                 throw new RuntimeException('Seats payload is empty.');
             }
+            $normalizedSeats = [];
+            foreach ($seats as $seat) {
+                $normalizedSeats[] = gift_promotion_apply_to_seat(is_array($seat) ? $seat : [], $lockedSession);
+            }
+            $seats = $normalizedSeats;
 
             $seatKeys = array_values(array_filter(array_map(function ($seat) {
                 return str_replace(':', '-', trim((string)($seat['identifier'] ?? '')));
@@ -69,11 +79,14 @@ if (!function_exists('bcc_finalize_payment_session')) {
 
             $transactionOriginalTotal = 0.0;
             $transactionTotal = 0.0;
+            $transactionGiftTotal = 0;
             foreach ($seats as $seat) {
                 $originalPrice = isset($seat['original_price']) ? (float)$seat['original_price'] : 0.0;
                 $finalPrice = isset($seat['final_price']) ? (float)$seat['final_price'] : $originalPrice;
-                $transactionOriginalTotal += $originalPrice;
-                $transactionTotal += $finalPrice;
+                $giftPrice = (int)($seat['gift_price'] ?? 0);
+                $transactionGiftTotal += $giftPrice;
+                $transactionOriginalTotal += $originalPrice + $giftPrice;
+                $transactionTotal += $finalPrice + $giftPrice;
             }
             $transactionPayload = [
                 'schema_version' => 2,
@@ -85,6 +98,7 @@ if (!function_exists('bcc_finalize_payment_session')) {
                 'int_ref' => $data['INT_REF'] ?? null,
                 'original_total' => round($transactionOriginalTotal, 2),
                 'discount_total' => round(max(0.0, $transactionOriginalTotal - $transactionTotal), 2),
+                'gift_total' => $transactionGiftTotal,
                 'final_total' => round($transactionTotal, 2),
             ];
             $transactionStmt = $pdo->prepare("INSERT INTO cash_transactions (type, session_id, user_id, customer_id, amount_cents, currency, payment_method, payload, created_at)
@@ -132,25 +146,35 @@ if (!function_exists('bcc_finalize_payment_session')) {
                 $identifier = str_replace(':', '-', (string)($seat['identifier'] ?? ''));
                 $originalPrice = isset($seat['original_price']) ? (float)$seat['original_price'] : 0.0;
                 $finalPrice = isset($seat['final_price']) ? (float)$seat['final_price'] : $originalPrice;
-                $discountAmount = max(0.0, $originalPrice - $finalPrice);
+                $giftPrice = (int)($seat['gift_price'] ?? 0);
+                $ticketOriginalPrice = $originalPrice + $giftPrice;
+                $ticketFinalPrice = $finalPrice + $giftPrice;
+                $discountAmount = max(0.0, $ticketOriginalPrice - $ticketFinalPrice);
                 $discountPercent = $originalPrice > 0 ? (int)round(($discountAmount / $originalPrice) * 100) : 0;
                 $ticketUid = bin2hex(random_bytes(8));
+                $promoCode = trim((string)($seat['promo_code'] ?? ''));
 
                 $insertTicket = $pdo->prepare("INSERT INTO tickets
-                    (schedule_id, event_id, hall_id, seat_identifier, original_price, final_price, discount, discount_amount,
+                    (schedule_id, event_id, hall_id, seat_identifier, original_price, final_price, discount, discount_amount, promo_code,
+                     gift_selected, gift_name, gift_price,
                      status, payment_status, payment_provider, payment_transaction_id, payment_session_id, customer_id, customer_name, customer_phone, customer_email, ticket_uid, channel, purchased_at, created_at, updated_at)
                     VALUES
-                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :original_price, :final_price, :discount, :discount_amount,
+                    (:schedule_id, :event_id, :hall_id, :seat_identifier, :original_price, :final_price, :discount, :discount_amount, :promo_code,
+                     :gift_selected, :gift_name, :gift_price,
                      'issued', 'paid', 'bcc', :txid, :payment_session_id, :customer_id, :customer_name, :customer_phone, :customer_email, :ticket_uid, 'web', NOW(), NOW(), NOW())");
                 $insertTicket->execute([
                     ':schedule_id' => (int)$lockedSession['session_id'],
                     ':event_id' => (int)$lockedSession['event_id'],
                     ':hall_id' => (int)$lockedSession['hall_id'],
                     ':seat_identifier' => $identifier,
-                    ':original_price' => number_format($originalPrice, 2, '.', ''),
-                    ':final_price' => number_format($finalPrice, 2, '.', ''),
+                    ':original_price' => number_format($ticketOriginalPrice, 2, '.', ''),
+                    ':final_price' => number_format($ticketFinalPrice, 2, '.', ''),
                     ':discount' => $discountPercent,
                     ':discount_amount' => number_format($discountAmount, 2, '.', ''),
+                    ':promo_code' => $promoCode !== '' ? $promoCode : null,
+                    ':gift_selected' => (int)($seat['gift_selected'] ?? 0),
+                    ':gift_name' => $seat['gift_name'] ?? null,
+                    ':gift_price' => $giftPrice,
                     ':txid' => $transactionId,
                     ':payment_session_id' => $paymentSessionId,
                     ':customer_id' => $customerId,

@@ -21,6 +21,24 @@
     const cartList = document.getElementById('bccCartList');
     const customerCartList = document.getElementById('bccCustomerCartList');
     const totalEl = document.getElementById('bccTotal');
+    const promoInput = document.getElementById('bccPromoCode');
+    const applyPromoBtn = document.getElementById('bccApplyPromoBtn');
+    const promoStatus = document.getElementById('bccPromoStatus');
+    const promoInfo = document.getElementById('bccPromoInfo');
+    const promoInfoTitle = document.getElementById('bccPromoInfoTitle');
+    const promoInfoText = document.getElementById('bccPromoInfoText');
+    const summaryCount = document.getElementById('bccSummaryCount');
+    const summarySubtotal = document.getElementById('bccSummarySubtotal');
+    const summaryDiscountRow = document.getElementById('bccSummaryDiscountRow');
+    const summaryDiscountLabel = document.getElementById('bccSummaryDiscountLabel');
+    const summaryDiscount = document.getElementById('bccSummaryDiscount');
+    const summaryTotal = document.getElementById('bccSummaryTotal');
+    const orderSummary = document.getElementById('bccOrderSummary');
+    const seatmapWrapper = document.getElementById('bccSeatmapWrapper');
+    const generalAdmissionPanel = document.getElementById('bccGeneralAdmission');
+    const generalAdmissionAvailability = document.getElementById('bccGeneralAdmissionAvailability');
+    const generalAdmissionQuantity = document.getElementById('bccGeneralAdmissionQuantity');
+    const generalAdmissionTotal = document.getElementById('bccGeneralAdmissionTotal');
     const payBtn = document.getElementById('bccPayBtn');
     const buyBtn = document.getElementById('bccBuyBtn');
     const reserveBtn = document.getElementById('bccReserveBtn');
@@ -41,9 +59,74 @@
     let clientReservationMinutes = 15;
     let maxTicketsPerUser = 6;
     let clientReserved = false;
+    let appliedPromoCode = '';
+    let appliedPromoDiscountCents = 0;
+    let promoRequestSeq = 0;
+    let promoPending = null;
+    let promoDebounceTimer = null;
+    let generalAdmission = false;
+    let generalAdmissionAvailableSeats = [];
+    let generalAdmissionMaxTickets = 6;
+
+    // Consent checkboxes
+    const consentData = document.getElementById('bccConsentData');
+    const consentPayment = document.getElementById('bccConsentPayment');
+
+    // Customer details inputs
+    const nameInput = document.getElementById('bccCustomerName');
+    const phoneInput = document.getElementById('bccCustomerPhone');
+    const emailInput = document.getElementById('bccCustomerEmail');
 
     function phoneDigits(value) {
         return String(value || '').replace(/\D+/g, '');
+    }
+
+    function updatePayBtnState() {
+        const consent = consentData && consentPayment && consentData.checked && consentPayment.checked;
+        const count = selectedSeats.length;
+        const overLimit = count > maxTicketsPerUser;
+        const nameFilled = nameInput && nameInput.value.trim().length > 0;
+        const phoneFilled = phoneInput && phoneDigits(phoneInput.value).length > 0;
+        const emailFilled = emailInput && emailInput.value.trim().length > 0;
+        if (payBtn) payBtn.disabled = !consent || !nameFilled || !phoneFilled || !emailFilled || count === 0 || overLimit;
+    }
+
+    function isPaymentFormValid() {
+        const consent = consentData && consentPayment && consentData.checked && consentPayment.checked;
+        const nameFilled = nameInput && nameInput.value.trim().length > 0;
+        const phoneFilled = phoneInput && phoneDigits(phoneInput.value).length > 0;
+        const emailFilled = emailInput && emailInput.value.trim().length > 0;
+        const count = selectedSeats.length;
+        const overLimit = count > maxTicketsPerUser;
+        return consent && nameFilled && phoneFilled && emailFilled && count > 0 && !overLimit;
+    }
+
+    if (consentData) consentData.addEventListener('change', updatePayBtnState);
+    if (consentPayment) consentPayment.addEventListener('change', updatePayBtnState);
+    if (nameInput) nameInput.addEventListener('input', updatePayBtnState);
+    if (phoneInput) phoneInput.addEventListener('input', updatePayBtnState);
+    if (emailInput) emailInput.addEventListener('input', updatePayBtnState);
+    if (applyPromoBtn) applyPromoBtn.addEventListener('click', function () { applyPromoCode(); });
+    if (generalAdmissionQuantity) {
+        generalAdmissionQuantity.addEventListener('input', updateGeneralAdmissionSelection);
+        generalAdmissionQuantity.addEventListener('change', updateGeneralAdmissionSelection);
+    }
+    if (promoInput) {
+        promoInput.addEventListener('input', function () {
+            const normalized = getEnteredPromoCode();
+            if (promoInput.value !== normalized) promoInput.value = normalized;
+            window.clearTimeout(promoDebounceTimer);
+            if (normalized !== appliedPromoCode) resetAppliedPromo('');
+            if (normalized.length >= 4 && normalized !== appliedPromoCode) {
+                promoDebounceTimer = window.setTimeout(function () { applyPromoCode({ auto: true }); }, 600);
+            }
+        });
+        promoInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                applyPromoCode();
+            }
+        });
     }
 
     function formatCustomerPhone(value) {
@@ -91,8 +174,171 @@
         errorEl.style.display = 'none';
     }
 
+    function getEnteredPromoCode() {
+        return promoInput ? promoInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12) : '';
+    }
+
+    function setPromoStatus(text, kind) {
+        if (!promoStatus) return;
+        promoStatus.textContent = text || '';
+        promoStatus.className = 'bcc-promo-status' + (kind ? ' is-' + kind : '');
+    }
+
+    function setPromoBusy(busy) {
+        if (!applyPromoBtn) return;
+        applyPromoBtn.disabled = busy;
+        applyPromoBtn.textContent = busy ? 'Проверка…' : 'Применить';
+    }
+
+    function showPromoInfo(payload) {
+        if (!promoInfo) return;
+        if (promoInfoTitle) {
+            promoInfoTitle.textContent = 'Промокод ' + payload.code + (payload.discount_label ? ': скидка ' + payload.discount_label : '');
+        }
+        if (promoInfoText) promoInfoText.textContent = payload.description || '';
+        promoInfo.style.display = '';
+    }
+
+    function clearAppliedPromo() {
+        appliedPromoCode = '';
+        appliedPromoDiscountCents = 0;
+        if (promoInfo) promoInfo.style.display = 'none';
+    }
+
+    function resetAppliedPromo(message, kind) {
+        const hadPromo = !!appliedPromoCode;
+        promoRequestSeq++;
+        promoPending = null;
+        window.clearTimeout(promoDebounceTimer);
+        clearAppliedPromo();
+        setPromoBusy(false);
+        setPromoStatus(message, kind);
+        if (hadPromo) updateTotal();
+    }
+
+    function applyPromoCode(options) {
+        const auto = !!(options && options.auto);
+        const code = getEnteredPromoCode();
+        window.clearTimeout(promoDebounceTimer);
+        if (!promoInput) return Promise.resolve(false);
+        if (!code) {
+            if (!auto) setPromoStatus('Введите промокод.', 'error');
+            return Promise.resolve(false);
+        }
+        if (!currentSession || selectedSeats.length === 0) {
+            if (!auto) setPromoStatus('Сначала выберите места.', 'error');
+            return Promise.resolve(false);
+        }
+        if (code === appliedPromoCode) return Promise.resolve(true);
+
+        const requestSeq = ++promoRequestSeq;
+        setPromoBusy(true);
+        setPromoStatus('Проверяем промокод…', '');
+        const request = fetch(cfg.ajaxUrl + '?action=validate_promo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: currentSession.id || currentSession.session_id,
+                promo_code: code,
+                seats: selectedSeats.map(function (seat) { return { identifier: seat.identifier }; })
+            })
+        }).then(function (response) {
+            return response.json().catch(function () { return null; }).then(function (payload) {
+                if (!payload || !payload.success) {
+                    const failure = new Error((payload && payload.message) || 'Не удалось применить промокод.');
+                    failure.isPromoError = true;
+                    throw failure;
+                }
+                return payload;
+            });
+        }).then(function (payload) {
+            if (requestSeq !== promoRequestSeq) return false;
+            appliedPromoCode = payload.code;
+            appliedPromoDiscountCents = Number(payload.discount_cents) || 0;
+            promoInput.value = appliedPromoCode;
+            setPromoStatus('Промокод применён.', 'success');
+            showPromoInfo(payload);
+            updateTotal();
+            return true;
+        }).catch(function (error) {
+            if (requestSeq !== promoRequestSeq) return false;
+            clearAppliedPromo();
+            setPromoStatus(
+                error && error.isPromoError ? error.message : 'Не удалось проверить промокод. Оплатить заказ можно и без него.',
+                'error'
+            );
+            updateTotal();
+            return false;
+        }).then(function (result) {
+            if (requestSeq === promoRequestSeq) {
+                setPromoBusy(false);
+                promoPending = null;
+            }
+            return result;
+        });
+        promoPending = request;
+        return request;
+    }
+
     function formatMoney(amount) {
         return Number(amount).toLocaleString('ru-KZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function updateGeneralAdmissionSelection() {
+        if (!generalAdmission || !generalAdmissionQuantity) return;
+        var quantity = Math.max(0, Math.min(generalAdmissionAvailableSeats.length, generalAdmissionMaxTickets, parseInt(generalAdmissionQuantity.value, 10) || 0));
+        generalAdmissionQuantity.value = quantity || '';
+        selectedSeats = generalAdmissionAvailableSeats.slice(0, quantity).map(function (number) {
+            return {
+                identifier: 'GA-' + String(number).padStart(5, '0'),
+                original_price: Number(currentSession.base_price) || 0,
+                row: 'Свободный вход',
+                col: number
+            };
+        });
+        if (generalAdmissionTotal) {
+            generalAdmissionTotal.textContent = 'Выбрано ' + quantity + ' из ' + generalAdmissionAvailableSeats.length
+                + ' доступных мест · ' + formatMoney(quantity * (Number(currentSession.base_price) || 0)) + ' ' + cfg.currencySymbol;
+        }
+        if (renderer && renderer.selectSeats) renderer.selectSeats([]);
+        updateCart();
+    }
+
+    function configureGeneralAdmission(payload, session) {
+        generalAdmission = payload.general_admission === true;
+        generalAdmissionMaxTickets = Number(payload.max_tickets_per_user || 6);
+        if (seatmapWrapper) seatmapWrapper.style.display = generalAdmission ? 'none' : '';
+        if (generalAdmissionPanel) generalAdmissionPanel.style.display = generalAdmission ? 'block' : 'none';
+        if (!generalAdmission) return;
+
+        var sold = {};
+        (payload.sold_seats || []).forEach(function (seat) {
+            sold[String(seat).replace(/:/g, '-')] = true;
+        });
+        var held = {};
+        (payload.held_seats || []).forEach(function (seat) {
+            var key = typeof seat === 'object' ? (seat.seat_key || seat.key) : seat;
+            if (key) held[String(key).replace(/:/g, '-')] = true;
+        });
+        generalAdmissionAvailableSeats = [];
+        for (var number = 1; number <= Number(session.capacity || 0); number++) {
+            var key = 'GA-' + String(number).padStart(5, '0');
+            if (!sold[key] && !held[key]) generalAdmissionAvailableSeats.push(number);
+        }
+
+        if (generalAdmissionAvailability) {
+            generalAdmissionAvailability.textContent = generalAdmissionAvailableSeats.length
+                ? 'Доступно мест: ' + generalAdmissionAvailableSeats.length + ' · цена билета ' + formatMoney(session.base_price) + ' ' + cfg.currencySymbol
+                : 'Свободных мест больше нет.';
+        }
+        if (generalAdmissionQuantity) {
+            generalAdmissionQuantity.max = String(Math.min(generalAdmissionAvailableSeats.length, generalAdmissionMaxTickets));
+            generalAdmissionQuantity.value = generalAdmissionAvailableSeats.length ? '1' : '';
+            generalAdmissionQuantity.disabled = generalAdmissionAvailableSeats.length === 0;
+        }
+        if (buyBtn) buyBtn.disabled = generalAdmissionAvailableSeats.length === 0;
+        if (generalAdmissionTotal) generalAdmissionTotal.textContent = '';
+        updateGeneralAdmissionSelection();
     }
 
     function formatSessionDate(datetime) {
@@ -138,6 +384,14 @@
     function openModal(sessionId) {
         currentSession = null;
         selectedSeats = [];
+        generalAdmission = false;
+        generalAdmissionAvailableSeats = [];
+        if (seatmapWrapper) seatmapWrapper.style.display = '';
+        if (generalAdmissionPanel) generalAdmissionPanel.style.display = 'none';
+        resetAppliedPromo('');
+        generalAdmission = false;
+        generalAdmissionAvailableSeats = [];
+        if (promoInput) promoInput.value = String(window.bccInitialPromoCode || '').toUpperCase();
         currentZoom = 1;
         clientHoldToken = createClientHoldToken();
         clientReserved = false;
@@ -175,7 +429,12 @@
                 stepCustomer.style.display = 'flex';
             }
             if (totalBar) totalBar.style.display = 'none';
+            if (stepCustomer) stepCustomer.scrollTop = 0;
             renderCustomerCart();
+            renderOrderSummary();
+            if (promoInput && getEnteredPromoCode() && !appliedPromoCode) {
+                applyPromoCode({ auto: true });
+            }
         } else {
             if (stepSeats) {
                 stepSeats.classList.add('active');
@@ -189,13 +448,40 @@
         }
     }
 
+    function renderOrderSummary() {
+        if (!summaryTotal) return;
+        const subtotal = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
+        const giftTotal = selectedSeats.reduce(function (sum, s) {
+            return sum + (s.gift_selected && currentSession && currentSession.promotion_enabled
+                ? Number(currentSession.promotion_gift_price) || 0
+                : 0);
+        }, 0);
+        const discount = appliedPromoCode ? Math.min(subtotal, appliedPromoDiscountCents / 100) : 0;
+        summaryCount.textContent = String(selectedSeats.length);
+        summarySubtotal.textContent = formatMoney(subtotal + giftTotal) + ' ' + cfg.currencySymbol;
+        if (orderSummary) orderSummary.style.display = discount > 0 || giftTotal > 0 ? '' : 'none';
+        if (summaryDiscountRow) summaryDiscountRow.style.display = discount > 0 ? '' : 'none';
+        if (discount > 0) {
+            summaryDiscountLabel.textContent = 'Скидка по промокоду ' + appliedPromoCode;
+            summaryDiscount.textContent = '−' + formatMoney(discount) + ' ' + cfg.currencySymbol;
+        }
+        summaryTotal.textContent = formatMoney(Math.max(0, subtotal - discount)) + ' ' + cfg.currencySymbol;
+    }
+
     function updateTotal() {
-        const total = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
+        const subtotal = selectedSeats.reduce(function (sum, s) { return sum + s.original_price; }, 0);
+        const giftTotal = selectedSeats.reduce(function (sum, s) {
+            return sum + (s.gift_selected && currentSession && currentSession.promotion_enabled
+                ? Number(currentSession.promotion_gift_price) || 0
+                : 0);
+        }, 0);
+        const total = Math.max(0, subtotal + giftTotal - (appliedPromoCode ? appliedPromoDiscountCents / 100 : 0));
         const count = selectedSeats.length;
         const overLimit = count > maxTicketsPerUser;
         if (totalEl) totalEl.textContent = formatMoney(total) + ' ' + cfg.currencySymbol;
+        renderOrderSummary();
         if (buyBtn) buyBtn.disabled = count === 0 || overLimit;
-        if (payBtn) payBtn.disabled = count === 0 || overLimit;
+        if (payBtn) updatePayBtnState();
         if (reserveBtn) {
             reserveBtn.disabled = count === 0 || overLimit || clientReserved || !clientReservationEnabled;
             if (clientReserved) reserveBtn.textContent = 'Места зарезервированы';
@@ -206,7 +492,10 @@
                 : 'Лимит одного заказа: ' + maxTicketsPerUser + ' билетов.';
             purchaseLimitNote.style.display = 'block';
         }
-        if (totalBar) totalBar.style.display = 'flex';
+        if (totalBar) {
+            const onCustomerStep = stepCustomer && stepCustomer.classList.contains('active');
+            totalBar.style.display = onCustomerStep ? 'none' : 'flex';
+        }
     }
 
     function updateReservationUi() {
@@ -282,9 +571,10 @@
                 if (payload.hall_seatmap && !currentSession.hall_seatmap) {
                     currentSession.hall_seatmap = payload.hall_seatmap;
                 }
+                configureGeneralAdmission(payload, currentSession);
                 updateHeaderDate(currentSession);
                 updateReservationUi();
-                initSeatmap(currentSession);
+                if (!generalAdmission) initSeatmap(currentSession);
             })
             .catch(() => {
                 showError('Ошибка загрузки сеанса');
@@ -505,19 +795,24 @@
     }
 
     function updateCart() {
+        resetAppliedPromo('');
         if (!cartList) return;
         cartList.innerHTML = '';
         if (selectedSeats.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'bcc-cart-empty';
-            empty.textContent = 'Выберите места на схеме зала';
+            empty.textContent = generalAdmission ? 'Укажите количество мест' : 'Выберите места на схеме зала';
             cartList.appendChild(empty);
         } else {
             selectedSeats.forEach(function (s, idx) {
                 cartList.appendChild(createSeatCard(s, idx));
             });
         }
+        if (stepCustomer && stepCustomer.style.display !== 'none') renderCustomerCart();
         updateTotal();
+        if (promoInput && getEnteredPromoCode() && stepCustomer && stepCustomer.classList.contains('active')) {
+            applyPromoCode({ auto: true });
+        }
     }
 
     function createSeatCard(s, idx) {
@@ -527,7 +822,7 @@
         info.className = 'bcc-seat-card-info';
         const title = document.createElement('span');
         title.className = 'bcc-seat-card-title';
-        title.textContent = s.row + ' ряд, ' + s.col + ' место';
+        title.textContent = generalAdmission ? 'Свободная рассадка' : s.row + ' ряд, ' + s.col + ' место';
         const meta = document.createElement('span');
         meta.className = 'bcc-seat-card-meta';
         meta.textContent = 'Взрослый';
@@ -538,14 +833,39 @@
         right.style.alignItems = 'center';
         const price = document.createElement('span');
         price.className = 'bcc-seat-card-price';
-        price.textContent = formatMoney(s.original_price) + ' ' + cfg.currencySymbol;
+        const giftPrice = s.gift_selected && currentSession && currentSession.promotion_enabled
+            ? Number(currentSession.promotion_gift_price) || 0
+            : 0;
+        price.textContent = formatMoney(Number(s.original_price) + giftPrice) + ' ' + cfg.currencySymbol;
+        if (currentSession && currentSession.promotion_enabled) {
+            const giftSelect = document.createElement('select');
+            giftSelect.className = 'form-control';
+            giftSelect.style.marginTop = '6px';
+            giftSelect.innerHTML = '<option value="0">Без подарка</option>';
+            const giftOption = document.createElement('option');
+            giftOption.value = '1';
+            giftOption.textContent = 'С подарком: ' + String(currentSession.promotion_gift_name || 'Подарок')
+                + ' +' + formatMoney(Number(currentSession.promotion_gift_price) || 0) + ' ' + cfg.currencySymbol;
+            giftSelect.appendChild(giftOption);
+            giftSelect.value = s.gift_selected ? '1' : '0';
+            giftSelect.addEventListener('change', function () {
+                s.gift_selected = giftSelect.value === '1';
+                updateCart();
+            });
+            info.appendChild(giftSelect);
+        }
         const remove = document.createElement('button');
         remove.className = 'bcc-seat-card-remove';
         remove.setAttribute('aria-label', 'Убрать билет');
         remove.innerHTML = '&times;';
         remove.addEventListener('click', function () {
+            if (generalAdmission) {
+                if (generalAdmissionQuantity) generalAdmissionQuantity.value = String(Math.max(0, selectedSeats.length - 1));
+                updateGeneralAdmissionSelection();
+                return;
+            }
             selectedSeats.splice(idx, 1);
-            renderer.selectSeats(selectedSeats.map(function (seat) { return seat.identifier; }));
+            if (renderer) renderer.selectSeats(selectedSeats.map(function (seat) { return seat.identifier; }));
             updateCart();
         });
         right.appendChild(price);
@@ -572,7 +892,7 @@
             info.className = 'bcc-seat-card-info';
             const title = document.createElement('span');
             title.className = 'bcc-seat-card-title';
-            title.textContent = s.row + ' ряд, ' + s.col + ' место';
+            title.textContent = generalAdmission ? 'Свободная рассадка' : s.row + ' ряд, ' + s.col + ' место';
             const meta = document.createElement('span');
             meta.className = 'bcc-seat-card-meta';
             meta.textContent = 'Взрослый';
@@ -580,7 +900,28 @@
             info.appendChild(meta);
             const price = document.createElement('span');
             price.className = 'bcc-seat-card-price';
-            price.textContent = formatMoney(s.original_price) + ' ' + cfg.currencySymbol;
+            const giftPrice = s.gift_selected && currentSession && currentSession.promotion_enabled
+                ? Number(currentSession.promotion_gift_price) || 0
+                : 0;
+            price.textContent = formatMoney(Number(s.original_price) + giftPrice) + ' ' + cfg.currencySymbol;
+            if (currentSession && currentSession.promotion_enabled) {
+                const giftSelect = document.createElement('select');
+                giftSelect.className = 'form-control';
+                giftSelect.style.marginTop = '6px';
+                giftSelect.innerHTML = '<option value="0">Без подарка</option>';
+                const giftOption = document.createElement('option');
+                giftOption.value = '1';
+                giftOption.textContent = 'С подарком: ' + String(currentSession.promotion_gift_name || 'Подарок')
+                    + ' +' + formatMoney(Number(currentSession.promotion_gift_price) || 0) + ' ' + cfg.currencySymbol;
+                giftSelect.appendChild(giftOption);
+                giftSelect.value = s.gift_selected ? '1' : '0';
+                giftSelect.addEventListener('change', function () {
+                    s.gift_selected = giftSelect.value === '1';
+                    renderCustomerCart();
+                    updateTotal();
+                });
+                info.appendChild(giftSelect);
+            }
             card.appendChild(info);
             card.appendChild(price);
             customerCartList.appendChild(card);
@@ -593,6 +934,14 @@
     }
 
     function startPayment() {
+        // Guard: block payment if form is not fully valid.
+        // The button should already be disabled via updatePayBtnState(),
+        // but we check here to prevent any edge cases where clicks slip through.
+        if (!isPaymentFormValid()) {
+            showError('Заполните все обязательные поля: Имя, Телефон, Email и отметьте оба чекбокса.');
+            return;
+        }
+
         hideError();
         if (!currentSession) {
             showError('Сеанс не загружен');
@@ -606,11 +955,18 @@
             showError('В одном заказе можно оформить не более ' + maxTicketsPerUser + ' билетов.');
             return;
         }
-
         const phone = canonicalCustomerPhone(document.getElementById('bccCustomerPhone').value);
         const name = document.getElementById('bccCustomerName').value.trim();
         const email = document.getElementById('bccCustomerEmail').value.trim();
 
+        if (!name) {
+            showError('Введите имя');
+            return;
+        }
+        if (!email) {
+            showError('Введите email');
+            return;
+        }
         if (!validatePhone(phone)) {
             showError('Введите корректный номер телефона');
             return;
@@ -619,14 +975,38 @@
         payBtn.disabled = true;
         payBtn.textContent = 'Подождите...';
 
+        // Промокод необязателен: ждём его проверку, но оплату не блокируем, даже если код не подошёл.
+        const customer = { name: name, phone: phone, email: email };
+        if (promoInput && getEnteredPromoCode() && getEnteredPromoCode() !== appliedPromoCode) {
+            (promoPending || applyPromoCode({ auto: true })).then(function () { submitPayment(customer); });
+            return;
+        }
+        submitPayment(customer);
+    }
+
+    function submitPayment(customer) {
+        if (!currentSession || selectedSeats.length === 0) {
+            payBtn.textContent = 'Перейти к оплате';
+            updatePayBtnState();
+            showError('Выберите места');
+            return;
+        }
+
         const payload = {
                 action: 'create_bcc_session',
                 session_id: currentSession.id || currentSession.session_id,
-                seats: selectedSeats.map(function (s) { return { identifier: s.identifier, original_price: s.original_price }; }),
-                customer_name: name,
-                customer_phone: phone,
-                customer_email: email,
-                client_hold_token: clientHoldToken
+                seats: selectedSeats.map(function (s) {
+                    return {
+                        identifier: s.identifier,
+                        original_price: s.original_price,
+                        gift_selected: !!s.gift_selected
+                    };
+                }),
+                customer_name: customer.name,
+                customer_phone: customer.phone,
+                customer_email: customer.email,
+                client_hold_token: clientHoldToken,
+                promo_code: appliedPromoCode
             };
         if (cfg.csrfToken) {
             payload.csrf_token = cfg.csrfToken;
@@ -641,6 +1021,11 @@
                 payBtn.disabled = false;
                 payBtn.textContent = 'Оплатить';
                 if (!data.success) {
+                    if (data.promo_error) {
+                        resetAppliedPromo(data.message, 'error');
+                        showError((data.message || 'Промокод не удалось применить.') + ' Сумма пересчитана — нажмите «Оплатить» ещё раз, чтобы продолжить без скидки.');
+                        return;
+                    }
                     showError(data.message || 'Ошибка создания платёжной сессии');
                     return;
                 }
@@ -762,4 +1147,11 @@
 
     // Экспортируем для внешних вызовов (например, из iframe-виджета Тильды)
     window.openBccModal = openModal;
-})();
+    // Ensure the Pay button state is correctly set on page load in case the script
+    // runs after the user has already selected seats and set consent states.
+    // The original script only updates the button when seats change or when the
+    // modal is opened, but in some cases those events may not fire before the
+    // user reaches the customer step. Calling `updatePayBtnState()` here
+    // guarantees the button is disabled until both checkboxes are checked.
+    updatePayBtnState();
+ })();

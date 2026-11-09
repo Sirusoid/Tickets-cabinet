@@ -114,6 +114,8 @@
         });
     }
 
+    window.openZhassahnaTicketModal = openModal;
+
     function escapeHtml(text) {
         var div = document.createElement('div');
         div.textContent = text;

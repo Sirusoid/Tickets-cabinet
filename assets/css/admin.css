@@ -147,6 +147,15 @@ html { box-sizing: border-box; }
   padding: 14px 20px;
   background: linear-gradient(180deg, #fff, #fbfdff);
   border-bottom: 1px solid var(--surface-border);
+/* Adjust container margin when sidebar collapsed */
+.admin-sidebar[aria-hidden="false"] + .container {
+  margin-left: 220px;
+}
+
+.admin-sidebar[aria-hidden="true"] + .container {
+  margin-left: 0;
+}
+
 }
 .admin-header .brand a { font-weight:500; color:var(--accent); text-decoration:none; font-size:16px; }
 .admin-header nav a { margin-left:12px; color:var(--muted); text-decoration:none; font-size:14px; }
@@ -822,15 +831,19 @@ button.btn-secondary[disabled] {
 
 
 /* Sidebar layout */
-.admin-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid #eee;
-  z-index: 1000;
-}
+ .admin-header {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   padding: 10px 16px;
+   background: #fff;
+   border-bottom: 1px solid #eee;
+   position: sticky;
+   top: 0;
+   left: 0;
+   width: 100%;
+   z-index: 999; /* behind sidebar */
+ }
 .brand { display:flex; align-items:center; gap:10px; }
 .sidebar-toggle {
   display:inline-block;
@@ -838,16 +851,45 @@ button.btn-secondary[disabled] {
   border:none;
   font-size:18px;
   cursor:pointer;
+  padding: 8px;
+  color: #475569;
+  transition: color 0.2s;
 }
+
+.sidebar-toggle:hover {
+  color: #0f1724;
+}
+
+
+/* SVG иконка в кнопке сайдбара */
+.sidebar-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+ /* Toggle visibility: show when sidebar is collapsed, hide when visible */
+  /* Toggle button is always visible; visibility handled by the button element itself */
+  .sidebar-toggle { display: inline-block; }
+
+  /* Brand margin adjustment based on sidebar state – keep brand left‑aligned
+     with a small margin regardless of sidebar state. */
+  .admin-header .brand { margin-left: 12px; }
+  .sidebar-collapsed .admin-header .brand { margin-left: 12px; }
 
 /* Sidebar */
 /* Sidebar visual update */
-.admin-sidebar {
-  position: fixed;
-  left: 0;
-  top: 56px;
-  bottom: 0;
-  width: 220px;
+  .admin-sidebar {
+    position: fixed;
+    left: 0;
+    /* Sidebar starts below the header – adding a small margin to avoid overlap */
+    top: 64px; /* default desktop width */
+    bottom: 0;
+    width: 220px;
   background: #ffffff; /* белый фон панели */
   color: #0f1724;
   border-right: 1px solid #e6e9ee;
@@ -994,8 +1036,9 @@ button.btn-secondary[disabled] {
 .sidebar-collapsed .container { margin-left: 16px; }
 
 /* Responsive Sidebar*/
-@media (max-width: 900px) {
-  .admin-sidebar { width: 200px; top: 52px; }
+  @media (max-width: 900px) {
+    /* Adjust sidebar top offset for small screens to maintain margin */
+    .admin-sidebar { width: 200px; top: 60px; }
   .with-sidebar .container { margin-left: 0; padding: 12px; }
   .sidebar-collapsed .container { margin-left: 0; }
 }
@@ -1147,3 +1190,12 @@ button.btn-secondary[disabled] {
 .btn:focus { box-shadow: 0 0 0 3px rgba(37,99,235,0.12); outline: none; }
 
 /* --- Конец файла --- */
+/* Mobile‑specific adjustments: keep sidebar collapsed and overlay on small screens */
+@media (max-width: 768px) {
+  /* Sidebar title (brand) should stay left aligned with a small margin */
+  .admin-header .brand { margin-left: 12px; }
+  /* When sidebar is open on mobile, do not shift the main content */
+  .admin-sidebar[aria-hidden="false"] + .container { margin-left: 0; }
+  /* When sidebar is collapsed on mobile, keep no margin as well */
+  .sidebar-collapsed .container { margin-left: 0; }
+}

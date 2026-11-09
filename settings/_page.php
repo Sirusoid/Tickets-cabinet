@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../init.php';
 require_login();
 require_once __DIR__ . '/../includes/settings_manager.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 $settingsPageKey = $settingsPageKey ?? 'general';
 $settingsPages = settings_pages_map();
@@ -10,6 +11,26 @@ $pageConfig = $settingsPages[$settingsPageKey] ?? null;
 if (!$pageConfig) {
     http_response_code(404);
     echo 'Страница настроек не найдена';
+    exit;
+}
+
+$settingsPermissionMap = [
+    'general' => 'settings_general',
+    'interface' => 'settings_interface',
+    'tickets' => 'settings_tickets',
+    'discounts' => 'settings_discounts',
+    'payment' => 'settings_payment',
+    'notifications' => 'settings_notifications',
+    'email' => 'settings_email',
+    'security' => 'settings_security',
+];
+$requiredPermission = $settingsPermissionMap[$settingsPageKey] ?? null;
+if (
+    $requiredPermission !== null
+    && (!isset($pdo) || !($pdo instanceof PDO) || !user_has_permission($pdo, $requiredPermission, false))
+) {
+    http_response_code(403);
+    echo 'Доступ к этому разделу настроек запрещён.';
     exit;
 }
 

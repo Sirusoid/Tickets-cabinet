@@ -10,6 +10,7 @@
   var page = 1, perPage = 25, totalPages = 1, totalCount = 0;
   var sessionSuggestTimer = null;
   var uidSuggestTimer = null;
+  var orderSuggestTimer = null;
   var customerSuggestTimer = null;
   var filterDebounceTimer = null;
 
@@ -35,6 +36,7 @@
       date_to: qs('filter_date_to') ? qs('filter_date_to').value || '' : '',
       session: sessionValueToSend || '',
       uid: qs('filter_uid') ? qs('filter_uid').value || '' : '',
+      order_number: qs('filter_order_number') ? qs('filter_order_number').value || '' : '',
       customer: qs('filter_customer') ? qs('filter_customer').value || '' : '',
       status: qs('filter_status') ? qs('filter_status').value || '' : '',
       payment_status: qs('filter_payment') ? qs('filter_payment').value || '' : '',
@@ -71,7 +73,7 @@
   }
 
   function mapSegment(code) {
-    var map = { adult: 'Взрослый', child: 'Детский', student: 'Студенческий', senior: 'Пенсионный', vip: 'VIP' };
+    var map = { adult: 'Взрослый', child: 'Детский', student: 'Студенческий', senior: 'Пенсионный', vip: 'VIP', manual: 'Ручная скидка' };
     return map[code] || (code || '—');
   }
 
@@ -103,11 +105,16 @@
     return dd + '.' + mm + '.' + yy + '.';
   }
 
+  function displaySeatIdentifier(value) {
+    var match = String(value || '').match(/^GA[-:](\d{1,5})$/i);
+    return match ? 'Свободное место № ' + Number(match[1]) : String(value || '').replace(/:/g, ' - ');
+  }
+
   function deriveSeatLabel(t) {
     if (!t) return '';
-    if (t.seat_label && String(t.seat_label).trim() !== '') return String(t.seat_label).trim();
-    if (t.seat_identifier && String(t.seat_identifier).trim() !== '') return String(t.seat_identifier).trim().replace(/:/g, ' - ');
-    if (t.seat && String(t.seat).trim() !== '') return String(t.seat).trim();
+    if (t.seat_label && String(t.seat_label).trim() !== '') return displaySeatIdentifier(String(t.seat_label).trim());
+    if (t.seat_identifier && String(t.seat_identifier).trim() !== '') return displaySeatIdentifier(String(t.seat_identifier).trim());
+    if (t.seat && String(t.seat).trim() !== '') return displaySeatIdentifier(String(t.seat).trim());
     if (t.seat_id !== undefined && t.seat_id !== null && String(t.seat_id).trim() !== '') return String(t.seat_id).trim();
 
     var candidates = ['payload','meta','ticket_meta','data'];
@@ -126,6 +133,7 @@
             var lbl2 = extractSeatFromObject(parsed);
             if (lbl2) return lbl2;
           }
+
         } catch (e) {
           var s = String(raw).trim();
           if (s.indexOf(':') !== -1) return s.replace(/:/g, ' - ');
@@ -152,9 +160,9 @@
 
   function extractSeatFromObject(obj) {
     if (!obj || typeof obj !== 'object') return '';
-    if (obj.seat_label && String(obj.seat_label).trim() !== '') return String(obj.seat_label).trim();
-    if (obj.seat_identifier && String(obj.seat_identifier).trim() !== '') return String(obj.seat_identifier).trim().replace(/:/g, ' - ');
-    if (obj.seat && String(obj.seat).trim() !== '') return String(obj.seat).trim();
+    if (obj.seat_label && String(obj.seat_label).trim() !== '') return displaySeatIdentifier(String(obj.seat_label).trim());
+    if (obj.seat_identifier && String(obj.seat_identifier).trim() !== '') return displaySeatIdentifier(String(obj.seat_identifier).trim());
+    if (obj.seat && String(obj.seat).trim() !== '') return displaySeatIdentifier(String(obj.seat).trim());
     if (obj.seat_id !== undefined && obj.seat_id !== null && String(obj.seat_id).trim() !== '') return String(obj.seat_id).trim();
     if (obj.row && obj.seat) return String(obj.row).trim() + ' - ' + String(obj.seat).trim();
     if (obj.row_label && obj.seat_number) return String(obj.row_label).trim() + ' - ' + String(obj.seat_number).trim();
@@ -241,6 +249,14 @@
 
     var priceTd = document.createElement('td');
     priceTd.textContent = (t.final_price !== null && t.final_price !== undefined) ? (Number(t.final_price).toLocaleString() + ' тг') : '—';
+    if (t.gift_selected) {
+      var giftNote = document.createElement('div');
+      giftNote.style.color = '#166534';
+      giftNote.style.fontSize = '11px';
+      giftNote.textContent = 'С подарком: ' + (t.gift_name || 'Подарок')
+        + ' +' + Number(t.gift_price || 0).toLocaleString() + ' тг';
+      priceTd.appendChild(giftNote);
+    }
     tr.appendChild(priceTd);
 
     var channelTd = document.createElement('td');
@@ -252,7 +268,23 @@
     tr.appendChild(paymentTypeTd);	  
 
     var orderTd = document.createElement('td');
-    orderTd.textContent = t.order_number || '—';
+    if (t.order_number) {
+      var orderLink = document.createElement('button');
+      orderLink.type = 'button';
+      orderLink.className = 'btn btn-ghost btn-sm';
+      orderLink.style.padding = '4px 8px';
+      orderLink.style.color = '#2563eb';
+      orderLink.style.textDecoration = 'underline';
+      orderLink.textContent = t.order_number;
+      orderLink.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openOrderTickets(t.order_number);
+      });
+      orderTd.appendChild(orderLink);
+    } else {
+      orderTd.textContent = '—';
+    }
     tr.appendChild(orderTd);
 	  
     var uidTd = document.createElement('td');
@@ -296,7 +328,7 @@
     var wrap = document.createElement('div');
     wrap.className = 'action-buttons';
 
-    if (!isRefunded) {
+    if (!isRefunded && t.status !== 'used') {
       var refundBtn = document.createElement('button');
       refundBtn.className = 'btn btn-ghost btn-xs';
       refundBtn.textContent = 'Возврат';
@@ -383,7 +415,7 @@
   }
 
   function resetFilters(){
-    ['filter_date_from','filter_date_to','filter_session','filter_session_raw','filter_uid','filter_customer','filter_status','filter_payment','filter_channel','filter_segment','filter_refund'].forEach(function(id){ var el = qs(id); if (el) el.value = ''; });
+    ['filter_date_from','filter_date_to','filter_session','filter_session_raw','filter_uid','filter_order_number','filter_customer','filter_status','filter_payment','filter_channel','filter_segment','filter_refund'].forEach(function(id){ var el = qs(id); if (el) el.value = ''; });
     hideSuggestions('session');
     hideSuggestions('uid');
     hideSuggestions('customer');
@@ -410,6 +442,33 @@
       });
   }
 
+  function openOrderTickets(orderNumber) {
+    fetch('/ajax/ticket.php?action=order_tickets&order_number=' + encodeURIComponent(orderNumber), {
+      credentials: 'same-origin'
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (json) {
+        if (!json || !json.success) {
+          showToast(json && json.message ? json.message : 'Ошибка загрузки заказа', 'error');
+          return;
+        }
+        if (!json.tickets || !json.tickets.length) {
+          showToast('Билеты по этому заказу не найдены', 'error');
+          return;
+        }
+        if (typeof window.openTicketBatchPreview === 'function') {
+          window.openTicketBatchPreview(json.tickets, json.order_number || orderNumber);
+          return;
+        }
+        window.open('/tickets/view.php?uids=' + json.tickets.map(function (ticket) {
+          return encodeURIComponent(ticket.ticket_uid);
+        }).join(','), '_blank');
+      })
+      .catch(function () {
+        showToast('Ошибка сети при загрузке заказа', 'error');
+      });
+  }
+
   function populateRefundModal(t) {
     qs('refund_ticket_id').value = t.id || '';
     qs('refund_client').textContent = t.customer_name || '—';
@@ -417,7 +476,7 @@
     var sessionLabel = (t.event_title ? t.event_title : '') + (t.schedule_id ? ' #' + (t.schedule_id || '') : '');
     qs('refund_session').textContent = sessionLabel || '—';
     qs('refund_session_dt').textContent = t.session_start ? (new Date(t.session_start)).toLocaleString() : '—';
-    var seat = t.seat_label || t.seat_identifier || t.seat || '—';
+    var seat = displaySeatIdentifier(t.seat_label || t.seat_identifier || t.seat || '—');
     qs('refund_seat').textContent = seat;
     var amtEl = qs('refund_amount');
     if (amtEl) {
@@ -501,7 +560,7 @@
 
   // --- Typeahead helpers with cross-filtering ---
   function showSuggestions(kind, items) {
-    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : 'suggestions_customer');
+    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : (kind === 'order' ? 'suggestions_order' : 'suggestions_customer'));
     var wrap = qs(wrapId);
     if (!wrap) return;
     wrap.innerHTML = '';
@@ -526,6 +585,9 @@
         } else if (kind === 'uid') {
           var el = qs('filter_uid');
           if (el) el.value = this.dataset.raw || this.dataset.display || '';
+        } else if (kind === 'order') {
+          var el = qs('filter_order_number');
+          if (el) el.value = this.dataset.raw || this.dataset.display || '';
         } else {
           var el = qs('filter_customer');
           if (el) el.value = this.dataset.raw || this.dataset.display || '';
@@ -540,7 +602,7 @@
   }
 
   function hideSuggestions(kind) {
-    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : 'suggestions_customer');
+    var wrapId = (kind === 'session') ? 'suggestions_session' : (kind === 'uid' ? 'suggestions_uid' : (kind === 'order' ? 'suggestions_order' : 'suggestions_customer'));
     var wrap = qs(wrapId);
     if (!wrap) return;
     wrap.style.display = 'none';
@@ -594,6 +656,27 @@
       }).catch(function(){ showSuggestions('uid', []); });
   }
 
+  function fetchOrderSuggestions(q) {
+    if (!q || q.length < 1) { showSuggestions('order', []); return; }
+    var other = getFilters();
+    var params = 'q=' + encodeURIComponent(q) + '&session=' + encodeURIComponent(other.session || '')
+      + '&uid=' + encodeURIComponent(other.uid || '') + '&customer=' + encodeURIComponent(other.customer || '');
+    fetch('/ajax/ticket.php?action=suggest_q&' + params, { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(json){
+        if (!json || !json.success) { showSuggestions('order', []); return; }
+        var items = (json.data || []).filter(function(it){ return it.type === 'order'; }).map(function(it){
+          return {
+            labelHtml: '<strong>Заказ:</strong> ' + escapeHtml(it.value),
+            displayValue: it.value,
+            rawValue: it.value,
+            extra: it.type
+          };
+        });
+        showSuggestions('order', items);
+      }).catch(function(){ showSuggestions('order', []); });
+  }
+
   function fetchCustomerSuggestions(q) {
     if (!q || q.length < 1) { showSuggestions('customer', []); return; }
     var other = getFilters();
@@ -636,7 +719,7 @@
     }
 
     var immediateFields = [
-      'filter_date_from','filter_date_to','filter_session','filter_uid','filter_customer',
+      'filter_date_from','filter_date_to','filter_session','filter_uid','filter_order_number','filter_customer',
       'filter_status','filter_payment','filter_channel','filter_segment','filter_refund'
     ];
     immediateFields.forEach(function(id){
@@ -677,6 +760,17 @@
       uidInput.addEventListener('blur', function(){ setTimeout(function(){ hideSuggestions('uid'); }, 180); });
     }
 
+    var orderInput = qs('filter_order_number');
+    if (orderInput) {
+      orderInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); } });
+      orderInput.addEventListener('input', function(){
+        clearTimeout(orderSuggestTimer);
+        var v = this.value.trim();
+        orderSuggestTimer = setTimeout(function(){ fetchOrderSuggestions(v); }, 180);
+      });
+      orderInput.addEventListener('blur', function(){ setTimeout(function(){ hideSuggestions('order'); }, 180); });
+    }
+
     var customerInput = qs('filter_customer');
     if (customerInput) {
       customerInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); } });
@@ -689,10 +783,11 @@
     }
 
     document.addEventListener('click', function(e){
-      var s1 = qs('suggestions_session'), s2 = qs('suggestions_uid'), s3 = qs('suggestions_customer');
+      var s1 = qs('suggestions_session'), s2 = qs('suggestions_uid'), s3 = qs('suggestions_customer'), s4 = qs('suggestions_order');
       if (s1 && !s1.contains(e.target) && e.target !== qs('filter_session')) hideSuggestions('session');
       if (s2 && !s2.contains(e.target) && e.target !== qs('filter_uid')) hideSuggestions('uid');
       if (s3 && !s3.contains(e.target) && e.target !== qs('filter_customer')) hideSuggestions('customer');
+      if (s4 && !s4.contains(e.target) && e.target !== qs('filter_order_number')) hideSuggestions('order');
     });
 
     var refundClose = qs('refundModalClose');

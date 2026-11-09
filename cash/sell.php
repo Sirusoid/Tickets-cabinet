@@ -18,7 +18,7 @@ $panel_actions = [
 $page_scripts = ['/assets/js/ticket_viewer.js',
                  '/assets/js/schedule-seating-canvas.js',
                  '/assets/js/legend-canvas.js',
-                 '/assets/js/cashier.js'];
+                 '/assets/js/cashier.js?v=' . filemtime(__DIR__ . '/../assets/js/cashier.js')];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
@@ -241,7 +241,7 @@ if ($totalSeats === null && !empty($session['seat_map'])) {
 // --- Получаем количество проданных билетов (status = 'issued') ---------------
 $soldCount = 0;
 try {
-    $q = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE schedule_id = :sid AND status = 'issued'");
+    $q = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE schedule_id = :sid AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
     $q->execute([':sid' => $session_id]);
     $soldCount = (int)$q->fetchColumn();
 } catch (Exception $e) {
@@ -263,7 +263,7 @@ if (!empty($prRaw)) {
 // --- Получаем список проданных билетов (для сопоставления с группами) ----------
 $soldTickets = [];
 try {
-    $q = $pdo->prepare("SELECT id, seat_id, seat_identifier FROM tickets WHERE schedule_id = :sid AND status = 'issued'");
+    $q = $pdo->prepare("SELECT id, seat_id, seat_identifier FROM tickets WHERE schedule_id = :sid AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
     $q->execute([':sid' => $session_id]);
     $soldTickets = $q->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
@@ -416,6 +416,9 @@ $jsSession = [
     'base_price' => isset($session['base_price']) ? $session['base_price'] : null,
     'price_ranges' => $prRaw ? $prRaw : null,
     'seat_map' => $session['seat_map'] ?? null,
+    'promotion_enabled' => !empty($session['promotion_enabled']),
+    'promotion_gift_name' => $session['promotion_gift_name'] ?? null,
+    'promotion_gift_price' => isset($session['promotion_gift_price']) ? (int)$session['promotion_gift_price'] : 0,
     'total_seats' => $totalSeats,
     'sold_count' => $soldCount,
     'free_seats' => $freeSeats,
@@ -428,7 +431,7 @@ $jsSession = [
 ];
 ?>
 
-<link rel="stylesheet" href="/assets/css/cashier.css">
+<link rel="stylesheet" href="/assets/css/cashier.css?v=<?= h((string)filemtime(__DIR__ . '/../assets/css/cashier.css')) ?>">
 <link rel="stylesheet" href="/assets/css/actor_form.css">
 <link rel="stylesheet" href="/assets/css/seatmap.css">
 
@@ -478,62 +481,18 @@ $jsSession = [
     </div>
   </div>
 
-  <!-- Клиентские данные — на всю ширину -->
   <div class="profile-layout" style="grid-template-columns: 1fr 320px; margin-top: 17px; align-items:start;">
-    <div class="profile-card profile-bio-full" style="grid-column: 1 / -1; margin-bottom: -10px; align-self:start;">
-      <div class="card-title">Данные клиента</div>
-
-      <div class="actors-row" style="margin-bottom:12px;">
-        <div style="position:relative;">
-          <label class="label">Клиент</label>
-          <input id="custFullName" class="input" type="text" placeholder="ФИО клиента" autocomplete="off" />
-          <div id="custNameResults" style="position:absolute; left:0; right:0; top:100%; z-index:100; background:#fff; border:1px solid #e0e0e0; border-radius:6px; margin-top:4px; max-height:200px; overflow:auto; display:none; box-shadow:0 6px 18px rgba(0,0,0,0.08);"></div>
-        </div>
-        <div>
-          <label class="label">Тип билета</label>
-          <select id="customer_segment" name="customer_segment" class="input">
-            <option value="adult" data-discount="<?= h((string)($discounts['adult'] ?? 0)) ?>">Взрослый <?= '(' . h((string)($discounts['adult'] ?? 0)) . '%)' ?></option>
-            <option value="child" data-discount="<?= h((string)($discounts['child'] ?? 0)) ?>">Детский <?= '(' . h((string)($discounts['child'] ?? 0)) . '%)' ?></option>
-            <option value="student" data-discount="<?= h((string)($discounts['student'] ?? 0)) ?>">Студенческий <?= '(' . h((string)($discounts['student'] ?? 0)) . '%)' ?></option>
-            <option value="senior" data-discount="<?= h((string)($discounts['senior'] ?? 0)) ?>">Пенсионный <?= '(' . h((string)($discounts['senior'] ?? 0)) . '%)' ?></option>
-            <?php if ($allowManualDiscount): ?>
-              <option value="manual">Ручная скидка</option>
-            <?php endif; ?>
-          </select>
-        </div>
-      </div>
-
-      <div class="actors-row" style="margin-bottom:12px;">
-        <div style="position:relative;">
-          <label class="label">Номер телефона (обязательно)</label>
-          <input id="custPhone" class="input" type="tel" placeholder="+7 700 000 0000" autocomplete="off" />
-          <div id="custPhoneResults" style="position:absolute; left:0; right:0; top:100%; z-index:100; background:#fff; border:1px solid #e0e0e0; border-radius:6px; margin-top:4px; max-height:200px; overflow:auto; display:none; box-shadow:0 6px 18px rgba(0,0,0,0.08);"></div>
-        </div>
-        <div style="position:relative;">
-          <label class="label">Email</label>
-          <input id="custEmail" class="input" type="email" placeholder="email@example.com" />
-        </div>
-      </div>
-
-      <div class="actors-row" style="margin-bottom:6px;">
-        <div>
-          <label class="label">Пол</label>
-          <select id="custGender" class="input">
-            <option value="">Не указан</option>
-            <option value="male">Мужской</option>
-            <option value="female">Женский</option>
-            <option value="other">Другое</option>
-          </select>
-        </div>
-        <div>
-          <label class="label">Город</label>
-          <input id="custCity" class="input" type="text" placeholder="Город" />
-        </div>
-      </div>
-    </div>
-<!-- Схема рассадки (левая, широкая) -->
+    <!-- Схема рассадки (левая, широкая) -->
     <div class="profile-card" style="grid-column: 1 / 2;">
       <h3 class="card-title" style="margin-top:0;">Схема рассадки</h3>
+      <div id="cashGeneralAdmissionPanel" class="cash-general-admission" style="display:none;">
+        <div class="cash-general-admission__label">Свободная рассадка</div>
+        <h4>Количество мест</h4>
+        <p id="cashGeneralAdmissionAvailability">Загружаем доступность…</p>
+        <label for="cashGeneralAdmissionQuantity">Сколько билетов продать</label>
+        <input id="cashGeneralAdmissionQuantity" class="input" type="number" min="1" step="1" value="1" inputmode="numeric">
+        <small>Касса автоматически закрепит свободные номера мест.</small>
+      </div>
       <div id="seatmapContainer" style="position:relative; height:640px;">
         <canvas id="cash-seatmap" width="1200" height="800" style="width:100%; height:100%; border:1px solid #e6e6e6; background:#fff; display:block;"></canvas>
       </div>
@@ -542,6 +501,22 @@ $jsSession = [
     <!-- Корзина (правая колонка) -->
     <aside class="profile-card" style="grid-column: 2 / 3; align-self:start;">
       <div class="card-title">Корзина</div>
+      <div style="margin-bottom:12px;">
+        <label class="label" for="customer_segment">Тип билета</label>
+        <select id="customer_segment" name="customer_segment" class="input" style="width:100%;">
+          <option value="adult" data-discount="<?= h((string)($discounts['adult'] ?? 0)) ?>">Взрослый <?= '(' . h((string)($discounts['adult'] ?? 0)) . '%)' ?></option>
+          <option value="child" data-discount="<?= h((string)($discounts['child'] ?? 0)) ?>">Детский <?= '(' . h((string)($discounts['child'] ?? 0)) . '%)' ?></option>
+          <option value="student" data-discount="<?= h((string)($discounts['student'] ?? 0)) ?>">Студенческий <?= '(' . h((string)($discounts['student'] ?? 0)) . '%)' ?></option>
+          <option value="senior" data-discount="<?= h((string)($discounts['senior'] ?? 0)) ?>">Пенсионный <?= '(' . h((string)($discounts['senior'] ?? 0)) . '%)' ?></option>
+          <?php if ($allowManualDiscount): ?>
+            <option value="manual">Ручная скидка</option>
+          <?php endif; ?>
+        </select>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label class="label" for="cashCustomerName">Имя клиента (необязательно)</label>
+        <input id="cashCustomerName" name="customer_name" class="input" type="text" maxlength="255" autocomplete="name" placeholder="Имя клиента">
+      </div>
       <div id="cartList" style="min-height:60px; margin-bottom:8px;">
         <div style="color:#666;">Пусто</div>
       </div>
@@ -571,7 +546,7 @@ $jsSession = [
         <?php if ($allowManualDiscount): ?>
         <div style="margin-top:12px;">
           <label class="label">Ручная скидка</label>
-          <input id="manualDiscountAmount" class="input" type="number" min="0" step="1" value="0" disabled />
+          <input id="manualDiscountAmount" class="input" type="number" min="0" step="any" value="0" />
           <small id="manualDiscountHint" style="display:block; margin-top:6px; color:#5d6f83; font-size:12px;">
             Активируется только при выборе пункта «Ручная скидка»
           </small>
@@ -600,16 +575,18 @@ $jsSession = [
 </div>
 
 <div id="ticketPreviewModal" style="display:none; position:fixed; inset:0; z-index:2200; align-items:center; justify-content:center; background:rgba(0,0,0,0.65);">
-  <div style="position:relative; width:min(1120px,100%); max-height:90vh; background:#fff; border-radius:10px; box-shadow:0 18px 48px rgba(0,0,0,0.28); overflow:hidden; display:flex; flex-direction:column; min-height:calc(100vh - 120px);">
+  <div style="position:relative; width:min(1120px,96%); max-height:90vh; background:#fff; border-radius:10px; box-shadow:0 18px 48px rgba(0,0,0,0.28); overflow:hidden; display:flex; flex-direction:column; min-height:320px;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid #e9ecef; background:#fafafa;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm">Скачать</button>
+        <button id="ticketPreviewDownloadAll" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать все билеты</button>
+        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать</button>
         <button id="ticketPreviewOpenNewTab" type="button" class="btn btn-ghost btn-sm">Открыть в новой вкладке</button>
         <button id="ticketPreviewClose" type="button" class="btn btn-ghost btn-xs">✕</button>
       </div>
     </div>
-    <iframe id="ticketPreviewIframe" src="about:blank" style="flex:1; width:100%; border:none; min-height:0;"></iframe>
+    <div id="ticketPreviewList" style="display:none; overflow:auto; padding:16px; background:#f7f9fc;"></div>
+    <iframe id="ticketPreviewIframe" src="about:blank" style="display:none; flex:1; width:100%; border:none; min-height:520px;"></iframe>
   </div>
 </div>
 
@@ -619,7 +596,6 @@ document.addEventListener('DOMContentLoaded', function(){
   var csrfToken = <?= json_encode($csrf) ?>;
   var sessionId = <?= json_encode($session_id) ?>;
   window.currentCashierUserId = <?= json_encode((int)($_SESSION['user_id'] ?? 0)) ?>;
-  window.currentCustomerId = null;
 
   function _localToast(msg, type, duration) {
     duration = duration || 3000;
@@ -652,126 +628,12 @@ document.addEventListener('DOMContentLoaded', function(){
     };
   })();
 
-  // Customer search autocomplete
-  (function setupCustomerSearch(){
-    var phoneEl = document.getElementById('custPhone');
-    var nameEl = document.getElementById('custFullName');
-    var phoneResults = document.getElementById('custPhoneResults');
-    var nameResults = document.getElementById('custNameResults');
-    var phoneTimer = null;
-    var nameTimer = null;
-
-    function normalizePhone(p) { return (p || '').replace(/\D+/g, ''); }
-
-    function formatPhoneDisplay(phone) {
-      var p = normalizePhone(phone);
-      if (p.length === 11 && p.charAt(0) === '7') {
-        return '+7 ' + p.substr(1,3) + ' ' + p.substr(4,3) + ' ' + p.substr(7,2) + ' ' + p.substr(9,2);
-      }
-      return p;
-    }
-
-    function normalizeSearchPhone(p) {
-      var digits = normalizePhone(p);
-      if (digits.charAt(0) === '8') digits = '7' + digits.substr(1);
-      if (digits.length > 0 && digits.charAt(0) !== '7') digits = '7' + digits;
-      return digits;
-    }
-
-    function fillCustomer(c) {
-      window.currentCustomerId = c.id || null;
-      if (nameEl) nameEl.value = c.full_name || '';
-      if (phoneEl) phoneEl.value = formatPhoneDisplay(c.phone || '');
-      var emailEl = document.getElementById('custEmail');
-      var cityEl = document.getElementById('custCity');
-      var genderEl = document.getElementById('custGender');
-      if (emailEl) emailEl.value = c.email || '';
-      if (cityEl) cityEl.value = c.city || '';
-      if (genderEl) genderEl.value = c.gender || '';
-      if (phoneResults) phoneResults.style.display = 'none';
-      if (nameResults) nameResults.style.display = 'none';
-    }
-
-    function renderResults(container, items) {
-      if (!container) return;
-      container.innerHTML = '';
-      if (!items || !items.length) {
-        container.style.display = 'none';
-        return;
-      }
-      items.forEach(function(c) {
-        var row = document.createElement('div');
-        row.style.padding = '8px 10px';
-        row.style.cursor = 'pointer';
-        row.style.borderBottom = '1px solid #f1f1f1';
-        row.style.fontSize = '13px';
-
-        var nameSpan = document.createElement('span');
-        nameSpan.style.fontWeight = '700';
-        nameSpan.textContent = c.full_name || '—';
-
-        var phoneSpan = document.createElement('span');
-        phoneSpan.style.color = '#555';
-        phoneSpan.style.marginLeft = '8px';
-        phoneSpan.textContent = formatPhoneDisplay(c.phone || '');
-
-        row.appendChild(nameSpan);
-        row.appendChild(phoneSpan);
-        row.addEventListener('mousedown', function(ev){ ev.preventDefault(); fillCustomer(c); });
-        row.addEventListener('mouseenter', function(){ row.style.background = '#f3f8ff'; });
-        row.addEventListener('mouseleave', function(){ row.style.background = ''; });
-        container.appendChild(row);
-      });
-      container.style.display = 'block';
-    }
-
-    function searchByPhone() {
-      var q = normalizeSearchPhone(phoneEl ? phoneEl.value : '');
-      if (!q || q.length < 3) { if (phoneResults) phoneResults.style.display = 'none'; return; }
-      fetch('/ajax/cash.php?action=customer_search&phone=' + encodeURIComponent(q), { credentials: 'same-origin' })
-        .then(function(r){ return r.json(); })
-        .then(function(res){ if (res && res.success) renderResults(phoneResults, res.data); })
-        .catch(function(){});
-    }
-
-    function searchByName() {
-      var q = (nameEl ? nameEl.value : '').trim();
-      if (!q || q.length < 2) { if (nameResults) nameResults.style.display = 'none'; return; }
-      fetch('/ajax/cash.php?action=customer_search&query=' + encodeURIComponent(q), { credentials: 'same-origin' })
-        .then(function(r){ return r.json(); })
-        .then(function(res){ if (res && res.success) renderResults(nameResults, res.data); })
-        .catch(function(){});
-    }
-
-    if (phoneEl) {
-      phoneEl.addEventListener('input', function(){
-        if (phoneTimer) clearTimeout(phoneTimer);
-        phoneTimer = setTimeout(searchByPhone, 300);
-      });
-      phoneEl.addEventListener('blur', function(){ setTimeout(function(){ if (phoneResults) phoneResults.style.display = 'none'; }, 200); });
-      phoneEl.addEventListener('focus', function(){ if (phoneResults && phoneResults.children.length) phoneResults.style.display = 'block'; });
-    }
-
-    if (nameEl) {
-      nameEl.addEventListener('input', function(){
-        if (nameTimer) clearTimeout(nameTimer);
-        nameTimer = setTimeout(searchByName, 300);
-      });
-      nameEl.addEventListener('blur', function(){ setTimeout(function(){ if (nameResults) nameResults.style.display = 'none'; }, 200); });
-      nameEl.addEventListener('focus', function(){ if (nameResults && nameResults.children.length) nameResults.style.display = 'block'; });
-    }
-
-    document.addEventListener('click', function(e){
-      if (phoneResults && !phoneEl.contains(e.target) && !phoneResults.contains(e.target)) phoneResults.style.display = 'none';
-      if (nameResults && !nameEl.contains(e.target) && !nameResults.contains(e.target)) nameResults.style.display = 'none';
-    });
-  })();
-
   // init cashier
   if (typeof Cashier !== 'undefined' && typeof Cashier.initSell === 'function') {
     Cashier.initSell({
       csrf: csrfToken,
-      currentUserId: <?= json_encode((int)($_SESSION['user_id'] ?? 0), JSON_UNESCAPED_UNICODE) ?>,
+      currentUserId: <?= json_encode((int)($_SESSION['user']['id'] ?? 0), JSON_UNESCAPED_UNICODE) ?>,
+      isAdmin: <?= json_encode(function_exists('is_admin') && is_admin()) ?>,
       sessionId: sessionId,
       seatmapCanvasId: 'cash-seatmap',
       seatmapRenderer: null,

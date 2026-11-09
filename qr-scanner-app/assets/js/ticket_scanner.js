@@ -4,6 +4,8 @@
 
   var scanner = null;
   var scannerRunning = false;
+  var scannerStarting = false;
+  var sessionsLoading = true;
   var lastCode = '';
   var lastCodeAt = 0;
   var deviceUid = getDeviceUid();
@@ -16,6 +18,13 @@
   var manualCode = document.getElementById('manual-code');
   var imageInput = document.getElementById('qr-image');
   var result = document.getElementById('scan-result');
+  var sessionSelect = document.getElementById('scanner-session');
+  var donut = document.getElementById('scanner-donut');
+  var totalCount = document.getElementById('scanner-total-count');
+  var checkedCount = document.getElementById('scanner-checked-count');
+  var checkedLabel = document.getElementById('scanner-checked-label');
+  var remainingCount = document.getElementById('scanner-remaining-count');
+  var statsUpdated = document.getElementById('scanner-stats-updated');
 
   function getDeviceUid() {
     var key = 'zhassahna_scanner_device_uid';
@@ -38,12 +47,121 @@
   }
 
   function setCameraButtons() {
-    startButton.disabled = scannerRunning;
+    startButton.disabled = scannerRunning || scannerStarting || sessionsLoading || !sessionSelect.value;
     stopButton.disabled = !scannerRunning;
+    sessionSelect.disabled = sessionsLoading || scannerRunning || scannerStarting || sessionSelect.options.length < 2;
+  }
+
+  function formatSessionDate(value) {
+    var date = new Date(String(value || '').replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('ru-RU', {
+      timeZone: 'Asia/Almaty',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date).replace('.', '');
+  }
+
+  function renderStats(total, checked) {
+    total = Math.max(0, Number(total) || 0);
+    checked = Math.min(total, Math.max(0, Number(checked) || 0));
+    var remaining = Math.max(0, total - checked);
+    var progress = total > 0 ? (checked / total) * 100 : 0;
+    donut.style.setProperty('--scan-progress', progress + '%');
+    donut.setAttribute('aria-label', 'Отсканировано ' + checked + ' из ' + total + ' билетов');
+    totalCount.textContent = total.toLocaleString('ru-RU');
+    checkedCount.textContent = checked.toLocaleString('ru-RU');
+    checkedLabel.textContent = checked.toLocaleString('ru-RU');
+    remainingCount.textContent = remaining.toLocaleString('ru-RU');
+    statsUpdated.textContent = new Intl.DateTimeFormat('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date());
+  }
+
+  function loadSessionStats(scheduleId) {
+    if (!scheduleId) return Promise.resolve();
+    statsUpdated.textContent = 'Обновление…';
+    return fetch('/ajax/ticket.php?action=scanner_stats&schedule_id=' + encodeURIComponent(scheduleId), {
+      credentials: 'same-origin'
+    }).then(function (response) {
+      return response.json().then(function (payload) {
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.message || 'Не удалось обновить статистику.');
+        }
+        renderStats(payload.data.total_tickets, payload.data.checked_in_tickets);
+      });
+    }).catch(function (error) {
+      statsUpdated.textContent = 'Нет связи';
+      console.error('Ticket scanner stats error:', error);
+    });
+  }
+
+  function loadSessions() {
+    fetch('/ajax/ticket.php?action=scanner_sessions', { credentials: 'same-origin' })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.success) {
+            throw new Error(payload.message || 'Не удалось загрузить расписание.');
+          }
+          return payload.data || [];
+        });
+      })
+      .then(function (sessions) {
+        sessionSelect.innerHTML = '';
+        if (!sessions.length) {
+          sessionSelect.add(new Option('Нет действующих сеансов', ''));
+          setStatus('В расписании нет действующих сеансов для сканирования.', 'error');
+          return;
+        }
+
+        sessions.forEach(function (session) {
+          var title = String(session.event_title || 'Спектакль');
+          var date = formatSessionDate(session.start_time);
+          var option = new Option(title + (date ? ' · ' + date : ''), String(session.id));
+          option.dataset.total = session.total_tickets;
+          option.dataset.checked = session.checked_in_tickets;
+          sessionSelect.add(option);
+        });
+        sessionSelect.selectedIndex = 0;
+        renderStats(sessions[0].total_tickets, sessions[0].checked_in_tickets);
+        setStatus('Выбран ближайший сеанс. Включите камеру для проверки билетов.', 'idle');
+      })
+      .catch(function (error) {
+        sessionSelect.innerHTML = '';
+        sessionSelect.add(new Option('Не удалось загрузить расписание', ''));
+        setStatus(error.message || 'Не удалось загрузить расписание для сканера.', 'error');
+        console.error('Ticket scanner sessions error:', error);
+      })
+      .finally(function () {
+        sessionsLoading = false;
+        setCameraButtons();
+      });
+  }
+
+  function cameraErrorMessage(error) {
+    var messages = {
+      NotAllowedError: 'Chrome заблокировал доступ к камере. Проверьте разрешение сайта и системное разрешение камеры.',
+      NotFoundError: 'Камера не найдена на устройстве.',
+      NotReadableError: 'Камера занята другим приложением. Закройте его и попробуйте снова.',
+      OverconstrainedError: 'Не удалось выбрать камеру устройства.',
+      SecurityError: 'Браузер запретил доступ к камере. Откройте сайт по HTTPS и проверьте настройки безопасности.'
+    };
+    var name = error && error.name ? error.name : '';
+    var details = error && error.message ? String(error.message) : String(error || '');
+    if (details.length > 180) details = details.slice(0, 177) + '...';
+    var message = messages[name] || 'Не удалось включить камеру. Проверьте настройки устройства и Chrome.';
+    return details ? message + ' (' + (name ? name + ': ' : '') + details + ')' : message;
   }
 
   function startCamera() {
-    if (scannerRunning) return;
+    if (scannerRunning || scannerStarting) return;
+    if (window.isSecureContext !== true || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('Камера в Chrome доступна только на защищённой странице HTTPS. Откройте защищённый адрес сайта.', 'error');
+      return;
+    }
     if (!window.Html5Qrcode) {
       setStatus('Модуль камеры не загрузился. Используйте UID или загрузку изображения.', 'error');
       return;
@@ -53,20 +171,39 @@
       scanner = new window.Html5Qrcode('qr-reader');
     }
 
+    scannerStarting = true;
+    setCameraButtons();
     setStatus('Запрашиваем доступ к камере…', 'idle');
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
-      onScanSuccess,
-      function () {}
-    ).then(function () {
+    window.Html5Qrcode.getCameras().catch(function (error) {
+      console.warn('Ticket scanner camera enumeration failed:', error);
+      return [];
+    }).then(function (devices) {
+      var cameras = (devices || []).filter(function (device) {
+        return device && device.id;
+      });
+      cameras.sort(function (first, second) {
+        var firstRear = /back|rear|environment|задн/i.test(first.label || '');
+        var secondRear = /back|rear|environment|задн/i.test(second.label || '');
+        return Number(secondRear) - Number(firstRear);
+      });
+      var camera = cameras.length ? cameras[0].id : { facingMode: 'environment' };
+      return scanner.start(
+        camera,
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
+        onScanSuccess,
+        function () {}
+      );
+    }).then(function () {
+      scannerStarting = false;
       scannerRunning = true;
       setCameraButtons();
       setStatus('Наведите камеру на QR-код билета', 'active');
     }).catch(function (error) {
+      scannerStarting = false;
       scannerRunning = false;
+      scanner = null;
       setCameraButtons();
-      setStatus('Не удалось включить камеру. Проверьте разрешение и HTTPS.', 'error');
+      setStatus(cameraErrorMessage(error), 'error');
       console.error('Ticket scanner camera error:', error);
     });
   }
@@ -103,6 +240,7 @@
     var body = [
       'action=checkin',
       'code=' + encodeURIComponent(code),
+      'schedule_id=' + encodeURIComponent(sessionSelect.value),
       'device_uid=' + encodeURIComponent(deviceUid),
       'csrf_token=' + encodeURIComponent(window.APP_CSRF_TOKEN || '')
     ].join('&');
@@ -120,6 +258,7 @@
       var payload = response.payload || {};
       renderResult(payload, response.httpOk);
       setStatus(payload.message || (response.httpOk ? 'Билет принят' : 'Проверка не пройдена'), response.httpOk ? 'success' : 'error');
+      if (response.httpOk) loadSessionStats(sessionSelect.value);
     }).catch(function (error) {
       setStatus('Ошибка связи с сервером. Повторите проверку.', 'error');
       console.error('Ticket scanner request error:', error);
@@ -179,18 +318,25 @@
 
   startButton.addEventListener('click', startCamera);
   stopButton.addEventListener('click', stopCamera);
-  manualForm.addEventListener('submit', function (event) {
-    event.preventDefault();
-    var code = manualCode.value.trim();
-    if (!code) {
-      setStatus('Введите UID билета', 'error');
-      manualCode.focus();
-      return;
-    }
-    stopCamera().then(function () {
-      checkTicket(code);
-    });
+  sessionSelect.addEventListener('change', function () {
+    var selected = sessionSelect.options[sessionSelect.selectedIndex];
+    if (selected) renderStats(selected.dataset.total, selected.dataset.checked);
+    loadSessionStats(sessionSelect.value);
   });
+  if (manualForm && manualCode) {
+    manualForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var code = manualCode.value.trim();
+      if (!code) {
+        setStatus('Введите UID билета', 'error');
+        manualCode.focus();
+        return;
+      }
+      stopCamera().then(function () {
+        checkTicket(code);
+      });
+    });
+  }
 
   imageInput.addEventListener('change', function () {
     var file = imageInput.files && imageInput.files[0];
@@ -209,4 +355,5 @@
   });
 
   setCameraButtons();
+  loadSessions();
 })();

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/reporting.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 
 require_once __DIR__ . '/../includes/excel.php';
@@ -10,13 +11,21 @@ if (!function_exists('excel_autoload') || !excel_autoload()) {
 }
 
 $sessionId = (int)($_GET['session_id'] ?? 0);
+$sourceFilter = reporting_normalize_source_filter(
+    $_GET['source'] ?? [],
+    array_key_exists('source_filter', $_GET)
+);
+$refundFilter = trim((string)($_GET['refund'] ?? 'all'));
+if (!in_array($refundFilter, ['all', 'without', 'only'], true)) {
+    $refundFilter = 'all';
+}
 if ($sessionId <= 0) {
     http_response_code(400);
     exit('Не указан сеанс.');
 }
 
 try {
-    $session = db_fetch_one("SELECT s.id, s.start_time, e.title AS event_title, h.name AS hall_name
+    $session = db_fetch_one("SELECT s.id, s.start_time, s.hall_id, e.title AS event_title, h.name AS hall_name
         FROM schedules s
         LEFT JOIN events e ON e.id = s.event_id
         LEFT JOIN halls h ON h.id = s.hall_id
@@ -27,18 +36,28 @@ try {
         exit('Сеанс не найден.');
     }
 
+    $sourceSql = reporting_source_sql($sourceFilter);
+    $refundFilterSql = $refundFilter === 'without'
+        ? " AND COALESCE(t.refund_status, 'none') <> 'refunded' "
+        : ($refundFilter === 'only' ? " AND t.refund_status = 'refunded' " : '');
     $rows = db_fetch_all("SELECT
-            t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount,
-            t.customer_segment, t.channel, t.payment_status, t.status,
+            t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.promo_code,
+            t.customer_segment, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.is_checked_in,
+            t.customer_email, t.customer_phone, t.payment_transaction_id,
             t.refund_status, t.refund_at, t.purchased_at,
+            seat.zone_name AS seat_zone, seat.seat_group, seat.seat_type,
             tx.payment_method AS tx_payment_method,
-            ps.order_number,
-            COALESCE(c.full_name, '') AS customer_name,
+            COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+            COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
             r.refund_amount AS refund_record_amount,
             r.refund_transaction_id AS refund_record_transaction_id,
             r.processed_by AS refund_processed_by
         FROM tickets t
+        LEFT JOIN schedules s ON s.id = t.schedule_id
         LEFT JOIN customers c ON c.id = t.customer_id
+        LEFT JOIN seats seat
+            ON seat.hall_id = s.hall_id
+           AND CONCAT(seat.row_number, '-', seat.seat_number) = REPLACE(t.seat_identifier, ':', '-')
         LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
         LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
         LEFT JOIN refunds r ON r.id = (
@@ -46,6 +65,8 @@ try {
         )
         WHERE t.schedule_id = :session_id
             AND t.payment_status = 'paid'
+            $sourceSql
+            $refundFilterSql
         ORDER BY t.purchased_at ASC, t.id ASC", [':session_id' => $sessionId]);
 } catch (Throwable $e) {
     error_log('[REPORT] Ошибка экспорта сеанса: ' . $e->getMessage());
@@ -67,8 +88,10 @@ foreach ($rows as $row) {
     $isRefunded = (string)($row['refund_status'] ?? '') === 'refunded';
     $refundAmount = $isRefunded ? max(0.0, (float)($row['refund_record_amount'] ?? $financials['paid'])) : 0.0;
     $paymentMethod = reporting_payment_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
-    $purchaseSource = in_array(strtolower((string)($row['channel'] ?? '')), ['web', 'mobile', 'online'], true)
-        || $paymentMethod === 'Карта' ? 'Онлайн' : 'Касса';
+    $purchaseSource = reporting_source_label($row['tx_payment_method'] ?? '', $row['channel'] ?? '');
+    $giftLabel = !empty($row['gift_selected'])
+        ? trim((string)($row['gift_name'] ?? '')) . ' (+' . (int)($row['gift_price'] ?? 0) . ' тг)'
+        : '—';
     if ($isRefunded) {
         $summary['refunded_tickets']++;
         $summary['refunds'] += $refundAmount;
@@ -79,26 +102,61 @@ foreach ($rows as $row) {
         $summary['sales'] += $financials['paid'];
     }
 
+    $generalAdmissionNumber = general_admission_identifier_number((string)($row['seat_identifier'] ?? ''));
+    $seatParts = preg_split('/\s*-\s*/', str_replace(':', '-', (string)($row['seat_identifier'] ?? '')), 2);
+    $seatRow = $generalAdmissionNumber !== null ? 'Свободная рассадка' : trim((string)($seatParts[0] ?? ''));
+    $seatNumber = $generalAdmissionNumber !== null ? (string)$generalAdmissionNumber : trim((string)($seatParts[1] ?? ''));
+    $sector = trim((string)($row['seat_zone'] ?? ''));
+    if ($sector === '') {
+        $sector = trim((string)($row['seat_group'] ?? ''));
+    }
+    $sector = $sector !== '' ? $sector : '—';
+    $saleChannel = strtolower(trim((string)($row['channel'] ?? '')));
+    $saleTypeLabels = [
+        'web' => 'Продажи через афишу',
+        'mobile' => 'Продажи через приложение',
+        'kassa' => 'Продажа через кассу',
+        'agent' => 'Агентская продажа',
+        'admin' => 'Административная продажа',
+        'qr' => 'Продажа по QR',
+    ];
+    $saleType = $isRefunded
+        ? 'Возврат'
+        : ($saleTypeLabels[$saleChannel] ?? 'Продажа');
+    $tariffName = trim((string)($row['seat_type'] ?? '')) ?: 'Стандартный';
+    $validationStatus = !empty($row['is_checked_in'])
+        ? 'Билет валидирован'
+        : 'Билет еще не валидирован';
+    $sessionLabel = !empty($session['start_time'])
+        ? date('d.m.Y H:i:s', strtotime((string)$session['start_time'])) . ' Asia/Almaty'
+        : '—';
+
     $details[] = [
-        $isRefunded ? 'Возврат' : 'Покупка',
-        $isRefunded ? ((int)($row['refund_processed_by'] ?? 0) > 0 ? 'Кассир' : 'Клиент') : $purchaseSource,
-        !empty($row['purchased_at']) ? reporting_format_date($row['purchased_at'], true) : '',
-        $isRefunded && !empty($row['refund_at']) ? reporting_format_date($row['refund_at'], true) : '',
-        str_replace(':', ' - ', (string)($row['seat_identifier'] ?? '')),
-        (string)($row['ticket_uid'] ?? ''),
-        reporting_segment_label($row['customer_segment'] ?? ''),
-        reporting_discount_label($row),
-        $financials['original'],
-        $financials['discount'],
+        (string)($row['ticket_uid'] ?? '—'),
+        'Театр Жас Сахна',
+        (string)($session['event_title'] ?? '—'),
+        $sessionLabel,
+        (string)($session['hall_name'] ?? '—'),
+        $sector,
+        $seatRow !== '' ? $seatRow : '—',
+        $seatNumber !== '' ? $seatNumber : '—',
         $financials['paid'],
-        $refundAmount,
-        max(0.0, $financials['paid'] - $refundAmount),
+        $tariffName,
+        $giftLabel,
+        trim((string)($row['promo_code'] ?? '')) !== ''
+            ? 'Промокод ' . (string)$row['promo_code']
+            : reporting_segment_label($row['customer_segment'] ?? ''),
+        (string)($row['payment_transaction_id'] ?? '—') !== '' ? (string)($row['payment_transaction_id'] ?? '—') : '—',
+        (string)($row['order_number'] ?? '') !== '' ? (string)($row['order_number'] ?? '') : '—',
+        !empty($row['purchased_at']) ? reporting_format_date($row['purchased_at'], true) : '—',
+        $saleType,
+        (string)($row['ticket_uid'] ?? '—'),
+        trim((string)($row['customer_name'] ?? '')) !== '' ? (string)$row['customer_name'] : '—',
+        trim((string)($row['customer_email'] ?? '')) !== '' ? (string)$row['customer_email'] : '—',
+        trim((string)($row['customer_phone'] ?? '')) !== '' ? (string)$row['customer_phone'] : '—',
         $paymentMethod,
-        (string)($row['channel'] ?? ''),
-        (string)($row['order_number'] ?? ''),
-        (string)($row['customer_name'] ?? ''),
-        $isRefunded ? 'Возвращён' : ((string)($row['status'] ?? '') === 'cancelled' ? 'Отменён' : 'Выдан'),
-        (string)($row['refund_record_transaction_id'] ?? ''),
+        $validationStatus,
+        $isRefunded ? 'Возвращён' : ((string)($row['status'] ?? '') === 'cancelled' ? 'Отменён' : '—'),
     ];
 }
 
@@ -132,36 +190,33 @@ $summarySheet->fromArray([
 $detailSheet = $spreadsheet->createSheet();
 $detailSheet->setTitle('Билеты');
 $detailSheet->fromArray([
-    ['Операция', 'Источник', 'Дата покупки', 'Дата возврата', 'Ряд - Место', 'UID билета',
-        'Тип билета', 'Тип скидки', 'Цена без скидки, тг', 'Скидка, тг', 'Продажа, тг',
-        'Возврат, тг', 'Итог, тг', 'Форма оплаты', 'Канал', 'Номер заказа', 'Клиент',
-        'Статус', 'Транзакция возврата'],
+    ['Отчет по продажам билетов'],
+    ['№ билета', 'Место проведения', 'Событие', 'Сеанс', 'Зал', 'Сектор', 'Ряд', 'Место',
+        'Цена', 'Название тарифа', 'Подарок', 'Тип билета', '№ продажи', 'Внешний ID заказа',
+        'Дата и время продажи', 'Тип продажи', '№ внешнего билета', 'Клиент', 'Почта клиента',
+        'Телефон клиента', 'Метод оплаты', 'Статус валидации', 'Комментарий'],
 ], null, 'A1');
 foreach ($details as $index => $detail) {
-    $detailSheet->fromArray([$detail], null, 'A' . ($index + 2));
+    $detailSheet->fromArray([$detail], null, 'A' . ($index + 3));
 }
-$sessionDetailTotalRow = count($details) + 2;
-$detailSheet->fromArray([[
-    'ИТОГО', null, null, null, null, null, null, null,
-    round($summary['original'], 2),
-    round($summary['discount'], 2),
-    round($summary['sales'], 2),
-    round($summary['refunds'], 2),
-    max(0.0, round($summary['sales'] - $summary['refunds'], 2)),
-    null, null, null, null, null, null,
-]], null, 'A' . $sessionDetailTotalRow);
+$sessionDetailTotalRow = count($details) + 3;
+$detailTotal = array_fill(0, 23, null);
+$detailTotal[0] = 'ИТОГО';
+$detailTotal[8] = round($summary['sales'], 2);
+$detailSheet->fromArray([$detailTotal], null, 'A' . $sessionDetailTotalRow);
 
 $summarySheet->getStyle('A1:B1')->getFont()->setBold(true)->setSize(15);
 $summarySheet->getStyle('A7:B7')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
 $summarySheet->getStyle('A7:B7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
-$detailSheet->getStyle('A1:S1')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
-$detailSheet->getStyle('A1:S1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
+$detailSheet->getStyle('A1:W1')->getFont()->setBold(true)->setSize(14);
+$detailSheet->getStyle('A2:W2')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+$detailSheet->getStyle('A2:W2')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF2563EB');
 $summarySheet->getStyle('B9:B14')->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('I2:M' . max(2, count($details) + 1))->getNumberFormat()->setFormatCode('#,##0.00');
-$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':S' . $sessionDetailTotalRow)->getFont()->setBold(true);
-$detailSheet->getStyle('I' . $sessionDetailTotalRow . ':M' . $sessionDetailTotalRow)->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('I3:I' . max(3, count($details) + 2))->getNumberFormat()->setFormatCode('#,##0.00');
+$detailSheet->getStyle('A' . $sessionDetailTotalRow . ':W' . $sessionDetailTotalRow)->getFont()->setBold(true);
+$detailSheet->getStyle('I' . $sessionDetailTotalRow)->getNumberFormat()->setFormatCode('#,##0.00');
 $summarySheet->freezePane('A8');
-$detailSheet->freezePane('A2');
+$detailSheet->freezePane('A3');
 foreach ([$summarySheet, $detailSheet] as $sheet) {
     foreach (range('A', $sheet->getHighestColumn()) as $column) {
         $sheet->getColumnDimension($column)->setAutoSize(true);

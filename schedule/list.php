@@ -5,9 +5,15 @@ require_login();
 
 $page_scripts = $page_scripts ?? [];
 $page_scripts[] = '';
+$page_scripts[] = '/assets/js/schedule-notifications.js?v=20261011-2';
+$page_styles = $page_styles ?? [];
+$page_styles[] = '/assets/css/schedule-notifications.css?v=20261011-2';
 
 $halls = db_fetch_all('SELECT id, name FROM halls ORDER BY name');
 $events = db_fetch_all('SELECT id, title FROM events ORDER BY title');
+$canScheduleNotifications = isset($pdo) && $pdo instanceof PDO
+  && function_exists('user_has_permission')
+  && user_has_permission($pdo, 'schedule_notifications', false);
 
 $use_sidebar = true;
 $active_menu = 'schedule';
@@ -295,6 +301,24 @@ foreach ($schedules_raw as $s) {
                 <td class="actions-col" style="padding:10px; vertical-align:middle;">
                   <div class="action-buttons">
                     <a class="btn btn-ghost btn-sm" href="/schedule/edit.php?id=<?= h($s['id']) ?>">Редактировать</a>
+                    <?php if ($canScheduleNotifications): ?>
+                      <button
+                        class="btn btn-secondary btn-sm js-schedule-notify"
+                        data-id="<?= h($s['id']) ?>"
+                        data-status="<?= h($status) ?>"
+                        data-event-title="<?= $event_title_attr ?>"
+                        data-hall="<?= h($s['hall_name'] ?? '') ?>"
+                        data-start="<?= h($s['start_time'] ?? '') ?>"
+                        data-end="<?= h($s['end_time'] ?? '') ?>"
+                      >Уведомить клиентов</button>
+                      <?php if ($status === 'cancelled'): ?>
+                        <button
+                          class="btn btn-ghost btn-sm js-schedule-refund-retry"
+                          data-id="<?= h($s['id']) ?>"
+                        >Повторить возвраты</button>
+                        <span class="schedule-refund-retry-status" data-refund-retry-status="<?= h($s['id']) ?>" role="status"></span>
+                      <?php endif; ?>
+                    <?php endif; ?>
 					<button class="btn btn-ghost btn-sm js-duplicate-session" data-id="<?= h($s['id']) ?>" data-event-title="<?= $event_title_attr ?>">Дублировать</button>  
                     <button class="btn btn-danger btn-sm js-delete-session" data-id="<?= h($s['id']) ?>" data-event-title="<?= $event_title_attr ?>">Удалить</button>
                   </div>

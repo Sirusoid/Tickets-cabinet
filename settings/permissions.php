@@ -39,10 +39,12 @@ $modules = [
 		'cash' => ['label' => 'Касса', 'path' => '/cash/index.php'],
 		'cashier_manual' => ['label' => 'Руководство кассира', 'path' => '/admin/cashier_manual.php'],
 		'schedule' => ['label' => 'Расписание', 'path' => '/schedule/list.php'],
+		'schedule_notifications' => ['label' => 'Уведомления о сеансах', 'path' => '/schedule/list.php'],
 		'events' => ['label' => 'Мероприятия', 'path' => '/events/list.php'],
 		'tickets' => ['label' => 'Билеты', 'path' => '/tickets/list.php'],
 		'refunds' => ['label' => 'Возвраты', 'path' => '/refunds/list.php'],
 		'scanner' => ['label' => 'Сканер QR', 'path' => '/scanner.php'],
+		'promo_codes' => ['label' => 'Промокоды', 'path' => '/promo_codes.php'],
 		'customers' => ['label' => 'Клиенты', 'path' => '/customers/list.php'],
 		'actors' => ['label' => 'Актёры', 'path' => '/actors/list.php'],
 		'halls' => ['label' => 'Залы', 'path' => '/halls/list.php'],
@@ -67,10 +69,12 @@ $defaultMatrix = [
 				'cash' => true,
 				'cashier_manual' => true,
 				'schedule' => true,
+				'schedule_notifications' => true,
 				'events' => true,
 				'tickets' => true,
 				'refunds' => true,
 				'scanner' => true,
+				'promo_codes' => true,
 				'customers' => true,
 				'actors' => true,
 				'halls' => true,
@@ -92,10 +96,12 @@ $defaultMatrix = [
 				'cash' => true,
 				'cashier_manual' => true,
 				'schedule' => true,
+				'schedule_notifications' => false,
 				'events' => false,
 				'tickets' => true,
 				'refunds' => true,
 				'scanner' => true,
+				'promo_codes' => false,
 				'customers' => true,
 				'actors' => false,
 				'halls' => false,
@@ -117,10 +123,12 @@ $defaultMatrix = [
 				'cash' => false,
 				'cashier_manual' => false,
 				'schedule' => false,
+				'schedule_notifications' => false,
 				'events' => false,
 				'tickets' => false,
 				'refunds' => false,
 				'scanner' => true,
+				'promo_codes' => false,
 				'customers' => false,
 				'actors' => false,
 				'halls' => false,
@@ -169,7 +177,10 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 						$selected = isset($postedPerms[$roleCode]) && is_array($postedPerms[$roleCode])
 								? $postedPerms[$roleCode]
 								: [];
-						$selectedMap = array_fill_keys($selected, true);
+						$selectedMap = array_fill_keys(
+							array_intersect(array_filter($selected, 'is_string'), array_keys($modules)),
+							true
+						);
 						foreach ($modules as $moduleKey => $moduleConfig) {
 								$matrix[$roleCode][$moduleKey] = !empty($selectedMap[$moduleKey]);
 						}
@@ -181,7 +192,10 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 
 				try {
 						$payload = json_encode($matrix, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-						settings_upsert_value(
+						if (!is_string($payload)) {
+							throw new RuntimeException('Не удалось сформировать матрицу прав.');
+						}
+						if (!settings_upsert_value(
 								$pdo,
 								'security.role_permissions',
 								'Матрица прав доступа',
@@ -191,7 +205,12 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 								'Управляет доступом ролей к разделам интерфейса и меню',
 								1,
 								40
-						);
+						)) {
+							throw new RuntimeException('Не удалось создать настройку матрицы прав.');
+						}
+						if (!settings_set_value($pdo, 'security.role_permissions', $payload)) {
+							throw new RuntimeException('Не удалось записать матрицу прав в базу данных.');
+						}
 						$saveSuccess = 'Права доступа сохранены.';
 				} catch (Throwable $e) {
 						$saveErrors[] = 'Ошибка при сохранении: ' . $e->getMessage();

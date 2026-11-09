@@ -4,6 +4,8 @@
 // Ключи мест всегда в формате hyphen: "row-seat" (например "6-17").
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/general_admission.php';
+require_once __DIR__ . '/../includes/gift_promotion.php';
 require_login();
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -223,7 +225,8 @@ function normalize_seats($seats_raw) {
                     'original_price' => $originalPrice,
                 ];
                 if ($segment !== null) $entry['customer_segment'] = $segment;
-                $result[] = $entry;
+                    if (isset($s['gift_selected'])) $entry['gift_selected'] = gift_promotion_selected($s['gift_selected']);
+                    $result[] = $entry;
             }
         }
     }
@@ -305,7 +308,7 @@ case 'sell':
     $discountPayload = isset($input['discount']) && is_array($input['discount']) ? $input['discount'] : [];
     $discount_input = [
         'manual_amount' => isset($discountPayload['manual_amount']) && is_numeric($discountPayload['manual_amount'])
-            ? max(0.0, (float)$discountPayload['manual_amount'])
+            ? round(max(0.0, (float)$discountPayload['manual_amount']), 0, PHP_ROUND_HALF_UP)
             : 0.0,
     ];
 
@@ -332,15 +335,13 @@ case 'sell':
         json_response(['success' => false, 'message' => 'Некорректный способ оплаты']);
     }
 
-    // phone required
-    if ($customer_phone === '') {
-        json_response(['success' => false, 'message' => 'Номер телефона клиента обязателен']);
-    }
-
     $now = (new DateTime())->format('Y-m-d H:i:s');
 
     // Получаем данные сеанса (event_id, hall_id)
-    $stmtSession = $pdo->prepare("SELECT id, event_id, hall_id FROM schedules WHERE id = :id LIMIT 1");
+    $stmtSession = $pdo->prepare("SELECT s.*, h.seat_map AS hall_seatmap
+        FROM schedules s
+        LEFT JOIN halls h ON h.id = s.hall_id
+        WHERE s.id = :id LIMIT 1");
     $stmtSession->execute([':id' => $session_id]);
     $sessionRow = $stmtSession->fetch(PDO::FETCH_ASSOC);
     if (!$sessionRow) {
@@ -352,15 +353,38 @@ case 'sell':
     if (empty($event_id) || empty($hall_id)) {
         json_response(['success' => false, 'message' => 'Сеанс не содержит event_id или hall_id. Невозможно завершить продажу.']);
     }
+    $generalAdmission = general_admission_is_session($sessionRow);
+    $promotion = gift_promotion_details($sessionRow);
 
     // Канонический источник цены места — только original_price из payload.
     $baseSeatPrices = [];
-    foreach ($seats as $seat) {
+    $seenGeneralAdmissionSeats = [];
+    $giftTotal = 0.0;
+    foreach ($seats as &$seat) {
+        $seat = gift_promotion_apply_to_seat($seat, $sessionRow);
         $p = isset($seat['original_price']) && is_numeric($seat['original_price'])
             ? (float)$seat['original_price']
             : 0.0;
+        if ($generalAdmission) {
+            $identifier = (string)($seat['identifier'] ?? '');
+            $number = general_admission_identifier_number($identifier);
+            if ($number === null || $number > (int)$sessionRow['capacity']) {
+                json_response(['success' => false, 'message' => 'Выбранное количество превышает вместимость сеанса.']);
+            }
+            if (isset($seenGeneralAdmissionSeats[$number])) {
+                json_response(['success' => false, 'message' => 'Одно и то же свободное место выбрано несколько раз.']);
+            }
+            $seenGeneralAdmissionSeats[$number] = true;
+            $seat['identifier'] = general_admission_identifier($number);
+            $p = (float)($sessionRow['base_price'] ?? 0);
+            if ($p <= 0) {
+                json_response(['success' => false, 'message' => 'Для сеанса не задана цена билета.']);
+            }
+        }
         $baseSeatPrices[] = max(0.0, $p);
+        $giftTotal += (float)$seat['gift_price'];
     }
+    unset($seat);
     $baseTotal = array_sum($baseSeatPrices);
     if ($baseTotal <= 0) {
         json_response(['success' => false, 'message' => 'У выбранных мест отсутствует исходная цена']);
@@ -415,14 +439,18 @@ case 'sell':
             $autoAmount = round($base * $segmentPercent / 100, 2);
             $afterAuto = max(0.0, $base - $autoAmount);
 
-            $customValue = $segment === 'manual' ? max(0.0, (float)$discount_input['manual_amount']) : 0.0;
+            $customValue = $segment === 'manual'
+                ? round(max(0.0, (float)$discount_input['manual_amount']), 0, PHP_ROUND_HALF_UP)
+                : 0.0;
             $maxAmount = isset($discountSettings['custom_max_amount']) && is_numeric($discountSettings['custom_max_amount'])
                 ? max(0.0, (float)$discountSettings['custom_max_amount'])
                 : 0.0;
             if ($maxAmount > 0) {
                 $customValue = min($customValue, $maxAmount);
             }
-            $customAmount = $segment === 'manual' ? min($afterAuto, round($customValue, 2)) : 0.0;
+            $customAmount = $segment === 'manual'
+                ? min($afterAuto, round($customValue, 0, PHP_ROUND_HALF_UP))
+                : 0.0;
 
             $finalTotal = max(0.0, round($afterAuto - $customAmount, 2));
             return [
@@ -459,7 +487,8 @@ case 'sell':
     $finalSeatPrices = cash_distribute_prices($baseSeatPrices, $discountApplied['final_total']);
 
     // Сумма всегда вычисляется сервером; значение клиента не используется.
-    $amount_cents = (int)round($discountApplied['final_total'] * 100);
+    $finalSaleTotal = round($discountApplied['final_total'] + $giftTotal, 2);
+    $amount_cents = (int)round($finalSaleTotal * 100);
 
     // --- формирование per-seat итогов (seats_final) ---
     $seats_final = [];
@@ -476,8 +505,9 @@ case 'sell':
         $identifier = str_replace(':', '-', $identifier);
 
         // prices
-        $orig = isset($baseSeatPrices[$idx]) ? (float)$baseSeatPrices[$idx] : 0.0;
-        $final = isset($finalSeatPrices[$idx]) ? (float)$finalSeatPrices[$idx] : 0.0;
+        $giftPrice = isset($seat['gift_price']) ? (float)$seat['gift_price'] : 0.0;
+        $orig = (isset($baseSeatPrices[$idx]) ? (float)$baseSeatPrices[$idx] : 0.0) + $giftPrice;
+        $final = (isset($finalSeatPrices[$idx]) ? (float)$finalSeatPrices[$idx] : 0.0) + $giftPrice;
 
         // discount amount in currency (orig - final)
         $discount_amount = round(max(0.0, $orig - $final), 2);
@@ -533,13 +563,22 @@ case 'sell':
 
     $pdo->beginTransaction();
     try {
+        if ($generalAdmission) {
+            $lockSchedule = $pdo->prepare('SELECT id FROM schedules WHERE id = :id FOR UPDATE');
+            $lockSchedule->execute([':id' => $session_id]);
+            if (!$lockSchedule->fetchColumn()) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'Сеанс не найден.']);
+            }
+        }
+
         // 1) Проверка, что места не проданы (используем seat_identifier IN ...)
         $placeholders = implode(',', array_fill(0, count($seat_keys), '?'));
         $params = array_merge([$session_id], $seat_keys);
 
         $sold_conflicts = [];
         try {
-            $sqlSold = "SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status = 'issued' FOR UPDATE";
+            $sqlSold = "SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded' FOR UPDATE";
             $stmtSold = $pdo->prepare($sqlSold);
             $stmtSold->execute($params);
             $sold_conflicts = $stmtSold->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -569,6 +608,42 @@ case 'sell':
             json_response(['success' => false, 'message' => 'Некоторые места удерживаются другим пользователем', 'conflicts' => $conflicting_holds]);
         }
 
+        if ($generalAdmission) {
+            $inventory = general_admission_inventory($pdo, $session_id);
+            foreach ($seat_keys as $seatKey) {
+                $number = general_admission_identifier_number((string)$seatKey);
+                if ($number === null || !empty($inventory['sold'][$number])) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'Одно или несколько выбранных мест уже проданы. Обновите кассу.']);
+                }
+            }
+            $selectedHoldStmt = $pdo->prepare(
+                "SELECT seat_key, user_id FROM cash_holds
+                 WHERE session_id = ? AND seat_key IN ($placeholders) AND expires_at > NOW()
+                 FOR UPDATE"
+            );
+            $selectedHoldStmt->execute($params);
+            while ($selectedHold = $selectedHoldStmt->fetch(PDO::FETCH_ASSOC)) {
+                if ((int)$selectedHold['user_id'] !== $user_id) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'Одно или несколько выбранных мест зарезервированы. Обновите кассу.']);
+                }
+            }
+            $ownedStmt = $pdo->prepare(
+                "SELECT COUNT(DISTINCT seat_key) FROM cash_holds
+                 WHERE session_id = ? AND user_id = ?
+                   AND expires_at > NOW() AND seat_key IN ($placeholders)"
+            );
+            $ownedStmt->execute(array_merge([$session_id, $user_id], $seat_keys));
+            $ownedSelectedHolds = (int)$ownedStmt->fetchColumn();
+            $finalOccupied = count($inventory['sold']) + count($inventory['held'])
+                - $ownedSelectedHolds + count($seat_keys);
+            if ($finalOccupied > (int)$sessionRow['capacity']) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'Свободных мест осталось меньше. Обновите кассу и выберите количество снова.']);
+            }
+        }
+
         // 3) Создаём запись транзакции (session_id хранит schedule_id)
         $txStmt = $pdo->prepare("INSERT INTO cash_transactions (type, session_id, user_id, amount_cents, currency, payment_method, payload, created_at) VALUES (:type, :session_id, :user_id, :amount_cents, :currency, :payment_method, :payload, NOW())");
         $payload = json_encode([
@@ -577,9 +652,10 @@ case 'sell':
             'source' => 'cashier',
             'payment_method' => $payment_method,
             'customer_segment' => $customer_segment_store,
-            'original_total' => round($baseTotal, 2),
+            'original_total' => round($baseTotal + $giftTotal, 2),
             'discount_total' => round($discountApplied['applied']['total_discount'] ?? 0, 2),
-            'final_total' => round($discountApplied['final_total'], 2),
+            'gift_total' => round($giftTotal, 2),
+            'final_total' => $finalSaleTotal,
         ], JSON_UNESCAPED_UNICODE);
         $currency = 'KZT';
         $txStmt->execute([
@@ -592,6 +668,19 @@ case 'sell':
             ':payload' => $payload
         ]);
         $transaction_id = $pdo->lastInsertId();
+        $cash_order_number = 'cash_' . (string)$transaction_id;
+        $cashPayload = json_decode((string)$payload, true);
+        if (!is_array($cashPayload)) {
+            throw new RuntimeException('Не удалось подготовить данные кассового заказа.');
+        }
+        $cashPayload['order_number'] = $cash_order_number;
+        $cashPayload['customer_name'] = $customer_full_name !== '' ? $customer_full_name : null;
+        $payload = json_encode($cashPayload, JSON_UNESCAPED_UNICODE);
+        if ($payload === false) {
+            throw new RuntimeException('Не удалось сериализовать данные кассового заказа.');
+        }
+        $updateCashPayload = $pdo->prepare('UPDATE cash_transactions SET payload = :payload WHERE id = :id');
+        $updateCashPayload->execute([':payload' => $payload, ':id' => $transaction_id]);
 		
         // --- find or create customer (by phone, fallback email) ---
         $customer_id = null;
@@ -639,7 +728,7 @@ case 'sell':
                 }
             }
 
-            if (empty($customer_id)) {
+            if (empty($customer_id) && $customer_phone !== '') {
                 $stmtFind = $pdo->prepare("SELECT id FROM customers WHERE phone = :phone LIMIT 1");
                 $stmtFind->execute([':phone' => $customer_phone]);
                 $row = $stmtFind->fetch(PDO::FETCH_ASSOC);
@@ -674,7 +763,7 @@ case 'sell':
                 }
             }
 
-            if (empty($customer_id)) {
+            if (empty($customer_id) && ($customer_phone !== '' || $customer_email || $customer_gender || $customer_city)) {
                 try { $custUid = bin2hex(random_bytes(8)); } catch (Exception $e) { $custUid = uniqid('c_', true); }
                 $insCust = $pdo->prepare("INSERT INTO customers (customer_uid, full_name, gender, email, phone, city, created_at, updated_at) VALUES (:customer_uid, :full_name, :gender, :email, :phone, :city, NOW(), NOW())");
                 $insCust->execute([
@@ -709,6 +798,9 @@ case 'sell':
         $ticket_has_original_price = column_exists($pdo, 'tickets', 'original_price');
         $ticket_has_final_price = column_exists($pdo, 'tickets', 'final_price');
         $ticket_has_discount_amount = column_exists($pdo, 'tickets', 'discount_amount');
+        $ticket_has_gift_selected = column_exists($pdo, 'tickets', 'gift_selected');
+        $ticket_has_gift_name = column_exists($pdo, 'tickets', 'gift_name');
+        $ticket_has_gift_price = column_exists($pdo, 'tickets', 'gift_price');
 
         // Extend baseCols to include any existing extra columns (we will not add new DB columns)
         $baseCols = "schedule_id, event_id, hall_id, seat_identifier, seat_id, status, payment_status, payment_transaction_id, ticket_uid, channel, customer_id, customer_segment, purchased_at, created_at, updated_at";
@@ -725,6 +817,9 @@ case 'sell':
         if ($ticket_has_original_price) { $extraCols[] = 'original_price'; $extraVals[] = ':original_price'; }
         if ($ticket_has_final_price) { $extraCols[] = 'final_price'; $extraVals[] = ':final_price'; }
         if ($ticket_has_discount_amount) { $extraCols[] = 'discount_amount'; $extraVals[] = ':discount_amount'; }
+        if ($ticket_has_gift_selected) { $extraCols[] = 'gift_selected'; $extraVals[] = ':gift_selected'; }
+        if ($ticket_has_gift_name) { $extraCols[] = 'gift_name'; $extraVals[] = ':gift_name'; }
+        if ($ticket_has_gift_price) { $extraCols[] = 'gift_price'; $extraVals[] = ':gift_price'; }
 
         if (!empty($extraCols)) {
             $baseCols .= ', ' . implode(', ', $extraCols);
@@ -777,8 +872,8 @@ case 'sell':
                 ':customer_segment' => $customer_segment_store
             ];
 
-            if ($ticket_has_customer_name) $bind[':customer_name'] = is_array($customer_snapshot) && isset($customer_snapshot['full_name']) ? $customer_snapshot['full_name'] : $customer_full_name;
-            if ($ticket_has_customer_phone) $bind[':customer_phone'] = is_array($customer_snapshot) && isset($customer_snapshot['phone']) ? $customer_snapshot['phone'] : $customer_phone;
+            if ($ticket_has_customer_name) $bind[':customer_name'] = is_array($customer_snapshot) && isset($customer_snapshot['full_name']) ? $customer_snapshot['full_name'] : ($customer_full_name !== '' ? $customer_full_name : null);
+            if ($ticket_has_customer_phone) $bind[':customer_phone'] = is_array($customer_snapshot) && isset($customer_snapshot['phone']) ? $customer_snapshot['phone'] : ($customer_phone !== '' ? $customer_phone : null);
             if ($ticket_has_customer_email) $bind[':customer_email'] = is_array($customer_snapshot) && isset($customer_snapshot['email']) ? $customer_snapshot['email'] : $customer_email;
             if ($ticket_has_customer_city) $bind[':customer_city'] = is_array($customer_snapshot) && isset($customer_snapshot['city']) ? $customer_snapshot['city'] : $customer_city;
             if ($ticket_has_customer_gender) $bind[':customer_gender'] = is_array($customer_snapshot) && isset($customer_snapshot['gender']) ? $customer_snapshot['gender'] : $customer_gender;
@@ -794,6 +889,9 @@ case 'sell':
             if ($ticket_has_final_price) {
                 $bind[':final_price'] = number_format($final_price, 2, '.', '');
             }
+            if ($ticket_has_gift_selected) $bind[':gift_selected'] = (int)($seat['gift_selected'] ?? 0);
+            if ($ticket_has_gift_name) $bind[':gift_name'] = $seat['gift_name'] ?? null;
+            if ($ticket_has_gift_price) $bind[':gift_price'] = (int)($seat['gift_price'] ?? 0);
 
             $insStmt->execute($bind);
 
@@ -868,7 +966,7 @@ case 'sell':
         if (!empty($generated_ticket_uids)) {
             $in = implode(',', array_fill(0, count($generated_ticket_uids), '?'));
             try {
-                $stmtT = $pdo->prepare("SELECT id, ticket_uid, seat_identifier, original_price, final_price, discount, discount_amount, purchased_at FROM tickets WHERE ticket_uid IN ($in)");
+                $stmtT = $pdo->prepare("SELECT id, ticket_uid, seat_identifier, original_price, final_price, discount, discount_amount, gift_selected, gift_name, gift_price, purchased_at FROM tickets WHERE ticket_uid IN ($in)");
                 $stmtT->execute($generated_ticket_uids);
                 while ($tr = $stmtT->fetch(PDO::FETCH_ASSOC)) {
                     $pdfPath = null;
@@ -888,6 +986,9 @@ case 'sell':
                         'final_price' => (float)$tr['final_price'],
                         'discount_percent' => (int)$tr['discount'],
                         'discount_amount' => (float)$tr['discount_amount'],
+                        'gift_selected' => (bool)$tr['gift_selected'],
+                        'gift_name' => $tr['gift_name'],
+                        'gift_price' => (int)$tr['gift_price'],
                         'purchased_at' => isset($tr['purchased_at']) ? $tr['purchased_at'] : null,
                         'pdf_url' => $pdfUrl
                     ];
@@ -898,13 +999,14 @@ case 'sell':
             }
         }
 
-        audit_log($pdo, $user_id, 'sale:create', 'session', $session_id, json_encode(['seats' => $seat_keys, 'tx_id' => $transaction_id, 'amount' => $amount_cents, 'uids' => $generated_ticket_uids, 'customer_id' => $customer_id, 'discount' => $discountApplied], JSON_UNESCAPED_UNICODE));
+        audit_log($pdo, $user_id, 'sale:create', 'session', $session_id, json_encode(['seats' => $seat_keys, 'tx_id' => $transaction_id, 'order_number' => $cash_order_number, 'amount' => $amount_cents, 'uids' => $generated_ticket_uids, 'customer_id' => $customer_id, 'discount' => $discountApplied], JSON_UNESCAPED_UNICODE));
 
         $response = [
             'success' => true,
             'message' => 'Продано',
             'sold' => $seat_keys,
             'transaction_id' => $transaction_id,
+            'order_number' => $cash_order_number,
             'ticket_uids' => $generated_ticket_uids,
             'tickets' => $sold_tickets,
             'customer_id' => $customer_id,
@@ -1007,11 +1109,12 @@ case 'sell':
                     $session['hall_seatmap'] = $decoded;
                 }
             }
+            $generalAdmission = general_admission_is_session($session);
 
             // sold seats (normalize to hyphen)
             $sold = [];
             try {
-                $q = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = :sid AND status = 'issued'");
+                $q = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = :sid AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
                 $q->execute([':sid' => $session_id]);
                 $rows = $q->fetchAll(PDO::FETCH_COLUMN, 0);
                 foreach ($rows as $r) {
@@ -1040,6 +1143,33 @@ case 'sell':
                 $held = [];
             }
 
+            // Админу показываем, кто поставил резерв (имя отдельным запросом, чтобы не влиять на список резервов).
+            if (is_admin() && !empty($held)) {
+                try {
+                    $holderIds = array_values(array_unique(array_filter(array_map(function ($h) {
+                        return (int)($h['user_id'] ?? 0);
+                    }, $held))));
+                    $holderNames = [];
+                    if (!empty($holderIds)) {
+                        $ph = implode(',', array_fill(0, count($holderIds), '?'));
+                        $us = $pdo->prepare("SELECT id, full_name, username FROM users WHERE id IN ($ph)");
+                        $us->execute($holderIds);
+                        while ($u = $us->fetch(PDO::FETCH_ASSOC)) {
+                            $holderNames[(int)$u['id']] = trim((string)$u['full_name']) !== '' ? trim((string)$u['full_name']) : (string)$u['username'];
+                        }
+                    }
+                    foreach ($held as &$holdItem) {
+                        $holderId = (int)($holdItem['user_id'] ?? 0);
+                        $holdItem['holder'] = $holderId === 0
+                            ? 'Онлайн-покупатель (сайт)'
+                            : ($holderNames[$holderId] ?? ('Пользователь #' . $holderId));
+                    }
+                    unset($holdItem);
+                } catch (Exception $e) {
+                    error_log('cash session holder names error: ' . $e->getMessage());
+                }
+            }
+
             // price ranges
             $priceRanges = null;
             try {
@@ -1049,7 +1179,17 @@ case 'sell':
                 }
             } catch (Exception $e) { $priceRanges = null; }
 
-            json_response(['success' => true, 'data' => ['session' => $session, 'sold_seats' => $sold, 'held_seats' => $held, 'price_ranges' => $priceRanges]]);
+            $generalInventory = $generalAdmission ? general_admission_inventory($pdo, $session_id) : null;
+            json_response(['success' => true, 'data' => [
+                'session' => $session,
+                'sold_seats' => $sold,
+                'held_seats' => $held,
+                'price_ranges' => $priceRanges,
+                'general_admission' => $generalAdmission,
+                'available_seats' => $generalAdmission
+                    ? count(general_admission_available_identifiers((int)$session['capacity'], $generalInventory['sold'], $generalInventory['held']))
+                    : null,
+            ]]);
             break;
 
         // ---------------- sessions_list (POST-only, lightweight) -------------------------
@@ -1381,19 +1521,54 @@ case 'sell':
                 json_response(['success' => false, 'message' => 'Неверный формат seats']);
             }
 
+            $holdSessionStmt = $pdo->prepare(
+                "SELECT s.*, h.seat_map AS hall_seatmap
+                 FROM schedules s LEFT JOIN halls h ON h.id = s.hall_id
+                 WHERE s.id = :id LIMIT 1"
+            );
+            $holdSessionStmt->execute([':id' => $session_id]);
+            $holdSession = $holdSessionStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$holdSession) {
+                json_response(['success' => false, 'message' => 'Сеанс не найден.'], 404);
+            }
+            $holdGeneralAdmission = general_admission_is_session($holdSession);
+            if ($holdGeneralAdmission) {
+                $seat_keys = array_map(static function ($seatKey) use ($holdSession) {
+                    $number = general_admission_identifier_number((string)$seatKey);
+                    if ($number === null || $number > (int)$holdSession['capacity']) {
+                        json_response(['success' => false, 'message' => 'Выбрано место за пределами вместимости сеанса.']);
+                    }
+                    return general_admission_identifier($number);
+                }, $seat_keys);
+                $seat_keys = array_values(array_unique($seat_keys));
+            }
+
             $pdo->beginTransaction();
             try {
+                if ($holdGeneralAdmission) {
+                    $lockSchedule = $pdo->prepare('SELECT id FROM schedules WHERE id = :id FOR UPDATE');
+                    $lockSchedule->execute([':id' => $session_id]);
+                    if (!$lockSchedule->fetchColumn()) throw new RuntimeException('Сеанс недоступен.');
+                    $inventory = general_admission_inventory($pdo, $session_id);
+                    $newSeatCount = count(array_filter($seat_keys, static function ($key) use ($inventory) {
+                        $number = general_admission_identifier_number((string)$key);
+                        return $number !== null && empty($inventory['sold'][$number]) && empty($inventory['held'][$number]);
+                    }));
+                    if (count($inventory['sold']) + count($inventory['held']) + $newSeatCount > (int)$holdSession['capacity']) {
+                        throw new RuntimeException('Свободных мест осталось меньше. Обновите кассу и выберите количество снова.');
+                    }
+                }
                 $placeholders = implode(',', array_fill(0, count($seat_keys), '?'));
                 $params = array_merge([$session_id], $seat_keys);
 
                 // check active holds
-                $sql = "SELECT seat_key, expires_at FROM cash_holds WHERE session_id = ? AND seat_key IN ($placeholders) FOR UPDATE";
+                $sql = "SELECT seat_key, user_id, expires_at FROM cash_holds WHERE session_id = ? AND seat_key IN ($placeholders) FOR UPDATE";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $conflicts = [];
                 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     $existingKey = is_string($row['seat_key']) ? str_replace(':', '-', $row['seat_key']) : $row['seat_key'];
-                    if ($row['expires_at'] > $now) $conflicts[] = $existingKey;
+                    if ($row['expires_at'] > $now && (int)$row['user_id'] !== $user_id) $conflicts[] = $existingKey;
                 }
                 if (!empty($conflicts)) {
                     $pdo->rollBack();
@@ -1403,7 +1578,7 @@ case 'sell':
                 // check sold seats by seat_identifier
                 $sold_conflicts = [];
                 try {
-                    $sql2 = "SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status = 'issued' LIMIT 1";
+                    $sql2 = "SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded' LIMIT 1";
                     $stmt2 = $pdo->prepare($sql2);
                     $stmt2->execute($params);
                     $sold_conflicts = $stmt2->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -1708,6 +1883,20 @@ case 'sell':
                 // If multiple seat keys - prepare placeholders
                 $placeholders = implode(',', array_fill(0, count($seat_keys), '?'));
 
+                // Любой авторизованный кассир может снять резерв независимо от владельца.
+                $isAdminUser = function_exists('is_admin') && is_admin();
+                $releaseUserId = current_user_id();
+                $holdOwners = [];
+                if ($holdsTableExists && $holdsHasSeatKey) {
+                    $ownerStmt = $pdo->prepare("SELECT seat_key, user_id, (expires_at > NOW()) AS is_active FROM cash_holds WHERE session_id = ? AND seat_key IN ($placeholders) FOR UPDATE");
+                    $ownerStmt->execute(array_merge([$schedule_id], $seat_keys));
+                    $foreignHolds = [];
+                    while ($ownerRow = $ownerStmt->fetch(PDO::FETCH_ASSOC)) {
+                        $ownerKey = str_replace(':', '-', (string)$ownerRow['seat_key']);
+                        $holdOwners[$ownerKey] = (int)$ownerRow['user_id'];
+                    }
+                }
+
                 // 1) delete from cash_holds if table and column exist
                 if ($holdsTableExists) {
                     try {
@@ -1769,6 +1958,17 @@ case 'sell':
                 }
 
                 $pdo->commit();
+
+                if ($affected > 0) {
+                    $foreignReleased = array_keys(array_filter($holdOwners, function ($ownerId) use ($releaseUserId) {
+                        return $ownerId !== $releaseUserId;
+                    }));
+                    audit_log($pdo, $releaseUserId, 'hold:release', 'session', $schedule_id, json_encode([
+                        'seats' => $seat_keys,
+                        'owners' => $holdOwners,
+                        'admin_override' => $isAdminUser && !empty($foreignReleased),
+                    ], JSON_UNESCAPED_UNICODE));
+                }
 
                 // After changes, recalc counts for this schedule (safe queries)
                 $sold = 0;

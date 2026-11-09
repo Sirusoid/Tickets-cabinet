@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     @session_start();
@@ -80,10 +81,11 @@ switch ($action) {
                 $session['hall_seatmap'] = $decoded;
             }
         }
+        $generalAdmission = general_admission_is_session($session);
 
         $sold = [];
         try {
-            $q = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = :sid AND status = 'issued'");
+            $q = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = :sid AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded'");
             $q->execute([':sid' => $session_id]);
             $rows = $q->fetchAll(PDO::FETCH_COLUMN, 0);
             foreach ($rows as $r) {
@@ -114,10 +116,15 @@ switch ($action) {
         $clientReservationEnabled = in_array(strtolower(trim((string)public_ticket_setting($pdo, 'tickets.client_reservation_enabled', '0'))), ['1', 'true', 'yes', 'on'], true);
         $clientReservationMinutes = max(1, min(240, (int)public_ticket_setting($pdo, 'tickets.client_reservation_minutes', '15')));
         $maxTickets = max(1, (int)public_ticket_setting($pdo, 'tickets.max_tickets_per_user', '6'));
+        $freeInventory = $generalAdmission ? general_admission_inventory($pdo, $session_id) : null;
         json_response(['success' => true, 'data' => [
             'session' => $session,
             'sold_seats' => $sold,
             'held_seats' => $held,
+            'general_admission' => $generalAdmission,
+            'available_seats' => $generalAdmission
+                ? count(general_admission_available_identifiers((int)$session['capacity'], $freeInventory['sold'], $freeInventory['held']))
+                : null,
             'price_ranges' => $priceRanges,
             'client_reservation_enabled' => $clientReservationEnabled,
             'client_reservation_minutes' => $clientReservationMinutes,
@@ -150,14 +157,48 @@ switch ($action) {
             json_response(['success' => false, 'message' => 'В одном заказе можно зарезервировать не более ' . $maxTickets . ' билетов.'], 400);
         }
 
-        $sessionStmt = $pdo->prepare("SELECT id FROM schedules WHERE id = :id AND status IN ('upcoming','active') AND start_time >= NOW() LIMIT 1");
+        $sessionStmt = $pdo->prepare("SELECT s.*, h.seat_map AS hall_seatmap
+            FROM schedules s
+            LEFT JOIN halls h ON h.id = s.hall_id
+            WHERE s.id = :id AND s.status IN ('upcoming','active') AND s.start_time >= NOW()
+            LIMIT 1");
         $sessionStmt->execute([':id' => $session_id]);
-        if (!$sessionStmt->fetchColumn()) json_response(['success' => false, 'message' => 'Сеанс недоступен'], 404);
+        $holdSession = $sessionStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$holdSession) json_response(['success' => false, 'message' => 'Сеанс недоступен'], 404);
+
+        if (general_admission_is_session($holdSession)) {
+            $seatKeys = array_map(static function ($seatKey) use ($holdSession) {
+                $number = general_admission_identifier_number((string)$seatKey);
+                if ($number === null || $number > (int)$holdSession['capacity']) {
+                    json_response(['success' => false, 'message' => 'Выбранное количество превышает вместимость сеанса.'], 400);
+                }
+                return general_admission_identifier($number);
+            }, $seatKeys);
+            $seatKeys = array_values(array_unique($seatKeys));
+            if (count($seatKeys) > $maxTickets) {
+                json_response(['success' => false, 'message' => 'Слишком много мест в одном резерве.'], 400);
+            }
+        }
 
         $placeholders = implode(',', array_fill(0, count($seatKeys), '?'));
         $pdo->beginTransaction();
         try {
-            $soldStmt = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status = 'issued' FOR UPDATE");
+            if (general_admission_is_session($holdSession)) {
+                $lockSchedule = $pdo->prepare('SELECT id FROM schedules WHERE id = :id FOR UPDATE');
+                $lockSchedule->execute([':id' => $session_id]);
+                if (!$lockSchedule->fetchColumn()) throw new RuntimeException('Сеанс недоступен.');
+                $inventory = general_admission_inventory($pdo, $session_id);
+                $newSeats = count(array_filter($seatKeys, static function ($key) use ($inventory) {
+                    $number = general_admission_identifier_number((string)$key);
+                    return $number !== null && empty($inventory['held'][$number]) && empty($inventory['sold'][$number]);
+                }));
+                $occupiedCount = count($inventory['sold']) + count($inventory['held']);
+                if ($occupiedCount + $newSeats > (int)$holdSession['capacity']) {
+                    throw new RuntimeException('Свободных мест осталось меньше. Обновите сеанс.');
+                }
+            }
+
+            $soldStmt = $pdo->prepare("SELECT seat_identifier FROM tickets WHERE schedule_id = ? AND seat_identifier IN ($placeholders) AND status IN ('issued', 'used') AND COALESCE(refund_status, 'none') <> 'refunded' FOR UPDATE");
             $soldStmt->execute(array_merge([$session_id], $seatKeys));
             if ($soldStmt->fetchColumn()) throw new RuntimeException('Некоторые места уже проданы');
 

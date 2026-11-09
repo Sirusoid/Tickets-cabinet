@@ -5,6 +5,8 @@ if (!function_exists('settings_get_value') && file_exists(__DIR__ . '/settings_m
     require_once __DIR__ . '/settings_manager.php';
 }
 
+require_once __DIR__ . '/general_admission.php';
+
 if (!function_exists('order_email_settings')) {
     function order_email_settings(?PDO $pdo = null): array
     {
@@ -51,8 +53,36 @@ if (!function_exists('order_email_format_datetime')) {
         }
         try {
             $date = new DateTimeImmutable((string)$value);
+            $monthsRu = [
+                1 => 'января',
+                2 => 'февраля',
+                3 => 'марта',
+                4 => 'апреля',
+                5 => 'мая',
+                6 => 'июня',
+                7 => 'июля',
+                8 => 'августа',
+                9 => 'сентября',
+                10 => 'октября',
+                11 => 'ноября',
+                12 => 'декабря',
+            ];
+            $weekdaysRu = [
+                0 => 'воскресенье',
+                1 => 'понедельник',
+                2 => 'вторник',
+                3 => 'среда',
+                4 => 'четверг',
+                5 => 'пятница',
+                6 => 'суббота',
+            ];
+            $monthNumber = (int)$date->format('n');
+            $weekdayNumber = (int)$date->format('w');
             return [
-                'date' => $date->format('d.m.Y'),
+                'date' => $date->format('j') . ' '
+                    . ($monthsRu[$monthNumber] ?? $date->format('F')) . ' '
+                    . $date->format('Y') . ' года, '
+                    . ($weekdaysRu[$weekdayNumber] ?? $date->format('l')),
                 'time' => $date->format('H:i'),
             ];
         } catch (Throwable $exception) {
@@ -73,7 +103,7 @@ if (!function_exists('order_email_load_order')) {
             FROM payment_sessions ps
             LEFT JOIN events e ON e.id = ps.event_id
             LEFT JOIN schedules s ON s.id = ps.session_id
-            LEFT JOIN halls h ON h.id = ps.hall_id
+            LEFT JOIN halls h ON h.id = s.hall_id
             WHERE ps.order_number = :order
             LIMIT 1");
         $sessionStmt->execute([':order' => $order]);
@@ -115,9 +145,17 @@ if (!function_exists('order_email_prepare_ticket_assets')) {
             }
 
             $pdfPath = function_exists('ticket_pdf_file_path') ? ticket_pdf_file_path($uid) : '';
-            if ($pdfPath !== '' && (!is_file($pdfPath) || filesize($pdfPath) <= 0) && function_exists('ticket_pdf_generate_by_ticket_uid')) {
+            $pdfHelperPath = __DIR__ . '/pdf_helpers.php';
+            $pdfHelperUpdatedAt = is_file($pdfHelperPath) ? (int)filemtime($pdfHelperPath) : 0;
+            $pdfUpdatedAt = $pdfPath !== '' && is_file($pdfPath) ? (int)filemtime($pdfPath) : 0;
+            $needsPdfRefresh = $pdfPath !== '' && (
+                $pdfUpdatedAt <= 0
+                || ($pdfHelperUpdatedAt > 0 && $pdfUpdatedAt < $pdfHelperUpdatedAt)
+            );
+            if ($needsPdfRefresh && function_exists('ticket_pdf_generate_by_ticket_uid')) {
                 $pdfError = null;
-                if (!ticket_pdf_generate_by_ticket_uid($uid, false, $pdfError)) {
+                $forcePdfRefresh = $pdfUpdatedAt > 0 && $pdfHelperUpdatedAt > $pdfUpdatedAt;
+                if (!ticket_pdf_generate_by_ticket_uid($uid, $forcePdfRefresh, $pdfError)) {
                     error_log('[ORDER EMAIL] PDF generation failed for ' . $uid . ': ' . ($pdfError ?: 'unknown error'));
                 }
             }
@@ -247,7 +285,8 @@ if (!function_exists('order_email_build_order_message')) {
         $safeEvent = order_email_escape('«' . mb_strtoupper($eventTitle, 'UTF-8') . '»');
         $safeDate = order_email_escape($datetime['date'] ?: 'Дата уточняется');
         $safeTime = order_email_escape($datetime['time'] ?: 'Время уточняется');
-        $safeHall = order_email_escape($orderData['hall_name'] ?: '');
+        $hallName = trim((string)($orderData['hall_name'] ?? ''));
+        $safeHall = order_email_escape($hallName !== '' ? $hallName . ' (Абая 117)' : '');
         $safeOrderUrl = order_email_escape($orderUrl);
         $safeFromName = order_email_escape($settings['from_name']);
         // PNG is supported more reliably than external SVG in Mail.ru dark mode.
@@ -256,7 +295,10 @@ if (!function_exists('order_email_build_order_message')) {
 
         $ticketRows = '';
         foreach ($orderData['tickets'] as $index => $ticket) {
-            $seat = order_email_escape(str_replace([':', '-'], [' / ', ' / '], (string)($ticket['seat_identifier'] ?? '')));
+            $seatIdentifier = (string)($ticket['seat_identifier'] ?? '');
+            $seat = order_email_escape(general_admission_is_identifier($seatIdentifier)
+                ? general_admission_ticket_label()
+                : str_replace([':', '-'], [' / ', ' / '], $seatIdentifier));
             $price = number_format((float)($ticket['final_price'] ?? 0), 2, '.', ' ');
             $ticketLink = '';
             foreach ($assets['links'] as $link) {
@@ -288,8 +330,9 @@ if (!function_exists('order_email_build_order_message')) {
             . '</td></tr><tr><td bgcolor="#ffffff" style="padding:28px;background:#ffffff!important;color:#172b4d">'
             . '<p style="margin:0 0 14px">Желаем Вам приятного просмотра!</p>'
             . '<p style="margin:0 0 4px"><strong>' . $safeEvent . '</strong></p>'
-            . '<p style="margin:0;color:#475569"><strong>Дата: ' . $safeDate . ' · Время: ' . $safeTime
-            . ($safeHall !== '' ? ' · Зал: ' . $safeHall : '') . '</strong></p>'
+            . '<p style="margin:0;color:#475569"><strong>ДАТА:</strong> ' . $safeDate . '</p>'
+            . '<p style="margin:4px 0 0;color:#475569"><strong>ВРЕМЯ:</strong> ' . $safeTime . '</p>'
+            . ($safeHall !== '' ? '<p style="margin:4px 0 0;color:#475569"><strong>ЗАЛ:</strong> ' . $safeHall . '</p>' : '')
             . '<p style="margin:18px 0 4px;color:#64748b">Номер заказа</p>'
             . '<p style="margin:0 0 20px;font-size:22px;font-weight:700;color:#173b67">' . $safeOrder . '</p>'
             . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 4px"><tr><td bgcolor="#18a957" style="border-radius:9px;background:#18a957">'

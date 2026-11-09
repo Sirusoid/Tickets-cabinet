@@ -61,6 +61,7 @@ if (!function_exists('audit_log_event')) {
                 'schedule.create' => 'Добавление расписания',
                 'schedule.update' => 'Изменение расписания',
                 'schedule.delete' => 'Удаление расписания',
+                'schedule.notification_sent' => 'Уведомление клиентов о сеансе',
                 'event.create' => 'Добавление спектакля',
                 'event.update' => 'Изменение спектакля',
                 'event.delete' => 'Удаление спектакля',

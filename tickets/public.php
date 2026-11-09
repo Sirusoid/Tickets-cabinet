@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/payment/bcc_refund.php';
 require_once __DIR__ . '/../includes/settings_manager.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 
 $order = isset($_GET['order']) ? trim((string)$_GET['order']) : '';
 $token = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
@@ -21,11 +22,13 @@ if ($order === '' || $token === '' || !ticket_public_token_verify($order, $token
 } elseif (!isset($pdo) || !($pdo instanceof PDO)) {
     $error = 'Ошибка подключения к базе данных.';
 } else {
-    $stmt = $pdo->prepare("SELECT ps.*, e.title AS event_title, s.start_time AS schedule_start, h.name AS hall_name
+    $stmt = $pdo->prepare("SELECT ps.*, e.title AS event_title, s.start_time AS schedule_start,
+            COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h.name), '')) AS hall_name
         FROM payment_sessions ps
         LEFT JOIN events e ON e.id = ps.event_id
         LEFT JOIN schedules s ON s.id = ps.session_id
         LEFT JOIN halls h ON h.id = ps.hall_id
+        LEFT JOIN halls h_schedule ON h_schedule.id = s.hall_id
         WHERE ps.order_number = :order LIMIT 1");
     $stmt->execute([':order' => $order]);
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -40,15 +43,16 @@ if (!$error && $session && $pdo instanceof PDO) {
         $uids = json_decode($session['ticket_uids'] ?? '[]', true);
         if (is_array($uids) && !empty($uids)) {
             $placeholders = implode(',', array_fill(0, count($uids), '?'));
-            $stmt = $pdo->prepare("                        SELECT t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.customer_segment, t.channel,
+            $stmt = $pdo->prepare("                        SELECT t.id, t.ticket_uid, t.seat_identifier, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.customer_segment, t.channel,
                         t.status, t.payment_status, t.refund_status, t.refund_at, t.purchased_at,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS schedule_start,
-                        h.name AS hall_name
+                        COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h.name), '')) AS hall_name
                     FROM tickets t
                     LEFT JOIN events e ON e.id = t.event_id
                     LEFT JOIN schedules s ON s.id = t.schedule_id
                     LEFT JOIN halls h ON h.id = t.hall_id
+                    LEFT JOIN halls h_schedule ON h_schedule.id = s.hall_id
                     WHERE t.ticket_uid IN ($placeholders)
                     ORDER BY t.id ASC");
             $stmt->execute($uids);
@@ -75,6 +79,7 @@ if (!preg_match('/^https?:\/\//i', $returnUrlTemplate)) {
 }
 $returnUrl = str_replace('{order}', rawurlencode($order), $returnUrlTemplate);
 $orderPageUrl = '/tickets/public.php?order=' . rawurlencode($order) . '&token=' . rawurlencode($token);
+$publicAmountCents = (int)($session['amount_cents'] ?? 0);
 $refundInfo = ['state' => 'unavailable', 'message' => '', 'deadline' => null];
 if (!$error && $session && $pdo instanceof PDO && (string)$session['status'] === 'paid') {
     $refundInfo = bcc_self_refund_status($pdo, $session, $tickets);
@@ -102,6 +107,11 @@ $formatPublicTime = static function ($datetime) {
 };
 
 $formatPublicSeat = static function ($identifier) {
+    $identifier = trim((string)$identifier);
+    $generalAdmissionNumber = general_admission_identifier_number($identifier);
+    if ($generalAdmissionNumber !== null) {
+        return ['row' => general_admission_ticket_label(), 'seat' => general_admission_ticket_label()];
+    }
     $parts = preg_split('/\s*[-:\/]\s*/', trim((string)$identifier), 2);
     if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
         return ['row' => $parts[0], 'seat' => $parts[1]];
@@ -199,7 +209,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <h2 class="order-bilingual order-bilingual--block" style="margin-bottom: 6px;"><span>Оплата прошла успешно!</span><span class="order-bilingual__kz">Төлем сәтті өтті!</span></h2>
                 <p style="color:#6b7280; margin: 0;">
                     Заказ / Тапсырыс <strong><?= h($order) ?></strong> ·
-                    Сумма / Сома <strong><?= number_format((int)$session['amount_cents'] / 100, 2, '.', ' ') ?> ₸</strong>
+                    Сумма / Сома <strong><?= number_format($publicAmountCents / 100, 2, '.', ' ') ?> ₸</strong>
                 </p>
             </div>
 
@@ -259,10 +269,14 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="ticket-card-info">
                                     <div style="font-size:15px; font-weight:700; margin-bottom:4px;">Билет № / Билет № <?= h($uid) ?></div>
                                     <div style="color:#4b5563;">
+                                        <?php if (!empty($ticket['hall_name'])): ?><strong>Зал: <?= h($ticket['hall_name']) ?></strong><br><?php endif; ?>
                                         <?php if ($publicSeat['row'] !== ''): ?><strong>Ряд: <?= h($publicSeat['row']) ?></strong><br><?php endif; ?>
                                         <strong>Место: <?= h($publicSeat['seat']) ?></strong>
                                     </div>
                                     <div style="color:#4b5563;">Цена / Бағасы: <?= number_format((float)$ticket['final_price'], 2, '.', ' ') ?> ₸</div>
+                                    <?php if (!empty($ticket['gift_selected'])): ?>
+                                        <div style="color:#166534; font-weight:600;">С подарком / Сыйлықпен: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> ₸)</div>
+                                    <?php endif; ?>
                                     <?php if (($ticket['refund_status'] ?? 'none') === 'refunded'): ?>
                                         <div style="color:#b91c1c; font-weight:600;">Билет возвращён / Билет қайтарылды</div>
                                     <?php endif; ?>
@@ -328,7 +342,7 @@ require_once __DIR__ . '/../includes/header.php';
             var returnUrl = <?= json_encode($returnUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
             var tildaOrigin = <?= json_encode(defined('TILDA_WIDGET_ORIGIN') ? constant('TILDA_WIDGET_ORIGIN') : 'https://zhassahna.kz') ?>;
             var order = <?= json_encode($order) ?>;
-            var amount = <?= json_encode(number_format((int)$session['amount_cents'] / 100, 2, '.', ' ')) ?>;
+            var amount = <?= json_encode(number_format($publicAmountCents / 100, 2, '.', ' ')) ?>;
             var tickets = <?= json_encode(array_map(function ($t) {
                 return [
                     'uid' => $t['ticket_uid'],

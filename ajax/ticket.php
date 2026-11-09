@@ -116,7 +116,7 @@ if ($action === 'suggest_sessions') {
         }
 
         if ($filter_customer !== '') {
-            $sql .= " AND EXISTS (SELECT 1 FROM tickets t3 JOIN customers c3 ON c3.id = t3.customer_id WHERE t3.schedule_id = s.id AND c3.full_name LIKE :fcust)";
+            $sql .= " AND EXISTS (SELECT 1 FROM tickets t3 LEFT JOIN customers c3 ON c3.id = t3.customer_id WHERE t3.schedule_id = s.id AND COALESCE(NULLIF(c3.full_name, ''), NULLIF(t3.customer_name, ''), '') LIKE :fcust)";
             $params['fcust'] = '%' . $filter_customer . '%';
         }
 
@@ -172,7 +172,7 @@ if ($action === 'suggest_q') {
         }
 
         if ($filter_customer !== '') {
-            $sqlUid .= " AND c.full_name LIKE :fcust";
+            $sqlUid .= " AND COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :fcust";
             $paramsUid['fcust'] = '%' . $filter_customer . '%';
         }
 
@@ -183,12 +183,52 @@ if ($action === 'suggest_q') {
             if (!empty($r['ticket_uid'])) $out[] = ['type' => 'uid', 'value' => $r['ticket_uid']];
         }
 
-        $sqlCust = "SELECT DISTINCT c.full_name
-                    FROM customers c
-                    JOIN tickets t ON t.customer_id = c.id
+        $sqlOrder = "SELECT DISTINCT COALESCE(ps.order_number, CASE
+                         WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+                     END) AS order_number
+                     FROM tickets t
+                     LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                     LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                     LEFT JOIN schedules s ON s.id = t.schedule_id
+                     LEFT JOIN events e ON e.id = s.event_id
+                     LEFT JOIN customers c ON c.id = t.customer_id
+                     WHERE COALESCE(ps.order_number, CASE
+                         WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+                     END, '') LIKE :q_order";
+        $paramsOrder = ['q_order' => '%' . $q . '%'];
+
+        if ($filter_session !== '') {
+            if (is_numeric($filter_session)) {
+                $sqlOrder .= " AND t.schedule_id = :fsched_o";
+                $paramsOrder['fsched_o'] = (int)$filter_session;
+            } else {
+                $sqlOrder .= " AND (e.title LIKE :fsession_o OR s.start_time LIKE :fsession2_o)";
+                $paramsOrder['fsession_o'] = '%' . $filter_session . '%';
+                $paramsOrder['fsession2_o'] = '%' . $filter_session . '%';
+            }
+        }
+        if ($filter_uid !== '') {
+            $sqlOrder .= " AND t.ticket_uid LIKE :fuid_o";
+            $paramsOrder['fuid_o'] = '%' . $filter_uid . '%';
+        }
+        if ($filter_customer !== '') {
+            $sqlOrder .= " AND COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :fcust_o";
+            $paramsOrder['fcust_o'] = '%' . $filter_customer . '%';
+        }
+
+        $sqlOrder .= " ORDER BY order_number ASC LIMIT 20";
+        $sOrder = $pdo->prepare($sqlOrder);
+        $sOrder->execute($paramsOrder);
+        while ($r = $sOrder->fetch(PDO::FETCH_ASSOC)) {
+            if (!empty($r['order_number'])) $out[] = ['type' => 'order', 'value' => $r['order_number']];
+        }
+
+        $sqlCust = "SELECT DISTINCT COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, '')) AS full_name
+                    FROM tickets t
+                    LEFT JOIN customers c ON c.id = t.customer_id
                     LEFT JOIN schedules s ON s.id = t.schedule_id
                     LEFT JOIN events e ON e.id = s.event_id
-                    WHERE c.full_name LIKE :q_cust";
+                    WHERE COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :q_cust";
         $paramsCust = ['q_cust' => '%' . $q . '%'];
 
         if ($filter_session !== '') {
@@ -222,19 +262,67 @@ if ($action === 'suggest_q') {
     }
 }
 
+// --- GET all tickets by order number ---
+if ($action === 'order_tickets') {
+        $orderNumber = trim((string)($_GET['order_number'] ?? $_POST['order_number'] ?? ''));
+        if ($orderNumber === '') {
+            json_resp(['success' => false, 'message' => 'Не указан номер заказа'], 400);
+        }
+
+        try {
+            $orderExpression = "COALESCE(ps.order_number, CASE
+                WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+            END, '')";
+            $stmt = $pdo->prepare("SELECT
+                    t.ticket_uid,
+                    t.seat_identifier,
+                    t.final_price,
+                    t.gift_selected,
+                    t.gift_name,
+                    t.refund_status,
+                    {$orderExpression} AS order_number
+                FROM tickets t
+                LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                WHERE {$orderExpression} = :order_number
+                ORDER BY t.id ASC");
+            $stmt->execute([':order_number' => $orderNumber]);
+            $tickets = [];
+            while ($ticket = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $tickets[] = [
+                    'ticket_uid' => (string)$ticket['ticket_uid'],
+                    'seat_identifier' => (string)($ticket['seat_identifier'] ?? ''),
+                    'final_price' => $ticket['final_price'] !== null ? (float)$ticket['final_price'] : null,
+                    'gift_selected' => (bool)$ticket['gift_selected'],
+                    'gift_name' => $ticket['gift_name'],
+                    'refund_status' => $ticket['refund_status'] ?? 'none',
+                ];
+            }
+            json_resp([
+                'success' => true,
+                'order_number' => $orderNumber,
+                'tickets' => $tickets,
+            ]);
+        } catch (Throwable $e) {
+            error_log('ajax/ticket.php order_tickets error: ' . $e->getMessage());
+            json_resp(['success' => false, 'message' => 'Ошибка загрузки заказа']);
+        }
+}
+
 // --- GET single ticket details for modal ---
 if ($action === 'get_ticket') {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id) json_resp(['success' => false, 'message' => 'Неверный id'], 400);
     try {
         $sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                       t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                       t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                    t.customer_segment, t.customer_id, t.schedule_id, t.payment_transaction_id,
                    t.payment_provider, t.payment_session_id,
                    tx.payment_method AS tx_payment_method,
-                   ps.order_number, ps.amount_cents AS payment_amount_cents, ps.provider_response,
+                   COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+                   ps.amount_cents AS payment_amount_cents, ps.provider_response,
                    ps.merch_rn_id,
-                       COALESCE(c.full_name, '') AS customer_name,
+                       COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                        COALESCE(e.title, '') AS event_title,
                        s.start_time AS session_start
                 FROM tickets t
@@ -273,6 +361,9 @@ if ($action === 'get_ticket') {
             'refund_status' => $r['refund_status'] ?? 'none',
             'discount_percent' => (int)($r['discount'] ?? 0),
             'discount_amount' => (float)($r['discount_amount'] ?? 0),
+            'gift_selected' => (bool)($r['gift_selected'] ?? false),
+            'gift_name' => $r['gift_name'] ?? null,
+            'gift_price' => (int)($r['gift_price'] ?? 0),
             'customer_name' => $r['customer_name'],
             'customer_id' => $r['customer_id'],
             'event_title' => $r['event_title'],
@@ -298,15 +389,103 @@ if ($action === 'get_ticket') {
 }
 
 // --- CHECK-IN action (QR scanner / manual UID) ---
+if ($action === 'scanner_sessions') {
+    if (!user_has_permission($pdo, 'scanner', false)) {
+        json_resp(['success' => false, 'message' => 'Доступ к сканеру запрещён.'], 403);
+    }
+
+    try {
+        $stmt = $pdo->query(
+            "SELECT s.id, s.start_time, e.title AS event_title, h.name AS hall_name,
+                    COUNT(CASE
+                        WHEN t.payment_status = 'paid'
+                            AND t.status IN ('issued', 'used')
+                            AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                        THEN 1
+                    END) AS total_tickets,
+                    COUNT(CASE
+                        WHEN t.payment_status = 'paid'
+                            AND (t.is_checked_in = 1 OR t.status = 'used')
+                            AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                        THEN 1
+                    END) AS checked_in_tickets
+             FROM schedules s
+             JOIN events e ON e.id = s.event_id
+             LEFT JOIN halls h ON h.id = s.hall_id
+             LEFT JOIN tickets t ON t.schedule_id = s.id
+             WHERE COALESCE(s.status, 'upcoming') IN ('upcoming', 'active')
+                AND s.end_time >= NOW()
+             GROUP BY s.id, s.start_time, e.title, h.name
+             ORDER BY s.start_time ASC
+             LIMIT 100"
+        );
+        json_resp(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (Throwable $e) {
+        error_log('ajax/ticket.php scanner_sessions error: ' . $e->getMessage());
+        json_resp(['success' => false, 'message' => 'Не удалось загрузить расписание для сканера.'], 500);
+    }
+}
+
+if ($action === 'scanner_stats') {
+    if (!user_has_permission($pdo, 'scanner', false)) {
+        json_resp(['success' => false, 'message' => 'Доступ к сканеру запрещён.'], 403);
+    }
+    $scheduleId = filter_var($_GET['schedule_id'] ?? '', FILTER_VALIDATE_INT);
+    if (!$scheduleId || $scheduleId < 1) {
+        json_resp(['success' => false, 'message' => 'Выберите сеанс для просмотра статистики.'], 400);
+    }
+
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT
+                COUNT(CASE
+                    WHEN t.payment_status = 'paid'
+                        AND t.status IN ('issued', 'used')
+                        AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                    THEN 1
+                END) AS total_tickets,
+                COUNT(CASE
+                    WHEN t.payment_status = 'paid'
+                        AND (t.is_checked_in = 1 OR t.status = 'used')
+                        AND COALESCE(t.refund_status, 'none') <> 'refunded'
+                    THEN 1
+                END) AS checked_in_tickets
+             FROM schedules s
+             LEFT JOIN tickets t ON t.schedule_id = s.id
+             WHERE s.id = :schedule_id
+                AND COALESCE(s.status, 'upcoming') IN ('upcoming', 'active')
+                AND s.end_time >= NOW()"
+        );
+        $stmt->execute([':schedule_id' => $scheduleId]);
+        $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$stats) {
+            json_resp(['success' => false, 'message' => 'Сеанс не найден или больше не действует.'], 404);
+        }
+        $stats['total_tickets'] = (int)$stats['total_tickets'];
+        $stats['checked_in_tickets'] = (int)$stats['checked_in_tickets'];
+        json_resp(['success' => true, 'data' => $stats]);
+    } catch (Throwable $e) {
+        error_log('ajax/ticket.php scanner_stats error: ' . $e->getMessage());
+        json_resp(['success' => false, 'message' => 'Не удалось обновить статистику входа.'], 500);
+    }
+}
+
 if ($action === 'checkin') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         json_resp(['success' => false, 'message' => 'Неверный метод'], 405);
     }
     check_csrf();
+    if (!user_has_permission($pdo, 'scanner', false)) {
+        json_resp(['success' => false, 'message' => 'Доступ к сканеру запрещён.'], 403);
+    }
 
     $rawCode = trim((string)($_POST['code'] ?? $_POST['ticket_uid'] ?? ''));
     if ($rawCode === '') {
         json_resp(['success' => false, 'message' => 'Отсканируйте QR-код или введите UID билета'], 400);
+    }
+    $scheduleId = filter_var($_POST['schedule_id'] ?? '', FILTER_VALIDATE_INT);
+    if (!$scheduleId || $scheduleId < 1) {
+        json_resp(['success' => false, 'message' => 'Сначала выберите сеанс в расписании.'], 400);
     }
 
     // QR-код билета содержит UID. Также принимаем публичную ссылку, если QR
@@ -330,11 +509,11 @@ if ($action === 'checkin') {
         $pdo->beginTransaction();
 
         $stmt = $pdo->prepare(
-            "SELECT t.id, t.ticket_uid, t.seat_identifier, t.status, t.payment_status,
+            "SELECT t.id, t.schedule_id, t.ticket_uid, t.seat_identifier, t.status, t.payment_status,
                     t.refund_status, t.is_checked_in, t.checked_in_at,
                     COALESCE(e.title, '') AS event_title,
                     s.start_time AS session_start,
-                    COALESCE(c.full_name, '') AS customer_name
+                    COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name
              FROM tickets t
              LEFT JOIN events e ON e.id = t.event_id
              LEFT JOIN schedules s ON s.id = t.schedule_id
@@ -349,6 +528,19 @@ if ($action === 'checkin') {
         if (!$ticket) {
             $pdo->rollBack();
             json_resp(['success' => false, 'message' => 'Билет с таким QR-кодом не найден'], 404);
+        }
+
+        if ((int)$ticket['schedule_id'] !== (int)$scheduleId) {
+            $pdo->rollBack();
+            json_resp([
+                'success' => false,
+                'message' => 'Билет относится к другому сеансу. Проверьте выбранный спектакль и дату.',
+                'data' => [
+                    'event_title' => $ticket['event_title'],
+                    'session_start' => $ticket['session_start'],
+                    'seat_identifier' => $ticket['seat_identifier'],
+                ],
+            ], 422);
         }
 
         $ticketId = (int)$ticket['id'];
@@ -473,6 +665,7 @@ if ($action === 'list') {
     $date_to = trim((string)($_POST['date_to'] ?? $_GET['date_to'] ?? ''));
     $session_q = trim((string)($_POST['session'] ?? $_GET['session'] ?? ''));
     $uid = trim((string)($_POST['uid'] ?? $_GET['uid'] ?? ''));
+    $order_number = trim((string)($_POST['order_number'] ?? $_GET['order_number'] ?? ''));
     $customer = trim((string)($_POST['customer'] ?? $_GET['customer'] ?? ''));
     $status = trim((string)($_POST['status'] ?? $_GET['status'] ?? ''));
     $payment_status = trim((string)($_POST['payment_status'] ?? $_GET['payment_status'] ?? ''));
@@ -529,8 +722,13 @@ if ($action === 'list') {
         $params['uid'] = '%' . $uid . '%';
     }
 
+    if ($order_number !== '') {
+        $where[] = "COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') LIKE :order_number";
+        $params['order_number'] = '%' . $order_number . '%';
+    }
+
     if ($customer !== '') {
-        $where[] = 'c.full_name LIKE :customer';
+        $where[] = "COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') LIKE :customer";
         $params['customer'] = '%' . $customer . '%';
     }
 
@@ -549,6 +747,8 @@ if ($action === 'list') {
                      LEFT JOIN schedules s ON s.id = t.schedule_id
                      LEFT JOIN events e ON e.id = s.event_id
                      LEFT JOIN customers c ON c.id = t.customer_id
+                     LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                     LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
                      $where_sql";
         $stmt = $pdo->prepare($countSql);
         $stmt->execute($params);
@@ -561,11 +761,11 @@ if ($action === 'list') {
     try {
         $sql = "SELECT
                     t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                    t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                    t.seat_id, t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                     t.customer_segment, t.payment_transaction_id,
                     tx.payment_method AS tx_payment_method,
-                    ps.order_number,
-                    COALESCE(c.full_name, '') AS customer_name,
+                    COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+                    COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                     COALESCE(e.title, '') AS event_title,
                     s.start_time AS session_start
                 FROM tickets t
@@ -594,11 +794,11 @@ if ($action === 'list') {
         try {
             $csvSql = "SELECT
                         t.id, t.ticket_uid, t.seat_identifier, REPLACE(t.seat_identifier, ':', ' - ') AS seat_label,
-                        t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.payment_status, t.status, t.refund_status,
+                        t.purchased_at, t.created_at, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.payment_status, t.status, t.refund_status,
                         t.customer_segment, t.payment_transaction_id,
                         tx.payment_method AS tx_payment_method,
-                        ps.order_number,
-                        COALESCE(c.full_name, '') AS customer_name,
+                        COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number,
+                        COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                         COALESCE(e.title, '') AS event_title,
                         s.start_time AS session_start
                     FROM tickets t
@@ -617,7 +817,7 @@ if ($action === 'list') {
             header('Content-Disposition: attachment; filename="tickets_export.csv"');
             echo "\xEF\xBB\xBF";
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['ID','UID','Ряд - Место','Клиент','Событие','Сеанс','Тип','База, тг','Скидка, тг','Цена, тг','Канал','Форма оплаты','Номер заказа','Статус','Возврат','Покупка']);
+            fputcsv($out, ['ID','UID','Ряд - Место','Клиент','Событие','Сеанс','Тип','Подарок','База, тг','Скидка, тг','Цена, тг','Канал','Форма оплаты','Номер заказа','Статус','Возврат','Покупка']);
             foreach ($all as $a) {
                 $sessionLabel = ($a['event_title'] ?? '') . ($a['session_start'] ? ' / ' . $a['session_start'] : '');
                 $seatOut = $a['seat_label'] ?: ($a['seat_identifier'] ?? '');
@@ -633,6 +833,7 @@ if ($action === 'list') {
                     $a['event_title'],
                     $a['session_start'],
                     $a['customer_segment'],
+                    !empty($a['gift_selected']) ? trim((string)($a['gift_name'] ?? '')) . ' (+' . (int)($a['gift_price'] ?? 0) . ' тг)' : '—',
                     $ticketBasePrice,
                     $ticketDiscount,
                     $ticketFinancials['paid'],
@@ -671,6 +872,9 @@ if ($action === 'list') {
             'original_price' => $ticketFinancials['original'],
             'discount_amount' => $ticketDiscount,
             'final_price' => $priceOut,
+            'gift_selected' => (bool)($r['gift_selected'] ?? false),
+            'gift_name' => $r['gift_name'] ?? null,
+            'gift_price' => (int)($r['gift_price'] ?? 0),
             'channel' => $r['channel'],
             'payment_type' => map_payment_type_display($r['channel'] ?? '', $r['tx_payment_method'] ?? null),
             'tx_payment_method' => $r['tx_payment_method'] ?? null,

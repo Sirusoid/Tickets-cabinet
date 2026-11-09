@@ -1,6 +1,7 @@
 <?php
 // includes/pdf_helpers.php
 // Хэлперы для генерации PDF билета, сохранения и очистки архива.
+require_once __DIR__ . '/general_admission.php';
 
 // -----------------------------
 // Путь и утилиты
@@ -444,8 +445,51 @@ if (!function_exists('ticket_pdf_render_html')) {
     function ticket_pdf_render_html(array $ticket) {
         // Basic sanitization
         $event_title = htmlspecialchars($ticket['event_title'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $session_time = !empty($ticket['schedule_start']) ? date('d.m.Y H:i', strtotime($ticket['schedule_start'])) : '';
+        $sessionDateValue = '';
+        $sessionTimeValue = '';
+        if (!empty($ticket['schedule_start'])) {
+            $sessionTimestamp = strtotime((string)$ticket['schedule_start']);
+            if ($sessionTimestamp !== false) {
+                $monthsRu = [
+                    1 => 'января',
+                    2 => 'февраля',
+                    3 => 'марта',
+                    4 => 'апреля',
+                    5 => 'мая',
+                    6 => 'июня',
+                    7 => 'июля',
+                    8 => 'августа',
+                    9 => 'сентября',
+                    10 => 'октября',
+                    11 => 'ноября',
+                    12 => 'декабря',
+                ];
+                $weekdaysRu = [
+                    0 => 'воскресенье',
+                    1 => 'понедельник',
+                    2 => 'вторник',
+                    3 => 'среда',
+                    4 => 'четверг',
+                    5 => 'пятница',
+                    6 => 'суббота',
+                ];
+                $monthNumber = (int)date('n', $sessionTimestamp);
+                $weekdayNumber = (int)date('w', $sessionTimestamp);
+                $sessionDateValue = date('j', $sessionTimestamp) . ' '
+                    . ($monthsRu[$monthNumber] ?? date('F', $sessionTimestamp)) . ' '
+                    . date('Y', $sessionTimestamp) . ' года, '
+                    . ($weekdaysRu[$weekdayNumber] ?? date('l', $sessionTimestamp));
+                $sessionTimeValue = date('H:i', $sessionTimestamp);
+            }
+        }
+        $sessionDateValueEsc = htmlspecialchars($sessionDateValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $sessionTimeValueEsc = htmlspecialchars($sessionTimeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $hallNameRaw = trim((string)($ticket['hall_name'] ?? ''));
+        $hallNameEsc = htmlspecialchars($hallNameRaw !== '' ? $hallNameRaw . ' (Абая 117)' : '—', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seat_raw = trim((string)($ticket['seat_label'] ?? $ticket['seat_identifier'] ?? ''));
+        $isGeneralAdmissionTicket = general_admission_is_identifier($seat_raw)
+            || general_admission_is_identifier(trim((string)($ticket['seat_identifier'] ?? '')));
+        $seat_raw = general_admission_display_label($seat_raw);
         $seat = htmlspecialchars($seat_raw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $ticket_uid = htmlspecialchars($ticket['ticket_uid'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
@@ -565,11 +609,16 @@ if (!function_exists('ticket_pdf_render_html')) {
 
         $orig_price_display = number_format($orig_price_value, 0, '.', '') . ' тг';
         $paid_price_display = number_format($paid_price_value, 0, '.', '') . ' тг';
+        $giftNameValue = trim((string)($ticket['gift_name'] ?? ''));
+        $giftLine = !empty($ticket['gift_selected'])
+            ? 'С ПОДАРКОМ / СЫЙЛЫҚПЕН' . ($giftNameValue !== '' ? ': ' . $giftNameValue : '')
+            : '';
         $discountLine = $discount_amount_display > 0
             ? 'СКИДКА / ЖЕҢІЛДІК: ' . number_format($discount_amount_display, 0, '.', '') . ' тг'
             : '';
 
         $channel_raw = trim((string)($ticket['channel'] ?? ''));
+        $order_number = trim((string)($ticket['order_number'] ?? ''));
         $segment_raw = trim((string)($ticket['customer_segment'] ?? ''));
         $purchased_at = !empty($ticket['purchased_at']) ? date('d.m.Y H:i', strtotime($ticket['purchased_at'])) : '';
 
@@ -612,7 +661,10 @@ if (!function_exists('ticket_pdf_render_html')) {
         // Row/seat parsing
         $rowValue = '—';
         $seatValue = '—';
-        if ($seat_raw !== '') {
+        if ($isGeneralAdmissionTicket) {
+            $rowValue = general_admission_ticket_label();
+            $seatValue = general_admission_ticket_label();
+        } elseif ($seat_raw !== '') {
             if (preg_match('/(\d+)\s*[:\-\/]\s*(\d+)/u', $seat_raw, $m)) {
                 $rowValue = $m[1];
                 $seatValue = $m[2];
@@ -629,9 +681,10 @@ if (!function_exists('ticket_pdf_render_html')) {
         $rowValueEsc = htmlspecialchars((string)$rowValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $seatValueEsc = htmlspecialchars((string)$seatValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        // Rules and texts (unchanged)
+        // Rules and texts
         $rulesIntroRu = 'Вход на спектакль возможен только один раз и по одному билету. Не допускайте копирования электронного билета. При посещении мероприятия администрация вправе потребовать любой удостоверяющий документ для проверки возможности посещения и принадлежности билета.';
         $rulesIntroKz = 'Спектакльге кіру бір рет қана және бір билет бойынша мүмкін. Электрондық билетті көшіруге болмайды. Іс-шараға келген кезде әкімшілік келуге мүмкіндік бар-жоғын және билеттің тиесілігін тексеру үшін кез келген жеке басын куәландыратын құжатты талап етуге құқылы.';
+        $rulesIntroEn = 'Admission to the performance is allowed only once and with one ticket. Do not copy the electronic ticket. When attending the event, the theatre administration may request any identity document to verify your right to attend and that the ticket belongs to you.';
         $rulesRu = [
             'Настоящий электронный билет является документом, подтверждающим ваше право на посещение указанного спектакля. Пожалуйста, храните его в безопасности и не передавайте его посторонним лицам и не публикуйте фотографии с видимым штрих-кодом билета в социальных сетях.',
             'Электронный билет является действительным на одного предъявителя.',
@@ -641,8 +694,9 @@ if (!function_exists('ticket_pdf_render_html')) {
             'В случае отмены, замены или переноса спектакля, решение о возврате денег принимает администрация театра. В случае таких изменений, администрация обязуется предоставить вам всю необходимую информацию в кратчайшие сроки.',
             'Администрация театра имеет право запретить съемку во время мероприятия или конфисковать оборудование в случае нарушения этого правила.',
             'Администрация театра вправе ограничить доступ на спектакль предъявителя билета, не соответствующих возрастным ограничениям без возмещения его стоимости.',
-            'Для получения консультации по любым вопросам включая возврат и обмен билетов просим обращаться в поддержку клиентов: info@zhassahna.kz или +7 727 259 65 98, +7 776 711 78 78.',
-            'Подробные правила, ограничения по срокам возврата и обмена билетов также изложены на нашем сайте и в публичной оферте: https://zhassahna.kz/agreement.'
+            'Для получения консультации по любым вопросам включая возврат и обмен билетов просим обращаться в поддержку клиентов: support@zhassahna.kz или +7 727 259 65 98, +7 776 711 78 78.',
+            'Подробные правила, ограничения по срокам возврата и обмена билетов также изложены на нашем сайте https://zhassahna.kz/payment-agreement.',
+            'С политикой конфиденциальности Вы можете ознакомиться на странице: https://zhassahna.kz/personal-policy.'
         ];
         $rulesKz = [
             'Осы электрондық билет аталған спектакльге қатысу құқығыңызды растайтын құжат болып табылады. Оны қауіпсіз сақтаңыз, бөгде адамдарға бермеңіз және билет штрих-коды көрінетін фотосуреттерді әлеуметтік желілерге жарияламаңыз.',
@@ -653,8 +707,22 @@ if (!function_exists('ticket_pdf_render_html')) {
             'Спектакль тоқтатылған, ауыстырылған немесе кейінге қалдырылған жағдайда ақша қайтару туралы шешімді театр әкімшілігі қабылдайды. Мұндай өзгерістер болған жағдайда әкімшілік сізге барлық қажетті ақпаратты мүмкіндігінше қысқа мерзімде беруге міндеттенеді.',
             'Театр әкімшілігі іс-шара кезінде түсірілімге тыйым салуға немесе осы қағида бұзылған жағдайда жабдықты тәркілеуге құқылы.',
             'Театр әкімшілігі жасы бойынша шектеулерге сәйкес келмейтін билет ұстаушысының спектакльге кіруін билет құнын қайтармай шектеуге құқылы.',
-            'Билеттерді қайтару және айырбастау, сондай-ақ кез келген басқа сұрақтар бойынша кеңес алу үшін клиенттерді қолдау қызметіне хабарласыңыз: info@zhassahna.kz немесе +7 727 259 65 98, +7 776 711 78 78.',
-            'Толық қағидалар, қайтару және айырбастау мерзімдеріне қатысты шектеулер біздің сайтта және жария офертада да көрсетілген: https://zhassahna.kz/agreement.'
+            'Билеттерді қайтару және айырбастау, сондай-ақ кез келген басқа сұрақтар бойынша кеңес алу үшін клиенттерді қолдау қызметіне хабарласыңыз: support@zhassahna.kz немесе +7 727 259 65 98, +7 776 711 78 78.',
+            'Толық қағидалар, қайтару және айырбастау мерзімдеріне қатысты шектеулер біздің сайтта да көрсетілген: https://zhassahna.kz/payment-agreement.',
+            'Құпиялылық саясатымен сіз бетте таныса аласыз: https://zhassahna.kz/personal-policy.'
+        ];
+        $rulesEn = [
+            'This electronic ticket is a document confirming your right to attend the specified performance. Please keep it safe, do not transfer it to third parties, and do not publish photos with the ticket barcode visible on social media.',
+            'The electronic ticket is valid for one holder only.',
+            'Printing the electronic ticket is not required.',
+            'When attending the performance, you must comply with all rules and regulations established by the theatre administration. This includes following safety rules, not bringing alcohol or drugs, and refraining from violence, discrimination, and any other unacceptable behaviour.',
+            'The theatre administration reserves the right to make changes to the programme, date, or start time of the performance without prior notice. In case of such changes, the administration undertakes to provide you with information about the new attendance conditions.',
+            'In case of cancellation, replacement, or postponement of the performance, the theatre administration decides whether a refund will be issued. In case of such changes, the administration undertakes to provide you with all necessary information as soon as possible.',
+            'The theatre administration has the right to prohibit filming during the event or confiscate equipment if this rule is violated.',
+            'The theatre administration may restrict admission to the performance without refunding the ticket price if the ticket holder does not meet the applicable age requirements.',
+            'For advice on any questions, including ticket refunds and exchanges, please contact customer support: support@zhassahna.kz or +7 727 259 65 98, +7 776 711 78 78.',
+            'Detailed rules and time limits for ticket refunds and exchanges are also set out on our website. https://zhassahna.kz/payment-agreement.',
+            'You can read the privacy policy on the following page: https://zhassahna.kz/personal-policy.'
         ];
 
         // Build HTML (same layout as before, using pdf_price_label, pdf_discount_percent, pdf_payment_label)
@@ -676,8 +744,11 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '.ticket-main-right{width:32%;padding-left:14px;border-left:1px dashed #cfd8e3;}';
         $html .= '.ticket-section{margin-bottom:12px;padding:12px 14px;border:1px solid #e1e8f0;border-radius:10px;background:#fff;}';
         $html .= '.event-title{font-size:24px;line-height:1.2;font-weight:700;color:#1a2f4f;margin-bottom:10px;}';
-        $html .= '.event-time{font-size:15px;color:#334862;margin-bottom:8px;}';
+        $html .= '.event-time{font-size:15px;line-height:1.45;color:#334862;margin-bottom:6px;}';
+        $html .= '.event-time div + div{margin-top:6px;}';
+        $html .= '.event-time strong{font-weight:700;}';
         $html .= '.inline-meta{font-size:15px;color:#24364f;line-height:1.45;}';
+        $html .= '.inline-meta-hall{margin-bottom:6px;}';
         $html .= '.inline-meta-second{margin-top:6px;}';
         $html .= '.inline-meta strong{color:#173056;}';
         $html .= '.customer-line{font-size:15px;color:#24364f;line-height:1.5;}';
@@ -689,8 +760,9 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '.ticket-rules{margin-top:8px;padding-top:6px;font-size:8px;line-height:1.22;color:#111;}';
         $html .= '.ticket-rules-title{margin:0 0 6px 0;padding:4px 0;border-top:2px solid #222;border-bottom:2px solid #222;font-size:9px;font-weight:700;color:#111;letter-spacing:.04em;text-transform:uppercase;text-align:center;}';
         $html .= '.ticket-rules-table{width:100%;border-collapse:collapse;table-layout:fixed;}';
-        $html .= '.ticket-rules-table td{vertical-align:top;padding:0 6px 0 0;word-wrap:break-word;text-align:justify;}';
-        $html .= '.ticket-rules-table td:last-child{padding-right:0;padding-left:6px;border-left:1px solid #bfc7d1;}';
+        $html .= '.ticket-rules-table td{width:33.333%;vertical-align:top;padding:0 4px 0 0;word-wrap:break-word;text-align:justify;}';
+        $html .= '.ticket-rules-table td + td{padding-left:4px;border-left:1px solid #bfc7d1;}';
+        $html .= '.ticket-rules-table td:last-child{padding-right:0;}';
         $html .= '.ticket-rules-row td{padding-top:2px;padding-bottom:2px;}';
         $html .= '.ticket-rules-block{margin-bottom:4px;}';
         $html .= '.ticket-rules-intro{margin:0 0 4px 0;font-weight:700;text-align:justify;}';
@@ -704,10 +776,17 @@ if (!function_exists('ticket_pdf_render_html')) {
         }
         $html .= '<div class="ticket-sub">Электронный билет. Для прохода предъявите QR или UID / Электронды билет. Кіру үшін QR немесе UID көрсетіңіз.</div></div></div></div>';
         $html .= '<div class="ticket-content"><div class="ticket-main"><div class="ticket-main-left">';
-        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time">' . $session_time . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div><div class="inline-meta inline-meta-second"><strong>КАТЕГОРИЯ / САНАТ:</strong> ' . $segmentRu . '</div></div>';
+        $html .= '<div class="ticket-section"><div class="event-title">' . $event_title_quoted . '</div><div class="event-time"><div><strong>ДАТА: / КҮНІ: </strong> ' . $sessionDateValueEsc . '</div><div><strong>ВРЕМЯ: / УАҚЫТ: </strong> ' . $sessionTimeValueEsc . '</div></div><div class="inline-meta inline-meta-hall"><strong>ЗАЛ:</strong> ' . $hallNameEsc . '</div><div class="inline-meta"><strong>РЯД / ҚАТАР:</strong> ' . $rowValueEsc . ' &nbsp;&nbsp; <strong>МЕСТО / ОРЫН:</strong> ' . $seatValueEsc . '</div></div>';
         $html .= '<div class="ticket-section">';
-        $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
-        $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';
+        if ($order_number !== '') {
+            $html .= '<div class="customer-line"><strong>№ ЗАКАЗА / ТАПСЫРЫС:</strong> ' . htmlspecialchars($order_number, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div>';
+        }
+        if ($giftLine !== '') {
+            $html .= '<div class="customer-line"><strong>' . htmlspecialchars($giftLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></div>';
+        }
+        // Раскомментировать, если нужно показывать строки с ценой и оплатой в билете
+        /* $html .= '<div class="customer-line"><strong>ЦЕНА / БАҒА:</strong> ' . (is_numeric($pdf_price_label) ? number_format((float)$pdf_price_label, 0, '.', '') . ' тг' : '—') . '</div>';
+        $html .= '<div class="customer-line"><strong>ОПЛАТА / ТӨЛЕМ:</strong> ' . (is_numeric($pdf_payment_label) ? number_format((float)$pdf_payment_label, 0, '.', '') . ' тг' : $paid_price_display) . ' (' . $channelRu . ')</div>';*/
 
 		// Раскомментировать, если нужно показывать строку со скидкой в билете вида "СКИДКА / ЖЕҢІЛДІК: 50%"
 		/*        if ($discountLine !== '') {
@@ -731,12 +810,12 @@ if (!function_exists('ticket_pdf_render_html')) {
         $html .= '</div></div></div>';
         $html .= '<div class="ticket-bottom-line"></div>';
         $html .= '<div class="ticket-rules">';
-        $html .= '<div class="ticket-rules-title">Правила пользования билетом / Билетті пайдалану ережелері</div>';
+        $html .= '<div class="ticket-rules-title">Правила пользования билетом / Билетті пайдалану ережелері / Ticket Terms of Use</div>';
         $html .= '<table class="ticket-rules-table" role="presentation">';
-        $html .= '<tr class="ticket-rules-row"><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroRu, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroKz, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td></tr>';
+        $html .= '<tr class="ticket-rules-row"><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroRu, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroKz, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td><td><div class="ticket-rules-intro">' . htmlspecialchars($rulesIntroEn, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div></td></tr>';
         for ($i = 0; $i < count($rulesRu); $i++) {
             $ruleNumber = $i + 1;
-            $html .= '<tr class="ticket-rules-row"><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesRu[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesKz[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td></tr>';
+            $html .= '<tr class="ticket-rules-row"><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesRu[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesKz[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td><td><span class="ticket-rules-item-num">' . $ruleNumber . '.</span> <span class="ticket-rules-item-text">' . htmlspecialchars($rulesEn[$i], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span></td></tr>';
         }
         $html .= '</table>';
         $html .= '</div>';
@@ -835,11 +914,19 @@ if (!function_exists('ticket_pdf_generate_by_ticket_uid')) {
         }
 
         try {
-            $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start, e.title AS event_title, c.full_name AS customer_name
+            $stmt = $pdo->prepare("SELECT t.*, s.start_time AS schedule_start,
+                COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h_ticket.name), ''), NULLIF(TRIM(h_event.name), '')) AS hall_name,
+                e.title AS event_title, COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
+                COALESCE(ps.order_number, CASE WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id) END, '') AS order_number
                 FROM tickets t
                 LEFT JOIN schedules s ON s.id = t.schedule_id
+                LEFT JOIN halls h_ticket ON h_ticket.id = t.hall_id
+                LEFT JOIN halls h_schedule ON h_schedule.id = s.hall_id
                 LEFT JOIN events e ON e.id = t.event_id
+                LEFT JOIN halls h_event ON h_event.id = e.hall_id
                 LEFT JOIN customers c ON c.id = t.customer_id
+                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+                LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
                 WHERE t.ticket_uid = :uid LIMIT 1");
             $stmt->execute([':uid' => $ticket_uid]);
             $ticket = $stmt->fetch(PDO::FETCH_ASSOC);

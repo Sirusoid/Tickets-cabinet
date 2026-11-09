@@ -394,7 +394,10 @@ if (!function_exists('settings_save_rows')) {
 if (!function_exists('settings_get_value')) {
     function settings_get_value(PDO $pdo, $key, $default = null)
     {
-        static $cache = [];
+        if (!isset($GLOBALS['settings_value_cache']) || !is_array($GLOBALS['settings_value_cache'])) {
+            $GLOBALS['settings_value_cache'] = [];
+        }
+        $cache = &$GLOBALS['settings_value_cache'];
         $cacheKey = (string)$key;
         if (array_key_exists($cacheKey, $cache)) {
             return $cache[$cacheKey];
@@ -407,6 +410,25 @@ if (!function_exists('settings_get_value')) {
             return $cache[$cacheKey] = $default;
         }
         return $cache[$cacheKey] = $value;
+    }
+}
+
+if (!function_exists('settings_set_value')) {
+    function settings_set_value(PDO $pdo, $key, $value)
+    {
+        $cacheKey = (string)$key;
+        $stmt = $pdo->prepare('UPDATE settings SET value = :value WHERE `key` = :key');
+        $stmt->bindValue(':value', $value, $value === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':key', $cacheKey, PDO::PARAM_STR);
+        if (!$stmt->execute()) {
+            return false;
+        }
+
+        if (!isset($GLOBALS['settings_value_cache']) || !is_array($GLOBALS['settings_value_cache'])) {
+            $GLOBALS['settings_value_cache'] = [];
+        }
+        $GLOBALS['settings_value_cache'][$cacheKey] = $value;
+        return true;
     }
 }
 

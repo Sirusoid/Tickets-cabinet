@@ -39,7 +39,16 @@ var Cashier = (function () {
   var pricedColors = {};
   var soldSeats = {};
   var heldSeats = {};
+  var generalAdmissionMode = false;
+  var generalAdmissionCapacity = 0;
+  var generalAdmissionPrice = 0;
+  var generalAdmissionAvailable = [];
+  var generalAdmissionQuantityEl = null;
+  var generalAdmissionAvailabilityEl = null;
+  var generalAdmissionPanelEl = null;
   var cart = [];
+  var giftSelections = {};
+  var sessionPromotion = { enabled: false, gift_name: '', gift_price: 0 };
   var selectedCartSeatKey = null;
   var legendRenderer = null;
 
@@ -71,6 +80,7 @@ var Cashier = (function () {
     custom_max_amount: 0
   };
   var currentUserId = 0;
+  var isAdmin = false;
 
   // --- Diagnostic guard: prevent accidental crashes from new helpers ---
   (function(){
@@ -163,13 +173,80 @@ var Cashier = (function () {
     return price;
   }
 
-  function computeCartTotal() {
+  function refreshGeneralAdmissionSelection() {
+      if (!generalAdmissionMode || !generalAdmissionQuantityEl) return;
+      generalAdmissionAvailable = [];
+      for (var number = 1; number <= generalAdmissionCapacity; number++) {
+        var key = 'GA-' + String(number).padStart(5, '0');
+        var held = heldSeats[key];
+        var heldByOther = held && Number(held.user_id) !== currentUserId;
+        if (!soldSeats[key] && !heldByOther) generalAdmissionAvailable.push(key);
+      }
+
+      if (generalAdmissionAvailabilityEl) {
+        generalAdmissionAvailabilityEl.textContent = 'Доступно мест: ' + generalAdmissionAvailable.length
+          + ' · цена билета ' + formatMoneyTg(generalAdmissionPrice);
+      }
+
+      var desired = Math.max(0, parseInt(generalAdmissionQuantityEl.value, 10) || 0);
+      desired = Math.min(desired, generalAdmissionAvailable.length);
+      generalAdmissionQuantityEl.max = String(generalAdmissionAvailable.length);
+      generalAdmissionQuantityEl.value = desired ? String(desired) : '';
+      cart = generalAdmissionAvailable.slice(0, desired);
+      selectedCartSeatKey = cart[0] || null;
+      cart.forEach(function (seatKey) { pricedSeats[seatKey] = generalAdmissionPrice; });
+      renderCart();
+    }
+
+  function configureGeneralAdmission(session, sold, held) {
+      generalAdmissionMode = session && session.general_admission === true;
+      generalAdmissionCapacity = generalAdmissionMode ? Number(session.capacity) || 0 : 0;
+      generalAdmissionPrice = generalAdmissionMode ? Number(session.base_price) || 0 : 0;
+      generalAdmissionPanelEl = document.getElementById('cashGeneralAdmissionPanel');
+      generalAdmissionQuantityEl = document.getElementById('cashGeneralAdmissionQuantity');
+      generalAdmissionAvailabilityEl = document.getElementById('cashGeneralAdmissionAvailability');
+
+      if (generalAdmissionPanelEl) generalAdmissionPanelEl.style.display = generalAdmissionMode ? 'block' : 'none';
+      if (containerEl) containerEl.style.display = generalAdmissionMode ? 'none' : '';
+      var seatingTitle = containerEl && containerEl.parentNode
+        ? containerEl.parentNode.querySelector('.card-title')
+        : null;
+      if (seatingTitle) seatingTitle.textContent = generalAdmissionMode ? 'Свободная рассадка' : 'Схема рассадки';
+      if (generalAdmissionMode && generalAdmissionQuantityEl && !generalAdmissionQuantityEl.dataset.bound) {
+        generalAdmissionQuantityEl.dataset.bound = '1';
+        generalAdmissionQuantityEl.addEventListener('input', refreshGeneralAdmissionSelection);
+        generalAdmissionQuantityEl.addEventListener('change', refreshGeneralAdmissionSelection);
+      }
+      if (generalAdmissionMode) {
+        if (generalAdmissionPrice <= 0) {
+          if (generalAdmissionAvailabilityEl) generalAdmissionAvailabilityEl.textContent = 'Для сеанса не задана цена билета.';
+          if (reserveBtnEl) reserveBtnEl.disabled = true;
+          if (sellBtnEl) sellBtnEl.disabled = true;
+          return;
+        }
+        if (generalAdmissionQuantityEl && !generalAdmissionQuantityEl.value) generalAdmissionQuantityEl.value = '1';
+        refreshGeneralAdmissionSelection();
+      }
+  }
+
+  function computeTicketBaseTotal() {
     var total = 0;
     cart.forEach(function (k) {
       var p = getSeatPrice(k);
       if (p != null && !isNaN(Number(p))) total += Math.floor(Number(p));
     });
     return total;
+  }
+
+  function computeGiftTotal() {
+    if (!sessionPromotion.enabled) return 0;
+    return cart.reduce(function (total, key) {
+      return total + (giftSelections[normalizeSeatKey(key)] ? sessionPromotion.gift_price : 0);
+    }, 0);
+  }
+
+  function computeCartTotal() {
+    return computeTicketBaseTotal() + computeGiftTotal();
   }
 
   function formatMoneyTg(value) {
@@ -189,12 +266,14 @@ var Cashier = (function () {
   }
 
   function calculateDiscounts(baseTotal) {
-    var base = Math.max(0, Number(baseTotal) || 0);
+    var ticketBase = Math.max(0, computeTicketBaseTotal());
+    var giftTotal = Math.max(0, computeGiftTotal());
+    var base = ticketBase + giftTotal;
     var segment = getCurrentSegment();
     var manualMode = segment === 'manual';
     var autoPercent = manualMode ? 0 : getSegmentDiscountPercent(segment);
-    var autoAmount = manualMode ? 0 : (Math.round(base * autoPercent) / 100);
-    var afterAuto = Math.max(0, base - autoAmount);
+    var autoAmount = manualMode ? 0 : (Math.round(ticketBase * autoPercent) / 100);
+    var afterAuto = Math.max(0, ticketBase - autoAmount);
 
     var manualAmount = 0;
     if (manualMode && discountConfig.custom_enabled) {
@@ -202,12 +281,14 @@ var Cashier = (function () {
       manualAmount = Math.min(manualAmount, Math.floor(afterAuto));
     }
 
-    var finalTotal = Math.max(0, afterAuto - manualAmount);
+    var finalTotal = Math.max(0, afterAuto - manualAmount) + giftTotal;
     var totalDiscount = Math.max(0, base - finalTotal);
 
     return {
       segment: segment,
       base_total: base,
+      ticket_base_total: ticketBase,
+      gift_total: giftTotal,
       auto_percent: autoPercent,
       auto_amount: autoAmount,
       custom_type: manualMode ? 'fixed' : 'none',
@@ -221,13 +302,23 @@ var Cashier = (function () {
   function getManualDiscountInputValue() {
     var el = manualDiscountAmountEl || document.getElementById('manualDiscountAmount');
     if (!el) return 0;
-    var v = parseInt(String(el.value).replace(/\D+/g, '') || '0', 10);
-    return isFinite(v) ? Math.max(0, v) : 0;
+    var v = Number(el.value);
+    return isFinite(v) ? Math.max(0, Math.round(v)) : 0;
+  }
+
+  function normalizeManualDiscountInput() {
+    var el = manualDiscountAmountEl || document.getElementById('manualDiscountAmount');
+    if (!el) return;
+    var value = Number(el.value);
+    if (!isFinite(value) || value < 0) {
+      el.value = '0';
+      return;
+    }
+    el.value = String(Math.round(value));
   }
 
   function refreshDiscountUi() {
-    var baseTotal = computeCartTotal();
-    var d = calculateDiscounts(baseTotal);
+    var d = calculateDiscounts(computeCartTotal());
     if (baseTotalOutputEl) baseTotalOutputEl.textContent = formatMoneyTg(d.base_total);
     if (discountTotalOutputEl) discountTotalOutputEl.textContent = formatMoneyTg(d.total_discount);
     if (finalTotalOutputEl) finalTotalOutputEl.textContent = formatMoneyTg(d.final_total);
@@ -238,8 +329,8 @@ var Cashier = (function () {
       manualDiscountAmountEl.disabled = !manualEnabled;
       if (manualEnabled) {
         var currentManual = getManualDiscountInputValue();
-        if (currentManual > d.base_total) {
-          manualDiscountAmountEl.value = String(Math.floor(d.base_total));
+        if (currentManual > d.ticket_base_total) {
+          manualDiscountAmountEl.value = String(Math.floor(d.ticket_base_total));
         }
       }
     }
@@ -299,7 +390,17 @@ var Cashier = (function () {
 
       var info = document.createElement('div');
       info.style.fontWeight = '700';
-      info.textContent = 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—') + ' - ' + (price ? Number(price).toLocaleString() + ' тг.' : '—');
+      var basePriceLabel = price ? Number(price).toLocaleString() + ' тг.' : '—';
+      var baseSeatLabel = generalAdmissionMode && /^GA-\d+$/i.test(itemKey)
+        ? 'Свободное место № ' + parseInt(itemKey.slice(3), 10)
+        : 'Р: ' + (parsed.row || '—') + ', М: ' + (parsed.seat || '—');
+      var giftSelected = !!giftSelections[itemKey];
+      info.textContent = baseSeatLabel + ' — Билет: ' + basePriceLabel;
+      if (giftSelected && sessionPromotion.enabled) {
+        var giftPriceLabel = Number(sessionPromotion.gift_price).toLocaleString() + ' тг.';
+        info.textContent += ' + Подарок: ' + sessionPromotion.gift_name + ' ' + giftPriceLabel
+          + ' = ' + (Number(price) + Number(sessionPromotion.gift_price)).toLocaleString() + ' тг.';
+      }
 
       left.appendChild(info);
 
@@ -311,6 +412,10 @@ var Cashier = (function () {
         ev.preventDefault();
         ev.stopPropagation();
         cart = cart.filter(function (x) { return normalizeSeatKey(x) !== itemKey; });
+        delete giftSelections[itemKey];
+        if (generalAdmissionMode && generalAdmissionQuantityEl) {
+          generalAdmissionQuantityEl.value = cart.length ? String(cart.length) : '';
+        }
         if (selectedCartSeatKey && normalizeSeatKey(selectedCartSeatKey) === itemKey) selectedCartSeatKey = null;
         renderCart();
         syncSelectionToRenderer();
@@ -323,6 +428,27 @@ var Cashier = (function () {
       });
 
       item.appendChild(left);
+      if (sessionPromotion.enabled) {
+        var giftSelect = document.createElement('select');
+        giftSelect.className = 'input';
+        giftSelect.style.width = '100%';
+        giftSelect.style.marginTop = '6px';
+        giftSelect.innerHTML = '<option value="0">Без подарка</option>';
+        var giftOption = document.createElement('option');
+        giftOption.value = '1';
+        giftOption.textContent = 'С подарком: ' + sessionPromotion.gift_name + ' +'
+          + Number(sessionPromotion.gift_price).toLocaleString() + ' тг';
+        giftSelect.appendChild(giftOption);
+        giftSelect.value = giftSelections[itemKey] ? '1' : '0';
+        giftSelect.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        giftSelect.addEventListener('change', function (ev) {
+          ev.stopPropagation();
+          giftSelections[itemKey] = giftSelect.value === '1';
+          renderCart();
+          syncSelectionToRenderer();
+        });
+        left.appendChild(giftSelect);
+      }
       item.appendChild(rem);
       container.appendChild(item);
     });
@@ -353,7 +479,8 @@ var Cashier = (function () {
           seats.push({
             id: seatId,
             identifier: (row && seat) ? (row + ':' + seat) : String(k),
-            original_price: price
+            original_price: price,
+            gift_selected: !!giftSelections[normalizeSeatKey(k)]
           });
         } catch (inner) {
         }
@@ -370,18 +497,79 @@ var Cashier = (function () {
     return keys.slice(0, 6).join(', ') + ' и ещё ' + (keys.length - 6);
   }
 
+  function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function describeSeatKey(key) {
+    var normalized = normalizeSeatKey(key);
+    if (/^GA-\d+$/i.test(normalized)) return 'Свободное место № ' + parseInt(normalized.slice(3), 10);
+    var parts = splitSeatKey(normalized);
+    return parts.row !== null ? 'Ряд ' + parts.row + ', место ' + parts.seat : normalized;
+  }
+
+  function pluralSeats(n) {
+    var mod10 = n % 10, mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return n + ' место';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return n + ' места';
+    return n + ' мест';
+  }
+
+  function isHeldByOther(key) {
+    var info = heldSeats[key];
+    return !!(info && info.user_id !== currentUserId);
+  }
+
+  function releaseForeignHolds(keys) {
+    ajax('release_reservation', { session_id: sessionId, seats: keys }, function (res) {
+      if (!res || !res.success) {
+        alert(res && res.message ? res.message : 'Не удалось снять резерв');
+        refreshHoldState();
+        return;
+      }
+      showToast(keys.length > 1 ? 'Резервы сняты' : 'Резерв снят');
+      refreshHoldState(function () {
+        syncSelectionToRenderer();
+        redrawLegend();
+      });
+    });
+  }
+
+  // Любой кассир может снять резерв независимо от того, кто его поставил.
+  function requestForeignRelease(keys) {
+    keys = (keys || []).filter(isHeldByOther);
+    if (!keys.length) return;
+
+    var text;
+    if (keys.length === 1) {
+      var holder = heldSeats[keys[0]].holder;
+      text = 'Снять резерв: ' + describeSeatKey(keys[0]) + '?' + (holder ? ' Резерв поставил: ' + holder + '.' : '');
+    } else {
+      text = 'Снять чужие резервы (' + pluralSeats(keys.length) + ')?';
+    }
+    var hasOnlineHold = keys.some(function (k) { return heldSeats[k].user_id === 0; });
+    if (hasOnlineHold) {
+      text += keys.length === 1
+        ? ' Это резерв онлайн-покупателя: возможно, он сейчас оплачивает заказ, а после снятия резерва место можно будет продать другому.'
+        : ' Среди них есть резерв онлайн-покупателя: возможно, он сейчас оплачивает заказ, а после снятия резерва эти места можно будет продать другому.';
+    }
+
+    var run = function () { releaseForeignHolds(keys); };
+    if (typeof window.showConfirmModal === 'function' && document.getElementById('modal-delete-confirm')) {
+      window.showConfirmModal(text, run);
+    } else if (window.confirm(text)) {
+      run();
+    }
+  }
+
   function updateHoldInfo() {
     if (!holdInfoEl) return;
     var keys = Object.keys(heldSeats || {});
     if (!keys.length) {
       holdInfoEl.textContent = 'Если билет в резерве, выберите место и нажмите «Продать». Время резерва можно задать выше.';
       return;
-    }
-
-    function formatSeatKey(key) {
-      if (typeof key !== 'string') return { row: key, seat: key };
-      var parts = key.split(':');
-      return { row: parts[0] || key, seat: parts[1] || '' };
     }
 
     function formatExpires(expiresAt) {
@@ -394,17 +582,14 @@ var Cashier = (function () {
     }
 
     var myLines = [];
-    var otherLines = [];
+    var otherKeys = [];
     var nearest = null;
     keys.forEach(function (k) {
       var info = heldSeats[k] || {};
-      var seat = formatSeatKey(k);
-      var expires = formatExpires(info.expires_at);
-      var line = 'Ряд: ' + seat.row + ', Место: ' + seat.seat + ' | Истекает через: ' + expires;
       if (info.user_id === currentUserId) {
-        myLines.push(line);
+        myLines.push(describeSeatKey(k) + ' | Истекает через: ' + formatExpires(info.expires_at));
       } else {
-        otherLines.push(line);
+        otherKeys.push(k);
       }
       if (info.expires_at) {
         var dt = new Date(info.expires_at);
@@ -412,14 +597,40 @@ var Cashier = (function () {
       }
     });
 
+    var releaseBtn = function (target, label) {
+      return ' <button type="button" class="btn btn-ghost btn-xs" data-release-keys="' + escapeHtml(target) + '">' + label + '</button>';
+    };
+
     var html = [];
     if (myLines.length) {
       html.push('<div><strong>Ваши резервы:</strong></div>');
-      myLines.forEach(function (line) { html.push('<div>' + line + '</div>'); });
+      myLines.forEach(function (line) { html.push('<div>' + escapeHtml(line) + '</div>'); });
     }
-    if (otherLines.length) {
+    if (otherKeys.length) {
       html.push('<div style="margin-top:8px;"><strong>Резерв другими:</strong></div>');
-      otherLines.forEach(function (line) { html.push('<div>' + line + '</div>'); });
+      if (generalAdmissionMode) {
+        var byHolder = {};
+        otherKeys.forEach(function (k) {
+          var name = heldSeats[k].holder || 'другой пользователь';
+          byHolder[name] = (byHolder[name] || 0) + 1;
+        });
+        Object.keys(byHolder).forEach(function (name) {
+          html.push('<div>' + escapeHtml(name + ': ' + pluralSeats(byHolder[name])) + '</div>');
+        });
+      } else {
+        otherKeys.forEach(function (k) {
+          var info = heldSeats[k] || {};
+          var text = describeSeatKey(k) + ' | Истекает через: ' + formatExpires(info.expires_at);
+          if (info.holder) text += ' | ' + info.holder;
+          html.push('<div>' + escapeHtml(text) + releaseBtn(k, 'Снять') + '</div>');
+        });
+      }
+      if (generalAdmissionMode || otherKeys.length > 1) {
+        html.push('<div style="margin-top:6px;">' + releaseBtn('*', 'Снять все чужие резервы (' + otherKeys.length + ')').trim() + '</div>');
+      }
+      if (!generalAdmissionMode) {
+        html.push('<div style="margin-top:6px;color:#555;">Чужой резерв можно снять кнопкой «Снять» или нажатием на место на схеме.</div>');
+      }
     }
     if (nearest) {
       var delta = Math.max(0, Math.round((nearest.getTime() - Date.now()) / 60000));
@@ -439,7 +650,8 @@ var Cashier = (function () {
         heldSeats[key] = {
           user_id: item.user_id !== undefined ? Number(item.user_id) : null,
           expires_at: item.expires_at || null,
-          meta: item.meta || null
+          meta: item.meta || null,
+          holder: item.holder || null
         };
         reservedKeys.push(key);
         if (heldSeats[key].user_id === currentUserId) ownedKeys.push(key);
@@ -467,6 +679,7 @@ var Cashier = (function () {
         renderer.setSoldSeats(Object.keys(soldSeats));
       }
       setReservedState(held);
+      if (generalAdmissionMode) refreshGeneralAdmissionSelection();
       if (typeof cb === 'function') cb(true, res);
     }, 'GET');
   }
@@ -479,7 +692,6 @@ var Cashier = (function () {
     var data = {
       seats: seatsPayload,
       total_amount: total,
-      customer_id: extra.customer_id || (window.currentCustomerId || null),
       schedule_id: extra.schedule_id || sessionId || null,
       event_id: extra.event_id || null,
       hall_id: extra.hall_id || null,
@@ -855,6 +1067,17 @@ var Cashier = (function () {
     customDiscountHintEl = document.getElementById(ids.customDiscountHintId);
     var onSessionLoaded = typeof options.onSessionLoaded === 'function' ? options.onSessionLoaded : null;
     currentUserId = Number(options.currentUserId || 0);
+    isAdmin = options.isAdmin === true;
+    if (holdInfoEl && !holdInfoEl.dataset.releaseBound) {
+      holdInfoEl.dataset.releaseBound = '1';
+      holdInfoEl.addEventListener('click', function (ev) {
+        var btn = ev.target && ev.target.closest ? ev.target.closest('[data-release-keys]') : null;
+        if (!btn) return;
+        ev.preventDefault();
+        var target = btn.getAttribute('data-release-keys');
+        requestForeignRelease(target === '*' ? Object.keys(heldSeats).filter(isHeldByOther) : [target]);
+      });
+    }
     if (options.discountConfig && typeof options.discountConfig === 'object') {
       discountConfig = Object.assign({}, discountConfig, options.discountConfig);
       if (!discountConfig.segment_percent) {
@@ -871,10 +1094,24 @@ var Cashier = (function () {
 
     setupPaymentCheckboxes(paymentCashEl, paymentCardEl);
 
-    if (customerSegmentEl) customerSegmentEl.addEventListener('change', refreshDiscountUi);
+    if (customerSegmentEl) customerSegmentEl.addEventListener('change', function () {
+      refreshDiscountUi();
+      normalizeManualDiscountInput();
+    });
     if (manualDiscountAmountEl) manualDiscountAmountEl.addEventListener('input', refreshDiscountUi);
+    if (manualDiscountAmountEl) {
+      manualDiscountAmountEl.addEventListener('blur', function () {
+        normalizeManualDiscountInput();
+        refreshDiscountUi();
+      });
+      manualDiscountAmountEl.addEventListener('change', function () {
+        normalizeManualDiscountInput();
+        refreshDiscountUi();
+      });
+    }
     if (customDiscountTypeEl) customDiscountTypeEl.addEventListener('change', refreshDiscountUi);
     if (customDiscountValueEl) customDiscountValueEl.addEventListener('input', refreshDiscountUi);
+    refreshDiscountUi();
 
     // Load session data
     ajax('session', { session_id: sessionId }, function (res) {
@@ -886,6 +1123,14 @@ var Cashier = (function () {
       var session = res.data && res.data.session ? res.data.session : null;
       var sold = res.data && res.data.sold_seats ? res.data.sold_seats : [];
       var held = res.data && res.data.held_seats ? res.data.held_seats : [];
+      if (session) session.general_admission = res.data.general_admission === true;
+      sessionPromotion = session && session.promotion_enabled
+        ? {
+          enabled: true,
+          gift_name: String(session.promotion_gift_name || ''),
+          gift_price: Number(session.promotion_gift_price) || 0
+        }
+        : { enabled: false, gift_name: '', gift_price: 0 };
       try {
         if (onSessionLoaded && session) onSessionLoaded(session);
       } catch (e) {
@@ -901,8 +1146,13 @@ var Cashier = (function () {
       if (Array.isArray(sold)) sold.forEach(function (k) { if (k) soldSeats[String(k)] = true; });
 
       setReservedState(held);
+      configureGeneralAdmission(session, sold, held);
+      updateHoldInfo();
 
-      if (options.seatmapRenderer && typeof options.seatmapRenderer.create === 'function') {
+      if (generalAdmissionMode) {
+        renderer = null;
+        viewer = null;
+      } else if (options.seatmapRenderer && typeof options.seatmapRenderer.create === 'function') {
         try {
           renderer = options.seatmapRenderer.create({
             canvasId: ids.canvasId,
@@ -928,8 +1178,8 @@ var Cashier = (function () {
               showToast('Место продано, выберите другое место для продажи');
               return;
             }
-            if (heldSeats[key] && heldSeats[key].user_id !== currentUserId) {
-              showToast('Место занято резервом другого кассира');
+            if (isHeldByOther(key)) {
+              requestForeignRelease([key]);
               return;
             }
             if (typeof pricedSeats[key] === 'undefined') {
@@ -965,8 +1215,8 @@ var Cashier = (function () {
               showToast('Место продано, выберите другое место для продажи');
               return;
             }
-            if (heldSeats[key] && heldSeats[key].user_id !== currentUserId) {
-              showToast('Место занято резервом другого кассира');
+            if (isHeldByOther(key)) {
+              requestForeignRelease([key]);
               return;
             }
             if (typeof pricedSeats[key] === 'undefined') {
@@ -999,10 +1249,15 @@ var Cashier = (function () {
             if (!resp || !resp.success) return alert(resp && resp.message ? resp.message : 'Ошибка создания резерва');
             showToast('Резерв создан');
             cart = [];
+            giftSelections = {};
             selectedCartSeatKey = null;
             renderCart();
             syncSelectionToRenderer();
             redrawLegend();
+            if (generalAdmissionMode && generalAdmissionQuantityEl) {
+              generalAdmissionQuantityEl.value = '';
+              refreshGeneralAdmissionSelection();
+            }
             refreshHoldState();
           });
         });
@@ -1016,21 +1271,10 @@ var Cashier = (function () {
             return;
           }
 
-          // collect customer data and normalize phone
-          function normalizePhone(p) { return (p || '').replace(/\D+/g, ''); }
-          var customer = {
-            full_name: (document.getElementById('custFullName') || {}).value.trim() || '',
-            phone: normalizePhone((document.getElementById('custPhone') || {}).value || ''),
-            email: (document.getElementById('custEmail') || {}).value.trim() || '',
-            gender: (document.getElementById('custGender') || {}).value || '',
-            city: (document.getElementById('custCity') || {}).value.trim() || ''
-          };
-          if (!customer.phone) {
-            showToast('Номер телефона обязателен');
-            return;
-          }
           var customer_segment = (document.getElementById('customer_segment') || {}).value || 'adult';
           var manualDiscountAmount = (customer_segment === 'manual' && discountConfig.custom_enabled) ? getManualDiscountInputValue() : 0;
+          var customerNameInput = document.getElementById('cashCustomerName');
+          var customerName = customerNameInput ? customerNameInput.value.trim() : '';
 
           // Build payload safely: structured seats + legacy keys
           var seatsPayload = buildSeatsPayload();
@@ -1038,7 +1282,7 @@ var Cashier = (function () {
             session_id: sessionId,
             seats: seatsPayload,
             payment_method: pm,
-            customer: customer,
+            customer: { full_name: customerName },
             customer_segment: customer_segment,
             discount: { manual_amount: manualDiscountAmount }
           };
@@ -1049,14 +1293,17 @@ var Cashier = (function () {
             if (!resp || !resp.success) {
               return alert(resp && resp.message ? resp.message : 'Ошибка продажи');
             }
+            if (customerNameInput) customerNameInput.value = '';
             cart.forEach(function (k) { soldSeats[k] = true; });
             cart = [];
+            if (generalAdmissionMode && generalAdmissionQuantityEl) generalAdmissionQuantityEl.value = '';
             if (renderer && typeof renderer.setSoldSeats === 'function') {
               renderer.setSoldSeats(Object.keys(soldSeats));
             } else if (viewer && typeof viewer.updateSoldSeats === 'function') {
               viewer.updateSoldSeats(Object.keys(soldSeats));
             }
-            renderCart();
+            if (generalAdmissionMode) refreshGeneralAdmissionSelection();
+            else renderCart();
             syncSelectionToRenderer();
             redrawLegend();
             showToast('Продано');
@@ -1074,9 +1321,23 @@ var Cashier = (function () {
 
             if (resp.ticket_uids && Array.isArray(resp.ticket_uids) && resp.ticket_uids.length) {
               var ticketUids = resp.ticket_uids;
-              var previewUrl = '/tickets/generate.php?uid=' + encodeURIComponent(ticketUids[0]);
-              if (window.openTicketPreview && typeof window.openTicketPreview === 'function') {
-                window.openTicketPreview(previewUrl, 'Билет ' + ticketUids[0]);
+              if (window.openTicketBatchPreview && typeof window.openTicketBatchPreview === 'function') {
+                var responseTickets = Array.isArray(resp.tickets) ? resp.tickets : [];
+                var batchTickets = ticketUids.map(function (uid) {
+                  var found = responseTickets.filter(function (ticket) {
+                    return String(ticket.ticket_uid || '') === String(uid);
+                  })[0] || {};
+                  return {
+                    ticket_uid: uid,
+                    seat_identifier: found.seat_identifier || '',
+                    final_price: found.final_price,
+                    gift_selected: !!found.gift_selected,
+                    gift_name: found.gift_name || ''
+                  };
+                });
+                window.openTicketBatchPreview(batchTickets, resp.order_number || '');
+              } else if (window.openTicketPreview && typeof window.openTicketPreview === 'function') {
+                window.openTicketPreview('/tickets/generate.php?uid=' + encodeURIComponent(ticketUids[0]), 'Билет ' + ticketUids[0]);
               } else {
                 var viewUrl = '/tickets/view.php?uids=' + ticketUids.map(encodeURIComponent).join(',');
                 window.open(viewUrl, '_blank');

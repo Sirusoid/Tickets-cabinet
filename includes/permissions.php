@@ -20,12 +20,13 @@ if (!function_exists('user_has_permission')) {
         $matrix = function_exists('settings_decode_json_value')
             ? settings_decode_json_value($rawMatrix, [])
             : [];
+        $scannerDefault = $role === 'scanner' && $permission === 'scanner';
         if (!is_array($matrix) || empty($matrix)) {
-            return $fallback;
+            return $scannerDefault || $fallback;
         }
         $roleMatrix = $matrix[$role] ?? null;
         if (!is_array($roleMatrix)) {
-            return $fallback;
+            return $scannerDefault || $fallback;
         }
         if (!array_key_exists($permission, $roleMatrix)) {
             // Совместимость со старыми сохранёнными матрицами до добавления новых разделов.
@@ -33,6 +34,15 @@ if (!function_exists('user_has_permission')) {
                 'cashier_manual' => [
                     'manager' => true,
                     'cashier' => true,
+                ],
+                'schedule_notifications' => [
+                    'manager' => true,
+                ],
+                'scanner' => [
+                    'scanner' => true,
+                ],
+                'promo_codes' => [
+                    'manager' => true,
                 ],
             ];
             if (isset($defaultPermissions[$permission][$role])) {

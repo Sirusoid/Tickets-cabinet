@@ -3,7 +3,13 @@ require_once __DIR__ . '/init.php';
 
 if (!empty($_SESSION['user'])) {
     require_login();
-    redirect('dashboard.php');
+     // Redirect based on role
+     $userRole = strtolower(trim((string)($_SESSION['user']['role'] ?? '')));
+     if ($userRole === 'scanner') {
+         redirect('scanner.php');
+     } else {
+         redirect('dashboard.php');
+     }
 }
 
 $error = null;

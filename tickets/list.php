@@ -9,7 +9,10 @@ $page_title_meta = 'Список билетов';
 $panel_title = 'Билеты';
 $panel_subtitle = 'Список проданных билетов, управление возвратами, просмотр и печать билетов';
 
-$page_scripts = ['/assets/js/tickets_list.js', '/assets/js/ticket_viewer.js'];
+$page_scripts = [
+  '/assets/js/tickets_list.js?v=' . filemtime(__DIR__ . '/../assets/js/tickets_list.js'),
+  '/assets/js/ticket_viewer.js?v=' . filemtime(__DIR__ . '/../assets/js/ticket_viewer.js'),
+];
 
 require __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/panel.php';
@@ -48,6 +51,14 @@ require __DIR__ . '/../includes/panel.php';
             <div style="position:relative;">
               <input id="filter_uid" class="form-control" placeholder="UID билета" autocomplete="off" />
               <div id="suggestions_uid" class="typeahead-dropdown" style="position:absolute; left:0; right:0; z-index:1400; display:none;"></div>
+            </div>
+          </div>
+
+          <div>
+            <label>Номер заказа</label>
+            <div style="position:relative;">
+              <input id="filter_order_number" class="form-control" placeholder="Номер заказа" autocomplete="off" />
+              <div id="suggestions_order" class="typeahead-dropdown" style="position:absolute; left:0; right:0; z-index:1400; display:none;"></div>
             </div>
           </div>
 
@@ -130,6 +141,14 @@ require __DIR__ . '/../includes/panel.php';
       </div>
 
       <div class="profile-card" style="padding:12px;">
+        <div id="ticketsPager" class="table-pagination" style="margin:0 0 10px;">
+          <div id="ticketsSummary" class="table-pagination__summary" style="color:#666;">—</div>
+          <div class="table-pagination__controls">
+            <button id="prevPage" class="btn btn-ghost">←</button>
+            <span id="currentPage">1 / 1</span>
+            <button id="nextPage" class="btn btn-ghost">→</button>
+          </div>
+        </div>
 
         <div style="margin-top:8px; overflow:auto;">
           <table id="ticketsTable" class="admin-table table--compact" style="width:100%; border-collapse:collapse;">
@@ -157,15 +176,6 @@ require __DIR__ . '/../includes/panel.php';
               <tr><td colspan="15" style="text-align:center; color:#666; padding:18px;">Загрузка...</td></tr>
             </tbody>
           </table>
-        </div>
-
-        <div id="ticketsPager" class="table-pagination">
-          <div id="ticketsSummary" class="table-pagination__summary" style="color:#666;">—</div>
-          <div class="table-pagination__controls">
-            <button id="prevPage" class="btn btn-ghost">←</button>
-            <span id="currentPage">1 / 1</span>
-            <button id="nextPage" class="btn btn-ghost">→</button>
-          </div>
         </div>
       </div>
     </div>
@@ -229,16 +239,18 @@ require __DIR__ . '/../includes/panel.php';
 </div>
 
 <div id="ticketPreviewModal" style="display:none; position:fixed; inset:0; z-index:2200; align-items:center; justify-content:center; background:rgba(0,0,0,0.65);">
-  <div style="position:relative; width:90%; max-width:1120px; height:90%; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+  <div style="position:relative; width:96%; max-width:1280px; height:96vh; max-height:96vh; min-height:320px; background:#fff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:#f7f7f7; border-bottom:1px solid #ddd;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm">Скачать</button>
+        <button id="ticketPreviewDownloadAll" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать все билеты</button>
+        <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать</button>
         <button id="ticketPreviewOpenNewTab" type="button" class="btn btn-ghost btn-sm">Открыть в новой вкладке</button>
         <button id="ticketPreviewClose" type="button" class="btn btn-ghost btn-xs">✕</button>
       </div>
     </div>
-    <iframe id="ticketPreviewIframe" src="about:blank" style="flex:1; width:100%; border:none; min-height:0;"></iframe>
+    <div id="ticketPreviewList" style="display:none; overflow:auto; padding:16px; background:#f7f9fc;"></div>
+    <iframe id="ticketPreviewIframe" src="about:blank" style="display:none; flex:1; width:100%; border:none; min-height:520px;"></iframe>
   </div>
 </div>
 

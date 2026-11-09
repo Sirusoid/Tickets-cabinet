@@ -12,6 +12,7 @@ if (!function_exists('reporting_segment_label')) {
             'senior' => 'Пенсионный',
             'pensioner' => 'Пенсионный',
             'vip' => 'VIP',
+            'manual' => 'Ручная скидка',
         ];
         $key = strtolower(trim((string)$segment));
         return $labels[$key] ?? ($key !== '' ? $key : 'Не указан');
@@ -74,6 +75,85 @@ if (!function_exists('reporting_payment_label')) {
     }
 }
 
+if (!function_exists('reporting_source_options')) {
+    function reporting_source_options(): array
+    {
+        return [
+            'cash_cash' => 'Касса наличные',
+            'cash_card' => 'Касса картой',
+            'online' => 'Онлайн',
+        ];
+    }
+}
+
+if (!function_exists('reporting_source_key')) {
+    function reporting_source_key($method, $channel): string
+    {
+        $method = strtolower(trim((string)$method));
+        $channel = strtolower(trim((string)$channel));
+        if ($channel !== 'kassa') {
+            return 'online';
+        }
+
+        $isCard = strpos($method, 'card') !== false
+            || in_array($method, ['bcc', 'terminal', 'visa', 'master', 'mastercard'], true);
+        return $isCard ? 'cash_card' : 'cash_cash';
+    }
+}
+
+if (!function_exists('reporting_source_label')) {
+    function reporting_source_label($method, $channel): string
+    {
+        $options = reporting_source_options();
+        return $options[reporting_source_key($method, $channel)] ?? 'Онлайн';
+    }
+}
+
+if (!function_exists('reporting_normalize_source_filter')) {
+    function reporting_normalize_source_filter($raw, bool $isProvided = false): array
+    {
+        $options = reporting_source_options();
+        if (!$isProvided) {
+            return array_keys($options);
+        }
+
+        if (!is_array($raw)) {
+            $raw = [$raw];
+        }
+
+        return array_values(array_intersect(array_keys($options), array_map('strval', $raw)));
+    }
+}
+
+if (!function_exists('reporting_source_sql')) {
+    function reporting_source_sql(array $selectedSources): string
+    {
+        $selectedSources = array_values(array_intersect(array_keys(reporting_source_options()), $selectedSources));
+        if ($selectedSources === []) {
+            return ' AND 1 = 0 ';
+        }
+
+        $cardMethodSql = "LOWER(COALESCE(tx.payment_method, ''))";
+        $cardMethodCondition = sprintf(
+            "(%1\$s LIKE '%%card%%' OR %1\$s IN ('bcc', 'terminal', 'visa', 'master', 'mastercard'))",
+            $cardMethodSql
+        );
+        $conditions = [];
+
+        if (in_array('cash_cash', $selectedSources, true)) {
+            $conditions[] = "(t.channel = 'kassa' AND NOT {$cardMethodCondition})";
+        }
+        if (in_array('cash_card', $selectedSources, true)) {
+            $conditions[] = "(t.channel = 'kassa' AND {$cardMethodCondition})";
+        }
+        if (in_array('online', $selectedSources, true)) {
+            $conditions[] = "(COALESCE(t.channel, '') <> 'kassa')";
+        }
+
+        return $conditions === [] ? ' AND 1 = 0 ' : ' AND (' . implode(' OR ', $conditions) . ') ';
+    }
+}
+
 if (!function_exists('reporting_discount_label')) {
     function reporting_discount_label(array $row): string
     {
@@ -83,7 +163,11 @@ if (!function_exists('reporting_discount_label')) {
             return 'Без скидки';
         }
         if ($discountAmount > 0 && $segment === 'manual') {
-            return 'Ручная, фиксированная';
+            return 'Ручная скидка';
+        }
+        $promoCode = trim((string)($row['promo_code'] ?? ''));
+        if ($discountAmount > 0 && $promoCode !== '') {
+            return 'Промокод ' . $promoCode;
         }
         if ($discountAmount > 0 && $segment !== '') {
             return 'По типу: ' . reporting_segment_label($segment);

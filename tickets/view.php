@@ -3,6 +3,7 @@
 // Страница просмотра одного или нескольких купленных билетов.
 
 require_once __DIR__ . '/../init.php';
+require_once __DIR__ . '/../includes/general_admission.php';
 require_login();
 
 $page_scripts = ['/assets/js/ticket_viewer.js'];
@@ -34,13 +35,16 @@ if ($ticket_id > 0) {
     redirect('/tickets/list.php');
 }
 
-$sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, t.customer_segment, t.original_price, t.final_price, t.discount, t.discount_amount, t.channel, t.status, t.payment_status, t.purchased_at,
-               COALESCE(c.full_name, '') AS customer_name,
+$sql = "SELECT t.id, t.ticket_uid, t.seat_identifier, t.customer_segment, t.original_price, t.final_price, t.discount, t.discount_amount, t.gift_selected, t.gift_name, t.gift_price, t.channel, t.status, t.payment_status, t.purchased_at,
+               COALESCE(NULLIF(c.full_name, ''), NULLIF(t.customer_name, ''), '') AS customer_name,
                COALESCE(e.title, '') AS event_title,
-               s.start_time AS schedule_start
+               s.start_time AS schedule_start,
+               COALESCE(NULLIF(TRIM(h_schedule.name), ''), NULLIF(TRIM(h_ticket.name), ''), '') AS hall_name
         FROM tickets t
         LEFT JOIN customers c ON c.id = t.customer_id
         LEFT JOIN schedules s ON s.id = t.schedule_id
+        LEFT JOIN halls h_schedule ON h_schedule.id = s.hall_id
+        LEFT JOIN halls h_ticket ON h_ticket.id = t.hall_id
         LEFT JOIN events e ON e.id = t.event_id
         WHERE " . implode(' AND ', $where) . "
         ORDER BY t.purchased_at DESC, t.id DESC";
@@ -103,8 +107,12 @@ require __DIR__ . '/../includes/panel.php';
           <div>
             <div style="font-size:16px; font-weight:700; margin-bottom:6px;">UID: <?= h($ticket['ticket_uid']) ?></div>
             <div style="color:#555;">Сеанс: <?= h($ticket['event_title']) ?>, <?= h($ticket['schedule_start']) ?></div>
-            <div style="color:#555;">Место: <?= h($ticket['seat_identifier']) ?></div>
+            <?php if ($ticket['hall_name'] !== ''): ?><div style="color:#555;">Зал: <?= h($ticket['hall_name']) ?></div><?php endif; ?>
+            <div style="color:#555;">Место: <?= h(general_admission_is_identifier((string)$ticket['seat_identifier']) ? general_admission_ticket_label() : (string)$ticket['seat_identifier']) ?></div>
             <div style="color:#555;">Клиент: <?= h($ticket['customer_name']) ?></div>
+            <?php if (!empty($ticket['gift_selected'])): ?>
+              <div style="color:#166534; font-weight:600;">С подарком: <?= h($ticket['gift_name'] ?: 'Подарок') ?> (+<?= number_format((int)$ticket['gift_price'], 0, '.', ' ') ?> тг)</div>
+            <?php endif; ?>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <a href="<?= h($previewUrl) ?>" target="_blank" class="btn btn-ghost btn-sm">Открыть PDF</a>

@@ -254,7 +254,9 @@ if (!function_exists('bcc_process_refund_request')) {
                     ':ticket_uid' => $ticket['ticket_uid'],
                     ':schedule_id' => (int)$session['session_id'],
                     ':refund_amount' => number_format((float)$ticket['final_price'], 2, '.', ''),
-                    ':reason' => 'Возврат кассиром через BCC',
+                    ':reason' => strpos($source, 'schedule_cancellation') === 0
+                        ? 'Возврат онлайн-заказа в связи с отменой сеанса театром'
+                        : 'Возврат кассиром через BCC',
                     ':processed_by' => !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null,
                 ]);
             }
@@ -270,7 +272,14 @@ if (!function_exists('bcc_process_refund_request')) {
         $refundForm = bcc_build_refund_form($cfg, $session, $originalResponse, (int)$session['amount_cents']);
         $ch = curl_init($refundForm['action']);
         if ($ch === false) {
-            throw new RuntimeException('Не удалось создать соединение с BCC.');
+            $data = [
+                'ACTION' => '',
+                'RC' => 'TRANSPORT_ERROR',
+                'RC_TEXT' => 'Could not initialize BCC gateway request',
+                'ORDER' => $order,
+            ];
+            bcc_mark_refund_result($pdo, $order, $data, false, $source . '_transport_error');
+            return ['success' => false, 'state' => 'rejected', 'response' => $data, 'message' => 'Не удалось подключиться к банку.'];
         }
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
