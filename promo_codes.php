@@ -200,7 +200,7 @@ if (!$migrationRequired) {
             "SELECT s.id, s.start_time, e.title AS event_title
              FROM schedules s
              JOIN events e ON e.id = s.event_id
-             WHERE s.status IN ('upcoming', 'active') AND s.start_time >= NOW()
+             WHERE s.status IN ('upcoming', 'active') AND s.start_time >= NOW() AND (s.sales_end_time IS NULL OR s.sales_end_time >= NOW())
              ORDER BY s.start_time ASC
              LIMIT 100"
         );
