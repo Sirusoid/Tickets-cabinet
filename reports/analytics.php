@@ -617,9 +617,27 @@ require __DIR__ . '/../includes/panel.php';
                     <?php endforeach; ?>
                 </select>
             <?php endif; ?>
-            <button type="submit" class="btn btn-primary"><?= $eventId > 0 ? 'Обновить график' : 'Выбрать' ?></button>
+            <noscript><button type="submit" class="btn btn-primary">Применить фильтр</button></noscript>
         </form>
     </div>
+    <script>
+    (function(){
+        var filter = document.querySelector('.analytics-filter');
+        if (!filter) {
+            return;
+        }
+        var selects = filter.querySelectorAll('select');
+        for (var index = 0; index < selects.length; index++) {
+            selects[index].addEventListener('change', function(){
+                if (typeof filter.requestSubmit === 'function') {
+                    filter.requestSubmit();
+                } else {
+                    filter.submit();
+                }
+            });
+        }
+    })();
+    </script>
 
     <?php if ($errorText !== ''): ?>
         <div class="card reports-alert reports-alert--danger"><?= h($errorText) ?></div>
