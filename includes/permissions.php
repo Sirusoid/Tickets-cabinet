@@ -38,6 +38,9 @@ if (!function_exists('user_has_permission')) {
                 'schedule_notifications' => [
                     'manager' => true,
                 ],
+                'sales_analytics' => [
+                    'manager' => true,
+                ],
                 'scanner' => [
                     'scanner' => true,
                 ],

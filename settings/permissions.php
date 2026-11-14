@@ -36,6 +36,7 @@ $roles = [
 $modules = [
 		'dashboard' => ['label' => 'Панель', 'path' => '/dashboard.php'],
 		'reports' => ['label' => 'Отчёты', 'path' => '/reports/sales.php'],
+		'sales_analytics' => ['label' => 'Аналитика', 'path' => '/reports/analytics.php'],
 		'cash' => ['label' => 'Касса', 'path' => '/cash/index.php'],
 		'cashier_manual' => ['label' => 'Руководство кассира', 'path' => '/admin/cashier_manual.php'],
 		'schedule' => ['label' => 'Расписание', 'path' => '/schedule/list.php'],
@@ -66,6 +67,7 @@ $defaultMatrix = [
 		'manager' => [
 				'dashboard' => true,
 				'reports' => true,
+				'sales_analytics' => true,
 				'cash' => true,
 				'cashier_manual' => true,
 				'schedule' => true,
@@ -93,6 +95,7 @@ $defaultMatrix = [
 		'cashier' => [
 				'dashboard' => true,
 				'reports' => true,
+				'sales_analytics' => false,
 				'cash' => true,
 				'cashier_manual' => true,
 				'schedule' => true,
@@ -120,6 +123,7 @@ $defaultMatrix = [
 		'scanner' => [
 				'dashboard' => false,
 				'reports' => false,
+				'sales_analytics' => false,
 				'cash' => false,
 				'cashier_manual' => false,
 				'schedule' => false,
