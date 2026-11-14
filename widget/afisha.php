@@ -44,7 +44,7 @@ $stmt = $pdo->prepare("SELECT s.id AS session_id, s.start_time, s.base_price, s.
     LEFT JOIN halls h ON s.hall_id = h.id
     WHERE s.start_time >= :now AND s.status IN ('upcoming','active')
     ORDER BY s.start_time ASC
-    LIMIT 50");
+    LIMIT 100");
 $stmt->execute([':now' => $now]);
 $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
