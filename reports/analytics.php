@@ -159,7 +159,7 @@ if (!function_exists('sales_analytics_curve_path')) {
     {
         $points = [];
         foreach ($values as $index => $value) {
-            $x = $left + (($periodDays - $index) / max(1, $periodDays)) * $width;
+            $x = $left + ($index / max(1, $periodDays)) * $width;
             $y = $top + (1 - (max(0, min(100, (float)$value)) / 100)) * $height;
             $points[] = number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
         }
@@ -778,7 +778,7 @@ require __DIR__ . '/../includes/panel.php';
                     <?php foreach (array_unique([$periodDays, (int)round($periodDays * .66), (int)round($periodDays * .33), 0]) as $tick): ?>
                         <?php $x = $plot['left'] + (($periodDays - $tick) / max(1, $periodDays)) * $plot['width']; ?>
                         <line x1="<?= number_format($x, 2, '.', '') ?>" y1="<?= number_format($plot['top'], 2, '.', '') ?>" x2="<?= number_format($x, 2, '.', '') ?>" y2="<?= number_format($plot['top'] + $plot['height'], 2, '.', '') ?>" class="analytics-chart-grid analytics-chart-grid--vertical"></line>
-                        <text x="<?= number_format($x, 2, '.', '') ?>" y="281" class="analytics-chart-axis-label" text-anchor="middle"><?= $tick ?> дн.</text>
+                        <text x="<?= number_format($x, 2, '.', '') ?>" y="281" class="analytics-chart-axis-label" text-anchor="middle"><?= $tick === 0 ? 'Сеанс' : $tick . ' дн.' ?></text>
                     <?php endforeach; ?>
                     <?php if (!empty($chartPaths['average_own'])): ?><path d="<?= h($chartPaths['average_own']) ?>" class="analytics-chart-line analytics-chart-line--average-own"></path><?php endif; ?>
                     <?php if (!empty($chartPaths['own'])): ?><path d="<?= h($chartPaths['own']) ?>" class="analytics-chart-line analytics-chart-line--own"></path><?php endif; ?>
