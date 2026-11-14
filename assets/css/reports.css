@@ -616,8 +616,9 @@
   .analytics-detail-hero h1 { margin: 4px 0; color: #fff; font-size: 25px; }
   .analytics-detail-hero p { margin: 0; color: rgba(255,255,255,.8); font-size: 12px; }
   .analytics-detail-hero .analytics-eyebrow { color: #93c5fd; }
-  .analytics-back-link { display: block; margin-bottom: 9px; color: rgba(255,255,255,.78); font-size: 11px; text-decoration: none; }
-  .analytics-back-link:hover { color: #fff; text-decoration: underline; }
+  .analytics-back-button { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 9px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.32); border-radius: 8px; background: rgba(255,255,255,.1); color: #fff; font-size: 11px; font-weight: 700; text-decoration: none; transition: background .16s ease, border-color .16s ease; }
+  .analytics-back-button:hover,
+  .analytics-back-button:focus-visible { border-color: rgba(255,255,255,.72); background: rgba(255,255,255,.2); color: #fff; outline: none; }
   .analytics-detail-donut { width: 94px; height: 94px; flex: 0 0 94px; }
   .analytics-detail-donut::before { width: 72px; height: 72px; }
   .analytics-detail-donut strong { color: #172b4d; font-size: 20px; }

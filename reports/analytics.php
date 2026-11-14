@@ -722,7 +722,7 @@ require __DIR__ . '/../includes/panel.php';
         ?>
         <section class="analytics-detail-hero card">
             <div>
-                <a class="analytics-back-link" href="/reports/analytics.php">← Все спектакли</a>
+                <a class="analytics-back-button" href="/reports/analytics.php">← Вернуться к списку спектаклей</a>
                 <span class="analytics-eyebrow">Аналитика спектакля</span>
                 <h1><?= h($selectedEvent['title']) ?></h1>
                 <p>Ближайший сеанс: <?= h(reporting_format_date($nextSchedule['start_time'], true)) ?> · <?= h($nextSchedule['hall_name'] ?? 'Зал не указан') ?></p>
