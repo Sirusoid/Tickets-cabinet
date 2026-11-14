@@ -750,6 +750,15 @@ require __DIR__ . '/../includes/panel.php';
             </div>
         </section>
 
+        <section class="analytics-forecast analytics-forecast--<?= h($forecast[0]) ?>">
+            <div class="analytics-forecast__heading">
+                <span class="analytics-eyebrow">Прогноз наших продаж на ближайший сеанс</span>
+                <strong><?= number_format($projectedOwnPercent, 0) ?>% квоты</strong>
+            </div>
+            <p><?= h($forecast[1]) ?></p>
+            <small>Прогноз увеличения квоты основан на сумме сайта и кассы за последние 7 дней; Ticketon.kz и Kino.kz в эту сумму не входят.</small>
+        </section>
+
         <div class="analytics-detail-kpis">
             <article class="card analytics-overview-kpi analytics-overview-kpi--own"><span>Продано нами · сайт + касса</span><strong><?= number_format((int)$currentStats['own_sold'], 0, '.', ' ') ?></strong></article>
             <article class="card analytics-overview-kpi analytics-overview-kpi--online"><span>Сайт и приложение</span><strong><?= number_format((int)$currentStats['online'], 0, '.', ' ') ?></strong></article>
@@ -802,15 +811,6 @@ require __DIR__ . '/../includes/panel.php';
             <?php if (!$chartHasSales): ?>
                 <p class="analytics-chart-empty">За выбранный период продаж не найдено.</p>
             <?php endif; ?>
-        </section>
-
-        <section class="analytics-forecast analytics-forecast--<?= h($forecast[0]) ?>">
-            <div class="analytics-forecast__heading">
-                <span class="analytics-eyebrow">Прогноз наших продаж на ближайший сеанс</span>
-                <strong><?= number_format($projectedOwnPercent, 0) ?>% квоты</strong>
-            </div>
-            <p><?= h($forecast[1]) ?></p>
-            <small>Прогноз увеличения квоты основан на сумме сайта и кассы за последние 7 дней; Ticketon.kz и Kino.kz в эту сумму не входят.</small>
         </section>
 
         <section class="card analytics-history-card">
