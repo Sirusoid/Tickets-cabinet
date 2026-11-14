@@ -599,7 +599,7 @@ require __DIR__ . '/../includes/panel.php';
     <div class="analytics-toolbar card">
         <div>
             <span class="analytics-eyebrow">Выборка по спектаклям</span>
-            <h2><?= $selectedEvent ? 'Детальная аналитика' : 'Предстоящие спектакли' ?></h2>
+            <h2>Анализ продаж через кабинет</h2>
         </div>
         <form method="get" class="analytics-filter">
             <label for="analytics-event">Спектакль</label>
