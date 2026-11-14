@@ -156,11 +156,35 @@ $isSettingsExpanded = $isSettingsPath ? 'true' : 'false';
     });
   }
 
-  // Инициализация: при загрузке страницы на мобильных устройствах закрываем сайдбар
-  if (window.innerWidth <= 768 && sidebar) {
-    // Устанавливаем aria-hidden в true и добавляем класс collapsed
+  var mobileSidebarQuery = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(max-width: 768px)')
+    : null;
+  function collapseSidebarOnMobile() {
+    var isMobile = mobileSidebarQuery ? mobileSidebarQuery.matches : window.innerWidth <= 768;
+    if (!sidebar || !isMobile) {
+      return;
+    }
     sidebar.setAttribute('aria-hidden', 'true');
     document.body.classList.add('sidebar-collapsed');
+  }
+
+  if (sidebar) {
+    collapseSidebarOnMobile();
+    if (mobileSidebarQuery && typeof mobileSidebarQuery.addEventListener === 'function') {
+      mobileSidebarQuery.addEventListener('change', function(event) {
+        if (event.matches) {
+          collapseSidebarOnMobile();
+        }
+      });
+    } else if (mobileSidebarQuery && typeof mobileSidebarQuery.addListener === 'function') {
+      mobileSidebarQuery.addListener(function(event) {
+        if (event.matches) {
+          collapseSidebarOnMobile();
+        }
+      });
+    } else {
+      window.addEventListener('resize', collapseSidebarOnMobile);
+    }
   }
 })();
 </script>
