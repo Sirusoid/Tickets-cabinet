@@ -476,12 +476,12 @@
     pendingRefundMode = refundMode === 'bcc' || refundMode === 'local' ? refundMode : '';
     if (!pendingRefundOrderNumber || !pendingRefundMode) return;
 
-    qs('orderRefundTitle').textContent = (pendingRefundMode === 'bcc' ? 'Возврат онлайн-заказа ' : 'Аннулирование заказа ')
+    qs('orderRefundTitle').textContent = (pendingRefundMode === 'bcc' ? 'Возврат онлайн-заказа ' : 'Возврат кассового заказа ')
       + pendingRefundOrderNumber;
-    qs('orderRefundConfirm').textContent = pendingRefundMode === 'bcc' ? 'Подтвердить возврат' : 'Аннулировать билеты';
+    qs('orderRefundConfirm').textContent = 'Подтвердить возврат';
     qs('orderRefundWarning').textContent = pendingRefundMode === 'bcc'
       ? 'Будут возвращены средства за весь онлайн-заказ через BCC. Билеты будут аннулированы после подтверждения возврата банком. Если банк отклонит возврат, билеты останутся действительными.'
-      : 'Будут аннулированы все ' + ticketCount + ' билетов этого кассового заказа. Денежная выплата не выполняется.';
+      : 'Будут аннулированы все ' + ticketCount + ' билетов кассового заказа, а сумма возврата будет записана в отчёт как выплаченная кассиром наличными. Подтвердите, что деньги возвращены клиенту.';
     var modal = qs('orderRefundModal');
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
@@ -531,7 +531,7 @@
           showToast(json.message || 'Возврат онлайн-заказа принят.', 'success');
         }
       } else {
-        showToast(json.message || 'Билеты заказа аннулированы', 'success');
+        showToast(json.message || 'Возврат кассового заказа записан', 'success');
       }
       closeOrderRefundConfirmation();
       if (typeof window.closeTicketPreview === 'function') window.closeTicketPreview();

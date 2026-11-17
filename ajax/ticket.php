@@ -4,7 +4,7 @@
 // seat_occupancy-backed implementation:
 // - seat_occupancy is the source of truth for current occupied seats
 // - Create ticket: atomically reserve seat in seat_occupancy, then INSERT new ticket (always new id), then link occupancy -> ticket_id
-// - Order cancellation: void cash tickets without recording a payout; BCC tickets are voided after bank confirmation.
+// - Order refunds: cash refunds are recorded per ticket; BCC tickets are voided after bank confirmation.
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/reporting.php';
@@ -1137,23 +1137,66 @@ if ($action === 'refund_order') {
         }
 
         $updateTicket = $pdo->prepare("UPDATE tickets
-            SET status = 'cancelled', updated_at = NOW()
+            SET refund_status = 'refunded', refund_at = NOW(), status = 'cancelled', updated_at = NOW()
             WHERE id = :id");
         $deleteOccupancy = $pdo->prepare('DELETE FROM seat_occupancy WHERE ticket_id = :ticket_id');
-        $reason = 'Аннулирование билетов кассиром по заказу ' . $orderNumber;
+        $reason = 'Возврат кассиром по заказу ' . $orderNumber;
         $ticketUids = [];
+        $insertRefund = $pdo->prepare("INSERT INTO refunds
+            (ticket_id, ticket_uid, schedule_id, refund_amount, refund_status, refund_method,
+             refund_provider, refund_transaction_id, approved_at, reason, processed_by, created_at)
+            VALUES (:ticket_id, :ticket_uid, :schedule_id, :refund_amount, 'refunded', 'cash',
+                NULL, NULL, NOW(), :reason, NULL, NOW())");
+        $cashTransaction = null;
+        if (column_exists($pdo, 'cash_transactions', 'type') && column_exists($pdo, 'cash_transactions', 'ticket_uids')) {
+            $cashTransaction = $pdo->prepare("INSERT INTO cash_transactions
+                (type, session_id, user_id, customer_id, amount_cents, currency, payment_method, payload, ticket_uids, created_at)
+                VALUES ('refund', :session_id, :user_id, :customer_id, :amount_cents, 'KZT', 'cash', :payload, :ticket_uids, NOW())");
+        }
 
         foreach ($tickets as $ticket) {
             $ticketId = (int)$ticket['id'];
             $ticketUid = (string)$ticket['ticket_uid'];
+            $refundAmount = number_format((float)($ticket['final_price'] ?? 0), 2, '.', '');
+            $refundAmountCents = (int)round((float)$refundAmount * 100);
             $ticketUids[] = $ticketUid;
 
             $updateTicket->execute([':id' => $ticketId]);
             $deleteOccupancy->execute([':ticket_id' => $ticketId]);
+            $insertRefund->execute([
+                ':ticket_id' => $ticketId,
+                ':ticket_uid' => $ticketUid,
+                ':schedule_id' => (int)$ticket['schedule_id'],
+                ':refund_amount' => $refundAmount,
+                ':reason' => $reason,
+            ]);
+
+            if ($cashTransaction) {
+                $payload = json_encode([
+                    'action' => 'refund',
+                    'ticket_id' => $ticketId,
+                    'ticket_uid' => $ticketUid,
+                    'schedule_id' => $ticket['schedule_id'],
+                    'seat_identifier' => $ticket['seat_identifier'],
+                    'refund_amount' => $refundAmount,
+                    'refund_method' => 'cash',
+                    'reason' => $reason,
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $cashTransaction->execute([
+                    ':session_id' => (int)$ticket['schedule_id'],
+                    ':user_id' => $_SESSION['user_id'] ?? null,
+                    ':customer_id' => $ticket['customer_id'] ?? null,
+                    ':amount_cents' => $refundAmountCents,
+                    ':payload' => $payload,
+                    ':ticket_uids' => json_encode([$ticketUid], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
 
             if (function_exists('audit_log_event')) {
-                audit_log_event($pdo, 'ticket.order_cancelled', 'ticket', $ticketId, $ticketUid, [], [
+                audit_log_event($pdo, 'ticket.refund', 'ticket', $ticketId, $ticketUid, [], [
                     'order_number' => $orderNumber,
+                    'refund_amount' => $refundAmount,
+                    'refund_method' => 'cash',
                     'reason' => $reason,
                 ]);
             }
@@ -1167,9 +1210,9 @@ if ($action === 'refund_order') {
         }
         json_resp([
             'success' => true,
-            'state' => 'cancelled',
+            'state' => 'refunded',
             'ticket_count' => count($ticketUids),
-            'message' => 'Билеты заказа аннулированы. Денежная выплата не выполнялась.',
+            'message' => 'Билеты заказа аннулированы, возврат наличными записан в отчёты.',
         ]);
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
