@@ -55,7 +55,7 @@ $userName = trim((string)($user['full_name'] ?? $user['name'] ?? $user['username
   <meta charset="utf-8">
   <title><?= h($page_title_meta) ?></title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/admin.css?v=<?= h((string)filemtime(__DIR__ . '/../assets/css/admin.css')) ?>">
   <?php foreach ($page_styles as $s): ?><link rel="stylesheet" href="<?= h($s) ?>"><?php endforeach; ?>
   <script>
     window.APP = {
