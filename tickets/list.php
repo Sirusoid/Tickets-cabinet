@@ -243,7 +243,7 @@ require __DIR__ . '/../includes/panel.php';
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:#f7f7f7; border-bottom:1px solid #ddd;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-        <button id="ticketPreviewRefundOrder" type="button" class="btn btn-danger btn-sm" style="display:none;">Сделать возврат</button>
+        <button id="ticketPreviewRefundOrder" type="button" class="btn btn-secondary btn-sm btn-refund-secondary" style="display:none;">Сделать возврат</button>
         <button id="ticketPreviewDownloadAll" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать все билеты</button>
         <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать</button>
         <button id="ticketPreviewOpenNewTab" type="button" class="btn btn-ghost btn-sm">Открыть в новой вкладке</button>

@@ -377,6 +377,18 @@ a.btn-secondary:focus {
   transform: translateY(-1px);
 }
 
+.btn.btn-secondary.btn-refund-secondary {
+  color: var(--danger);
+}
+
+.btn.btn-secondary.btn-refund-secondary:hover,
+.btn.btn-secondary.btn-refund-secondary:focus {
+  background: var(--danger);
+  border-color: var(--danger-700);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(220,38,38,0.12);
+}
+
 /* active / pressed */
 .btn.btn-secondary:active,
 a.btn-secondary:active,
