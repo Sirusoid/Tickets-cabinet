@@ -104,6 +104,11 @@
   white-space: nowrap;
 }
 
+.cash-clear-selection-button {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
 .btn.btn-secondary.cash-mass-select-button[aria-pressed="true"],
 .btn.btn-secondary.cash-mass-select-button[aria-pressed="true"]:hover,
 .btn.btn-secondary.cash-mass-select-button[aria-pressed="true"]:focus {

@@ -486,6 +486,7 @@ $jsSession = [
     <div class="profile-card" style="grid-column: 1 / 2;">
       <h3 class="card-title" style="margin-top:0;"><span id="cashSeatmapTitle">Схема рассадки</span>
         <button id="cashMassSelectBtn" type="button" class="btn btn-secondary btn-sm cash-mass-select-button" aria-pressed="false">Массовая продажа</button>
+        <button id="cashClearSelectionBtn" type="button" class="btn btn-secondary btn-sm cash-clear-selection-button" title="Убрать выбранные места из корзины" disabled>Сбросить выделение</button>
       </h3>
       <div id="cashGeneralAdmissionPanel" class="cash-general-admission" style="display:none;">
         <div class="cash-general-admission__label">Свободная рассадка</div>

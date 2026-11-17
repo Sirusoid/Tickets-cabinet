@@ -336,6 +336,8 @@ var Cashier = (function () {
 
   function renderCart() {
     if (!cartListEl) return;
+    var clearSelectionButton = document.getElementById('cashClearSelectionBtn');
+    if (clearSelectionButton) clearSelectionButton.disabled = cart.length === 0;
     cartListEl.innerHTML = '';
 
     if (!cart.length) {
@@ -456,6 +458,22 @@ var Cashier = (function () {
     if (amountInputEl) amountInputEl.value = String(Math.round(d.final_total));
     try { window.dispatchEvent(new CustomEvent('cashier:cart-updated', { detail: { cart: cart.slice(), selectedSeatKey: normalizeSeatKey(selectedCartSeatKey) } })); } catch (e) {}
     refreshDiscountUi();
+  }
+
+  function clearCartSelection() {
+    cart = [];
+    giftSelections = {};
+    selectedCartSeatKey = null;
+
+    if (generalAdmissionMode && generalAdmissionQuantityEl) {
+      generalAdmissionQuantityEl.value = '';
+      refreshGeneralAdmissionSelection();
+      return;
+    }
+
+    renderCart();
+    syncSelectionToRenderer();
+    redrawLegend();
   }
 
   // --- Safe build seats payload (protected) ---
@@ -1184,6 +1202,11 @@ var Cashier = (function () {
     containerEl = document.getElementById(ids.containerId) || (canvasEl ? canvasEl.parentElement : null);
     legendContainer = document.getElementById(ids.legendContainerId);
     cartListEl = document.getElementById(ids.cartListId);
+    var clearSelectionButton = document.getElementById('cashClearSelectionBtn');
+    if (clearSelectionButton && !clearSelectionButton.dataset.bound) {
+      clearSelectionButton.dataset.bound = '1';
+      clearSelectionButton.addEventListener('click', clearCartSelection);
+    }
     amountInputEl = document.getElementById(ids.amountInputId);
     reserveBtnEl = document.getElementById(ids.reserveBtnId);
     sellBtnEl = document.getElementById(ids.sellBtnId);
@@ -1492,7 +1515,7 @@ var Cashier = (function () {
   return {
     initSell: initSell,
     getCart: function () { return cart.slice(); },
-    clearCart: function () { cart = []; renderCart(); syncSelectionToRenderer(); redrawLegend(); },
+    clearCart: clearCartSelection,
     refreshHoldState: refreshHoldState,
     redrawLegend: redrawLegend
   };
