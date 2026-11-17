@@ -208,9 +208,7 @@ var Cashier = (function () {
 
       if (generalAdmissionPanelEl) generalAdmissionPanelEl.style.display = generalAdmissionMode ? 'block' : 'none';
       if (containerEl) containerEl.style.display = generalAdmissionMode ? 'none' : '';
-      var seatingTitle = containerEl && containerEl.parentNode
-        ? containerEl.parentNode.querySelector('.card-title')
-        : null;
+      var seatingTitle = document.getElementById('cashSeatmapTitle');
       if (seatingTitle) seatingTitle.textContent = generalAdmissionMode ? 'Свободная рассадка' : 'Схема рассадки';
       if (generalAdmissionMode && generalAdmissionQuantityEl && !generalAdmissionQuantityEl.dataset.bound) {
         generalAdmissionQuantityEl.dataset.bound = '1';
