@@ -724,6 +724,141 @@ var Cashier = (function () {
     else if (viewer && typeof viewer.render === 'function') viewer.render();
   }
 
+  function setupMassSelection(activeRenderer) {
+    var button = document.getElementById('cashMassSelectBtn');
+    if (!button) return;
+    if (!activeRenderer || typeof activeRenderer.getInternal !== 'function') {
+      button.style.display = 'none';
+      return;
+    }
+
+    var selectionContainer = containerEl || canvasEl.parentElement;
+    if (!selectionContainer) {
+      button.style.display = 'none';
+      return;
+    }
+
+    var selectionBox = document.createElement('div');
+    selectionBox.className = 'cash-seat-selection-box';
+    selectionContainer.appendChild(selectionBox);
+
+    var enabled = false;
+    var pointer = null;
+    var dragStarted = false;
+    var suppressNextClick = false;
+
+    function setEnabled(value) {
+      enabled = !!value;
+      var internal = activeRenderer.getInternal();
+      if (internal) internal.disablePan = enabled;
+      button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      canvasEl.style.cursor = enabled ? 'crosshair' : 'grab';
+      canvasEl.style.touchAction = enabled ? 'none' : '';
+    }
+
+    function renderSelectionBox(clientX, clientY) {
+      var bounds = selectionContainer.getBoundingClientRect();
+      var left = Math.min(pointer.x, clientX);
+      var top = Math.min(pointer.y, clientY);
+      selectionBox.style.left = (left - bounds.left) + 'px';
+      selectionBox.style.top = (top - bounds.top) + 'px';
+      selectionBox.style.width = Math.abs(clientX - pointer.x) + 'px';
+      selectionBox.style.height = Math.abs(clientY - pointer.y) + 'px';
+      selectionBox.style.display = 'block';
+    }
+
+    function addSeatsInRectangle(clientX, clientY) {
+      var internal = activeRenderer.getInternal();
+      var computed = internal && internal._computed;
+      if (!computed || !computed.seats) {
+        showToast('Не удалось определить места для выделения');
+        return;
+      }
+
+      var fit = internal._fit || {};
+      var scale = Number(fit.scale) || 1;
+      var offsetX = Number(fit.offsetX) || 0;
+      var offsetY = Number(fit.offsetY) || 0;
+      var canvasBounds = canvasEl.getBoundingClientRect();
+      var minX = Math.min(pointer.x, clientX);
+      var maxX = Math.max(pointer.x, clientX);
+      var minY = Math.min(pointer.y, clientY);
+      var maxY = Math.max(pointer.y, clientY);
+      var added = 0;
+      var unavailable = 0;
+
+      Object.keys(computed.seats).forEach(function (rawKey) {
+        var seat = computed.seats[rawKey];
+        if (!seat) return;
+        var centerX = canvasBounds.left + offsetX + (seat.x + seat.w / 2) * scale;
+        var centerY = canvasBounds.top + offsetY + (seat.y + seat.h / 2) * scale;
+        if (centerX < minX || centerX > maxX || centerY < minY || centerY > maxY) return;
+
+        var key = normalizeSeatKey(seat.key || rawKey);
+        if (!key || cart.indexOf(key) !== -1) return;
+        if (isSoldSeatKey(key) || isHeldByOther(key) || typeof getSeatPrice(key) === 'undefined') {
+          unavailable++;
+          return;
+        }
+        cart.push(key);
+        added++;
+      });
+
+      if (added) {
+        renderCart();
+        syncSelectionToRenderer();
+        redrawLegend();
+      }
+
+      var message = added ? 'Добавлено ' + pluralSeats(added) : 'В выделенной области нет новых доступных мест';
+      if (unavailable) message += '. Недоступно: ' + pluralSeats(unavailable);
+      showToast(message);
+    }
+
+    button.addEventListener('click', function () {
+      setEnabled(!enabled);
+    });
+
+    canvasEl.addEventListener('pointerdown', function (event) {
+      if (!enabled || event.button !== 0 || event.isPrimary === false) return;
+      pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      dragStarted = false;
+    });
+
+    window.addEventListener('pointermove', function (event) {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      if (!dragStarted && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) < 4) return;
+      dragStarted = true;
+      renderSelectionBox(event.clientX, event.clientY);
+    });
+
+    window.addEventListener('pointerup', function (event) {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      if (dragStarted) {
+        addSeatsInRectangle(event.clientX, event.clientY);
+        suppressNextClick = true;
+        window.setTimeout(function () { suppressNextClick = false; }, 0);
+      }
+      selectionBox.style.display = 'none';
+      pointer = null;
+      dragStarted = false;
+    });
+
+    window.addEventListener('pointercancel', function (event) {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      selectionBox.style.display = 'none';
+      pointer = null;
+      dragStarted = false;
+    });
+
+    canvasEl.addEventListener('click', function (event) {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
+
   function syncLegendRenderer() {
     if (!window.LegendCanvas || typeof window.LegendCanvas.init !== 'function') return;
     try {
@@ -1235,6 +1370,8 @@ var Cashier = (function () {
       } else {
         initLegacyViewerFallback(seatMap, pricedSeats, pricedColors, sold);
       }
+
+      setupMassSelection(renderer);
 
       // wire reserve/sell buttons
       if (reserveBtnEl) {

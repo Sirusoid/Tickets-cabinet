@@ -99,6 +99,29 @@
   color: #222;
 }
 
+.cash-mass-select-button {
+  margin-left: 12px;
+  white-space: nowrap;
+}
+
+.btn.btn-secondary.cash-mass-select-button[aria-pressed="true"],
+.btn.btn-secondary.cash-mass-select-button[aria-pressed="true"]:hover,
+.btn.btn-secondary.cash-mass-select-button[aria-pressed="true"]:focus {
+  color: #fff;
+  background: #2563eb;
+  border-color: #1d4ed8;
+}
+
+.cash-seat-selection-box {
+  position: absolute;
+  z-index: 2;
+  display: none;
+  border: 1px solid rgba(37, 99, 235, 0.9);
+  background: rgba(37, 99, 235, 0.14);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
   /* Make disabled release button visually distinct */
   #releaseHoldBtn[disabled] {
     opacity: 0.6;
