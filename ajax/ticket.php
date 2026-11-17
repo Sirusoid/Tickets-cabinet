@@ -4,7 +4,7 @@
 // seat_occupancy-backed implementation:
 // - seat_occupancy is the source of truth for current occupied seats
 // - Create ticket: atomically reserve seat in seat_occupancy, then INSERT new ticket (always new id), then link occupancy -> ticket_id
-// - Refund: update tickets.refund_status = 'refunded' and remove occupancy row (free seat). No inserts into refunds table.
+// - Order cancellation: void cash tickets without recording a payout; BCC tickets are voided after bank confirmation.
 
 require_once __DIR__ . '/../init.php';
 require_once __DIR__ . '/../includes/reporting.php';
@@ -279,7 +279,17 @@ if ($action === 'order_tickets') {
                     t.final_price,
                     t.gift_selected,
                     t.gift_name,
+                    t.status,
                     t.refund_status,
+                    t.channel,
+                    t.payment_provider,
+                    t.payment_session_id,
+                    tx.id AS cash_transaction_id,
+                    ps.provider AS payment_session_provider,
+                    EXISTS (
+                        SELECT 1 FROM refunds r
+                        WHERE r.ticket_id = t.id AND r.refund_status IN ('requested', 'refunded')
+                    ) AS has_pending_refund,
                     {$orderExpression} AS order_number
                 FROM tickets t
                 LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
@@ -288,7 +298,20 @@ if ($action === 'order_tickets') {
                 ORDER BY t.id ASC");
             $stmt->execute([':order_number' => $orderNumber]);
             $tickets = [];
+            $refundModes = [];
+            $canRefundOrder = true;
             while ($ticket = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $isBccTicket = (int)($ticket['payment_session_id'] ?? 0) > 0
+                    && strtolower(trim((string)($ticket['payment_provider'] ?? ''))) === 'bcc'
+                    && strtolower(trim((string)($ticket['payment_session_provider'] ?? ''))) === 'bcc';
+                $isCashTicket = strtolower(trim((string)($ticket['channel'] ?? ''))) === 'kassa'
+                    && (int)($ticket['cash_transaction_id'] ?? 0) > 0;
+                $refundModes[] = $isBccTicket ? 'bcc' : ($isCashTicket ? 'local' : 'unsupported');
+                if ((string)($ticket['status'] ?? '') === 'cancelled'
+                    || in_array((string)($ticket['refund_status'] ?? 'none'), ['requested', 'refunded'], true)
+                    || (bool)$ticket['has_pending_refund']) {
+                    $canRefundOrder = false;
+                }
                 $tickets[] = [
                     'ticket_uid' => (string)$ticket['ticket_uid'],
                     'seat_identifier' => (string)($ticket['seat_identifier'] ?? ''),
@@ -298,10 +321,13 @@ if ($action === 'order_tickets') {
                     'refund_status' => $ticket['refund_status'] ?? 'none',
                 ];
             }
+            $uniqueRefundModes = array_values(array_unique($refundModes));
+            $refundMode = count($uniqueRefundModes) === 1 ? $uniqueRefundModes[0] : 'unsupported';
             json_resp([
                 'success' => true,
                 'order_number' => $orderNumber,
                 'tickets' => $tickets,
+                'refund_mode' => $canRefundOrder ? $refundMode : 'unsupported',
             ]);
         } catch (Throwable $e) {
             error_log('ajax/ticket.php order_tickets error: ' . $e->getMessage());
@@ -1014,6 +1040,145 @@ try {
         ticket_debug_log("create_ticket exception: " . $e->getMessage());
         error_log('ajax/ticket.php create_ticket error: ' . $e->getMessage());
         json_resp(['success' => false, 'message' => 'Ошибка создания билета'], 500);
+    }
+}
+
+// --- REFUND all tickets belonging to an order ---
+if ($action === 'refund_order') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_resp(['success' => false, 'message' => 'Неверный метод'], 405);
+    check_csrf();
+
+    $orderNumber = trim((string)($_POST['order_number'] ?? ''));
+    if ($orderNumber === '') json_resp(['success' => false, 'message' => 'Не указан номер заказа'], 400);
+
+    $orderExpression = "COALESCE(ps.order_number, CASE
+        WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+    END, '')";
+
+    try {
+        $pdo->beginTransaction();
+        $ticketStmt = $pdo->prepare("SELECT t.id, t.ticket_uid, t.final_price, t.refund_status, t.status,
+                t.schedule_id, t.seat_identifier, t.channel, t.customer_id, t.payment_provider,
+                t.payment_session_id, tx.id AS cash_transaction_id, ps.provider AS payment_session_provider
+            FROM tickets t
+            LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+            LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
+            WHERE {$orderExpression} = :order_number
+            ORDER BY t.id ASC
+            FOR UPDATE");
+        $ticketStmt->execute([':order_number' => $orderNumber]);
+        $tickets = $ticketStmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($tickets === []) {
+            $pdo->rollBack();
+            json_resp(['success' => false, 'message' => 'Билеты заказа не найдены'], 404);
+        }
+
+        $paymentSessionIds = [];
+        $allBccTickets = true;
+        $allCashTickets = true;
+        foreach ($tickets as $ticket) {
+            $paymentSessionId = (int)($ticket['payment_session_id'] ?? 0);
+            $isBccTicket = $paymentSessionId > 0
+                && strtolower(trim((string)($ticket['payment_provider'] ?? ''))) === 'bcc'
+                && strtolower(trim((string)($ticket['payment_session_provider'] ?? ''))) === 'bcc';
+            $isCashTicket = strtolower(trim((string)($ticket['channel'] ?? ''))) === 'kassa'
+                && (int)($ticket['cash_transaction_id'] ?? 0) > 0;
+            $allBccTickets = $allBccTickets && $isBccTicket;
+            $allCashTickets = $allCashTickets && $isCashTicket;
+            if ($isBccTicket) $paymentSessionIds[$paymentSessionId] = true;
+        }
+
+        if ($allBccTickets && count($paymentSessionIds) === 1) {
+            $paymentSessionId = (int)array_key_first($paymentSessionIds);
+            $pdo->commit();
+
+            $sessionStmt = $pdo->prepare("SELECT ps.*, s.start_time AS schedule_start
+                FROM payment_sessions ps
+                LEFT JOIN schedules s ON s.id = ps.session_id
+                WHERE ps.id = :id LIMIT 1");
+            $sessionStmt->execute([':id' => $paymentSessionId]);
+            $paymentSession = $sessionStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$paymentSession) {
+                json_resp(['success' => false, 'message' => 'Платёжная сессия заказа не найдена'], 404);
+            }
+
+            $orderTicketStmt = $pdo->prepare("SELECT id, ticket_uid, final_price, refund_status
+                FROM tickets WHERE payment_session_id = :payment_session_id ORDER BY id ASC");
+            $orderTicketStmt->execute([':payment_session_id' => $paymentSessionId]);
+            $orderTickets = $orderTicketStmt->fetchAll(PDO::FETCH_ASSOC);
+            $originalResponse = json_decode((string)($paymentSession['provider_response'] ?? ''), true);
+            if (!is_array($originalResponse)) $originalResponse = [];
+
+            $refundResult = bcc_process_refund_request(
+                $pdo,
+                $paymentSession,
+                $orderTickets,
+                $originalResponse,
+                'cashier_bcc_refund'
+            );
+            json_resp([
+                'success' => !empty($refundResult['success']),
+                'state' => $refundResult['state'] ?? 'rejected',
+                'message' => $refundResult['message'] ?? 'Возврат обработан.',
+            ], !empty($refundResult['success']) ? 200 : 400);
+        }
+
+        if (!$allCashTickets) {
+            $pdo->rollBack();
+            json_resp(['success' => false, 'message' => 'Этот тип заказа не поддерживает пакетный возврат'], 409);
+        }
+
+        foreach ($tickets as $ticket) {
+            if ((string)($ticket['status'] ?? '') === 'cancelled'
+                || in_array((string)($ticket['refund_status'] ?? 'none'), ['requested', 'refunded'], true)) {
+                $pdo->rollBack();
+                json_resp(['success' => false, 'message' => 'В заказе уже есть аннулированные или возвращаемые билеты'], 409);
+            }
+        }
+
+        $updateTicket = $pdo->prepare("UPDATE tickets
+            SET status = 'cancelled', updated_at = NOW()
+            WHERE id = :id");
+        $deleteOccupancy = $pdo->prepare('DELETE FROM seat_occupancy WHERE ticket_id = :ticket_id');
+        $reason = 'Аннулирование билетов кассиром по заказу ' . $orderNumber;
+        $ticketUids = [];
+
+        foreach ($tickets as $ticket) {
+            $ticketId = (int)$ticket['id'];
+            $ticketUid = (string)$ticket['ticket_uid'];
+            $ticketUids[] = $ticketUid;
+
+            $updateTicket->execute([':id' => $ticketId]);
+            $deleteOccupancy->execute([':ticket_id' => $ticketId]);
+
+            if (function_exists('audit_log_event')) {
+                audit_log_event($pdo, 'ticket.order_cancelled', 'ticket', $ticketId, $ticketUid, [], [
+                    'order_number' => $orderNumber,
+                    'reason' => $reason,
+                ]);
+            }
+        }
+
+        $pdo->commit();
+        foreach ($ticketUids as $ticketUid) {
+            if (function_exists('ticket_pdf_delete_by_uid')) {
+                ticket_pdf_delete_by_uid($ticketUid);
+            }
+        }
+        json_resp([
+            'success' => true,
+            'state' => 'cancelled',
+            'ticket_count' => count($ticketUids),
+            'message' => 'Билеты заказа аннулированы. Денежная выплата не выполнялась.',
+        ]);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('ajax/ticket.php refund_order error: ' . $e->getMessage());
+        $isExpectedError = $e instanceof RuntimeException;
+        json_resp([
+            'success' => false,
+            'message' => $isExpectedError ? $e->getMessage() : 'Ошибка при возврате заказа',
+        ], $isExpectedError ? 409 : 500);
     }
 }
 

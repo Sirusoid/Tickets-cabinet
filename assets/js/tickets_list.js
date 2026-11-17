@@ -13,6 +13,8 @@
   var orderSuggestTimer = null;
   var customerSuggestTimer = null;
   var filterDebounceTimer = null;
+  var pendingRefundOrderNumber = '';
+  var pendingRefundMode = '';
 
   try {
     var stored = parseInt(localStorage.getItem('tickets_per_page'), 10);
@@ -457,7 +459,7 @@
           return;
         }
         if (typeof window.openTicketBatchPreview === 'function') {
-          window.openTicketBatchPreview(json.tickets, json.order_number || orderNumber);
+          window.openTicketBatchPreview(json.tickets, json.order_number || orderNumber, json.refund_mode);
           return;
         }
         window.open('/tickets/view.php?uids=' + json.tickets.map(function (ticket) {
@@ -468,6 +470,80 @@
         showToast('Ошибка сети при загрузке заказа', 'error');
       });
   }
+
+  function openOrderRefundConfirmation(orderNumber, refundMode, ticketCount) {
+    pendingRefundOrderNumber = String(orderNumber || '');
+    pendingRefundMode = refundMode === 'bcc' || refundMode === 'local' ? refundMode : '';
+    if (!pendingRefundOrderNumber || !pendingRefundMode) return;
+
+    qs('orderRefundTitle').textContent = (pendingRefundMode === 'bcc' ? 'Возврат онлайн-заказа ' : 'Аннулирование заказа ')
+      + pendingRefundOrderNumber;
+    qs('orderRefundConfirm').textContent = pendingRefundMode === 'bcc' ? 'Подтвердить возврат' : 'Аннулировать билеты';
+    qs('orderRefundWarning').textContent = pendingRefundMode === 'bcc'
+      ? 'Будут возвращены средства за весь онлайн-заказ через BCC. Билеты будут аннулированы после подтверждения возврата банком. Если банк отклонит возврат, билеты останутся действительными.'
+      : 'Будут аннулированы все ' + ticketCount + ' билетов этого кассового заказа. Денежная выплата не выполняется.';
+    var modal = qs('orderRefundModal');
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeOrderRefundConfirmation() {
+    var modal = qs('orderRefundModal');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    pendingRefundOrderNumber = '';
+    pendingRefundMode = '';
+  }
+
+  function submitOrderRefund() {
+    if (!pendingRefundOrderNumber || !pendingRefundMode) return;
+    var confirmButton = qs('orderRefundConfirm');
+    confirmButton.disabled = true;
+    var payload = {
+      action: 'refund_order',
+      order_number: pendingRefundOrderNumber,
+      csrf_token: csrfToken
+    };
+    var body = Object.keys(payload).map(function (key) {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+    }).join('&');
+
+    fetch('/ajax/ticket.php', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body
+    }).then(function (response) {
+      return response.json();
+    }).then(function (json) {
+      if (!json || !json.success) {
+        showToast(json && json.message ? json.message : 'Не удалось выполнить возврат заказа', 'error');
+        return;
+      }
+      if (pendingRefundMode === 'bcc') {
+        if (json.state === 'processing') {
+          showToast('Запрос на возврат средств за онлайн-заказ отправлен в BCC и обрабатывается.', 'info');
+        } else if (json.state === 'refunded') {
+          showToast('BCC подтвердил возврат средств; все билеты онлайн-заказа аннулированы.', 'success');
+        } else {
+          showToast(json.message || 'Возврат онлайн-заказа принят.', 'success');
+        }
+      } else {
+        showToast(json.message || 'Билеты заказа аннулированы', 'success');
+      }
+      closeOrderRefundConfirmation();
+      if (typeof window.closeTicketPreview === 'function') window.closeTicketPreview();
+      loadTickets();
+    }).catch(function () {
+      showToast('Ошибка сети при возврате заказа', 'error');
+    }).then(function () {
+      confirmButton.disabled = false;
+    });
+  }
+
+  window.openOrderRefundConfirmation = openOrderRefundConfirmation;
 
   function populateRefundModal(t) {
     qs('refund_ticket_id').value = t.id || '';
@@ -796,6 +872,16 @@
     if (refundCancel) refundCancel.addEventListener('click', hideRefundModal);
     var refundConfirm = qs('refundConfirmBtn');
     if (refundConfirm) refundConfirm.addEventListener('click', doRefundSubmit);
+    var orderRefundCancel = qs('orderRefundCancel');
+    if (orderRefundCancel) orderRefundCancel.addEventListener('click', closeOrderRefundConfirmation);
+    var orderRefundConfirm = qs('orderRefundConfirm');
+    if (orderRefundConfirm) orderRefundConfirm.addEventListener('click', submitOrderRefund);
+    var orderRefundModal = qs('orderRefundModal');
+    if (orderRefundModal) {
+      orderRefundModal.addEventListener('click', function (event) {
+        if (event.target === orderRefundModal) closeOrderRefundConfirmation();
+      });
+    }
 
     loadTickets();
   });

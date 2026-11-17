@@ -71,6 +71,7 @@ if (!function_exists('audit_log_event')) {
                 'ticket.create' => 'Создание билета',
                 'ticket.checkin' => 'Отметка входа по билету',
                 'ticket.refund' => 'Возврат билета',
+                'ticket.order_cancelled' => 'Аннулирование билета в заказе',
                 'payment.sale_completed' => 'Онлайн-покупка',
                 'payment.refund_completed' => 'Возврат через BCC',
                 'payment.refund_rejected' => 'Отклонённый возврат BCC',

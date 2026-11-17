@@ -243,6 +243,7 @@ require __DIR__ . '/../includes/panel.php';
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:#f7f7f7; border-bottom:1px solid #ddd;">
       <div id="ticketPreviewTitle" style="font-size:16px; font-weight:700; color:#222;">Просмотр билета</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <button id="ticketPreviewRefundOrder" type="button" class="btn btn-danger btn-sm" style="display:none;">Сделать возврат</button>
         <button id="ticketPreviewDownloadAll" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать все билеты</button>
         <button id="ticketPreviewDownload" type="button" class="btn btn-secondary btn-sm" style="display:none;">Скачать</button>
         <button id="ticketPreviewOpenNewTab" type="button" class="btn btn-ghost btn-sm">Открыть в новой вкладке</button>
@@ -251,6 +252,17 @@ require __DIR__ . '/../includes/panel.php';
     </div>
     <div id="ticketPreviewList" style="display:none; overflow:auto; padding:16px; background:#f7f9fc;"></div>
     <iframe id="ticketPreviewIframe" src="about:blank" style="display:none; flex:1; width:100%; border:none; min-height:520px;"></iframe>
+  </div>
+</div>
+
+<div id="orderRefundModal" style="display:none; position:fixed; inset:0; z-index:2300; align-items:center; justify-content:center; background:rgba(0,0,0,0.65);" aria-hidden="true">
+  <div role="dialog" aria-modal="true" aria-labelledby="orderRefundTitle" style="position:relative; width:520px; max-width:94%; background:#fff; border-radius:10px; padding:20px; box-shadow:0 10px 35px rgba(0,0,0,0.3);">
+    <div id="orderRefundTitle" style="font-size:18px; font-weight:700; margin-bottom:14px;">Возврат заказа</div>
+    <div id="orderRefundWarning" class="alert--warning" style="line-height:1.5; margin-bottom:18px;"></div>
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button id="orderRefundCancel" type="button" class="btn btn-ghost">Отмена</button>
+      <button id="orderRefundConfirm" type="button" class="btn btn-danger">Подтвердить возврат</button>
+    </div>
   </div>
 </div>
 

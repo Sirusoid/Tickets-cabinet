@@ -13,11 +13,13 @@
   var titleEl = qs('ticketPreviewTitle');
   var downloadBtn = qs('ticketPreviewDownload');
   var downloadAllBtn = qs('ticketPreviewDownloadAll');
+  var refundOrderBtn = qs('ticketPreviewRefundOrder');
   var openNewTabBtn = qs('ticketPreviewOpenNewTab');
   var closeBtn = qs('ticketPreviewClose');
   var currentUrl = '';
   var batchTickets = [];
   var batchOrderNumber = '';
+  var batchRefundMode = '';
 
   function closePreview() {
     if (!modal) return;
@@ -32,9 +34,11 @@
       listEl.style.display = 'none';
     }
     if (downloadAllBtn) downloadAllBtn.style.display = 'none';
+    if (refundOrderBtn) refundOrderBtn.style.display = 'none';
     currentUrl = '';
     batchTickets = [];
     batchOrderNumber = '';
+    batchRefundMode = '';
   }
 
   function setActionButtons(url) {
@@ -127,10 +131,11 @@
     listEl.style.display = 'block';
   }
 
-  function openTicketBatchPreview(tickets, orderNumber) {
+  function openTicketBatchPreview(tickets, orderNumber, refundMode) {
     if (!modal || !listEl) return;
     batchTickets = Array.isArray(tickets) ? tickets : [];
     batchOrderNumber = String(orderNumber || '');
+    batchRefundMode = refundMode === 'bcc' || refundMode === 'local' ? refundMode : '';
     if (dialog) {
       dialog.style.height = 'auto';
       dialog.style.maxHeight = '90vh';
@@ -153,6 +158,14 @@
         }).filter(Boolean);
         window.location.href = '/tickets/download_batch.php?uids=' + encodeURIComponent(uids.join(','))
           + '&order_number=' + encodeURIComponent(batchOrderNumber);
+      };
+    }
+    if (refundOrderBtn) {
+      refundOrderBtn.style.display = batchTickets.length && batchRefundMode ? '' : 'none';
+      refundOrderBtn.onclick = function () {
+        if (typeof window.openOrderRefundConfirmation === 'function') {
+          window.openOrderRefundConfirmation(batchOrderNumber, batchRefundMode, batchTickets.length);
+        }
       };
     }
     renderBatchCards(batchTickets);
@@ -178,6 +191,7 @@
       listEl.style.display = 'none';
     }
     if (downloadAllBtn) downloadAllBtn.style.display = 'none';
+    if (refundOrderBtn) refundOrderBtn.style.display = 'none';
     titleEl.textContent = title || 'Просмотр билета';
     iframe.src = url || 'about:blank';
     iframe.style.display = 'block';
