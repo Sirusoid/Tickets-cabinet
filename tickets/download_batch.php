@@ -8,7 +8,6 @@ if (!is_array($rawUids)) {
     $rawUids = explode(',', (string)$rawUids);
 }
 $uids = array_values(array_unique(array_filter(array_map('trim', $rawUids))));
-$uids = array_slice($uids, 0, 100);
 $orderNumber = trim((string)($_GET['order_number'] ?? ''));
 
 if ($uids === []) {
