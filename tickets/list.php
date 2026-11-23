@@ -259,6 +259,7 @@ require __DIR__ . '/../includes/panel.php';
   <div role="dialog" aria-modal="true" aria-labelledby="orderRefundTitle" style="position:relative; width:520px; max-width:94%; background:#fff; border-radius:10px; padding:20px; box-shadow:0 10px 35px rgba(0,0,0,0.3);">
     <div id="orderRefundTitle" style="font-size:18px; font-weight:700; margin-bottom:14px;">Возврат заказа</div>
     <div id="orderRefundWarning" class="alert--warning" style="line-height:1.5; margin-bottom:18px;"></div>
+    <div id="orderRefundFeedback" style="display:none; margin-bottom:14px; padding:10px 12px; border-radius:8px; line-height:1.45;"></div>
     <div style="display:flex; justify-content:flex-end; gap:8px;">
       <button id="orderRefundCancel" type="button" class="btn btn-ghost">Отмена</button>
       <button id="orderRefundConfirm" type="button" class="btn btn-danger">Подтвердить возврат</button>

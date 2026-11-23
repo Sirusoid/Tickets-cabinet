@@ -482,9 +482,28 @@
     qs('orderRefundWarning').textContent = pendingRefundMode === 'bcc'
       ? 'Будут возвращены средства за весь онлайн-заказ через BCC. Билеты будут аннулированы после подтверждения возврата банком. Если банк отклонит возврат, билеты останутся действительными.'
       : 'Будут аннулированы все ' + ticketCount + ' билетов заказа. Подтверждаете возврат?';
+    var feedback = qs('orderRefundFeedback');
+    if (feedback) {
+      feedback.textContent = '';
+      feedback.style.display = 'none';
+    }
     var modal = qs('orderRefundModal');
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function showOrderRefundFeedback(message, isError) {
+    var feedback = qs('orderRefundFeedback');
+    if (!feedback) {
+      showToast(message, isError ? 'error' : 'info');
+      return;
+    }
+    feedback.textContent = message;
+    feedback.style.display = 'block';
+    feedback.style.color = isError ? '#b42318' : '#344054';
+    feedback.style.background = isError ? '#fef3f2' : '#f2f4f7';
+    feedback.style.border = '1px solid ' + (isError ? '#fecdca' : '#eaecf0');
+    feedback.setAttribute('role', isError ? 'alert' : 'status');
   }
 
   function closeOrderRefundConfirmation() {
@@ -500,7 +519,10 @@
   function submitOrderRefund() {
     if (!pendingRefundOrderNumber || !pendingRefundMode) return;
     var confirmButton = qs('orderRefundConfirm');
+    var originalButtonText = confirmButton.textContent;
     confirmButton.disabled = true;
+    confirmButton.textContent = 'Отправка…';
+    showOrderRefundFeedback('Отправляем запрос на возврат…', false);
     var payload = {
       action: 'refund_order',
       order_number: pendingRefundOrderNumber,
@@ -516,10 +538,16 @@
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: body
     }).then(function (response) {
-      return response.json();
-    }).then(function (json) {
-      if (!json || !json.success) {
-        showToast(json && json.message ? json.message : 'Не удалось выполнить возврат заказа', 'error');
+      return response.json().then(function (json) {
+        return {ok: response.ok, status: response.status, json: json};
+      });
+    }).then(function (result) {
+      var json = result.json;
+      if (!result.ok || !json || !json.success) {
+        showOrderRefundFeedback(
+          json && json.message ? json.message : 'Не удалось выполнить возврат заказа (HTTP ' + result.status + ').',
+          true
+        );
         return;
       }
       if (pendingRefundMode === 'bcc') {
@@ -536,10 +564,12 @@
       closeOrderRefundConfirmation();
       if (typeof window.closeTicketPreview === 'function') window.closeTicketPreview();
       loadTickets();
-    }).catch(function () {
-      showToast('Ошибка сети при возврате заказа', 'error');
+    }).catch(function (error) {
+      console.error('Order refund request failed:', error);
+      showOrderRefundFeedback('Не удалось отправить запрос или прочитать ответ сервера. Обновите страницу и попробуйте снова.', true);
     }).then(function () {
       confirmButton.disabled = false;
+      confirmButton.textContent = originalButtonText;
     });
   }
 

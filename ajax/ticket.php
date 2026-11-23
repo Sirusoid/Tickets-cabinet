@@ -1205,7 +1205,7 @@ if ($action === 'refund_order') {
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 $cashTransactionParams = [
                     ':session_id' => (int)$ticket['schedule_id'],
-                    ':user_id' => $_SESSION['user_id'] ?? null,
+                    ':user_id' => (int)$_SESSION['user']['id'],
                     ':amount_cents' => $refundAmountCents,
                     ':payload' => $payload,
                 ];
@@ -1426,7 +1426,7 @@ if ($action === 'refund') {
                 $txStmt->execute([
                     ':type' => 'refund',
                     ':session_id' => $t['schedule_id'],
-                    ':user_id' => $_SESSION['user_id'] ?? null,
+                    ':user_id' => (int)$_SESSION['user']['id'],
                     ':customer_id' => $t['customer_id'] ?? null,
                     ':amount_cents' => $refundAmountCents,
                     ':currency' => 'KZT',
