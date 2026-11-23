@@ -22,6 +22,9 @@ $orderSearch = trim((string)($_GET['order'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $requestedPerPage = (int)($_GET['per_page'] ?? 25);
 $perPage = in_array($requestedPerPage, [25, 50, 100, 500], true) ? $requestedPerPage : 25;
+$orderSql = "COALESCE(ps.order_number, CASE
+    WHEN LOWER(t.channel) = 'kassa' AND tx.id IS NOT NULL THEN CONCAT('cash_', tx.id)
+END, '')";
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
@@ -66,13 +69,14 @@ if ($suggestType !== '') {
                 ORDER BY r.refund_transaction_id
                 LIMIT 20";
         } elseif ($suggestType === 'order') {
-            $suggestSql = "SELECT DISTINCT ps.order_number AS value
+            $suggestSql = "SELECT DISTINCT {$orderSql} AS value
                 FROM refunds r
                 LEFT JOIN tickets t ON t.id = r.ticket_id
                 LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+                LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
                 WHERE r.created_at BETWEEN :date_from AND :date_to
-                    AND ps.order_number LIKE :like
-                ORDER BY ps.order_number
+                    AND {$orderSql} LIKE :like
+                ORDER BY value
                 LIMIT 20";
         } else {
             echo json_encode(['success' => true, 'data' => []], JSON_UNESCAPED_UNICODE);
@@ -92,6 +96,7 @@ if ($suggestType !== '') {
 
 $originSql = "CASE
     WHEN r.processed_by IS NOT NULL THEN 'cashier'
+    WHEN LOWER(t.channel) = 'kassa' THEN 'cashier'
     WHEN r.reason LIKE '%кассир%' OR r.reason LIKE '%cashier%' THEN 'cashier'
     ELSE 'client'
 END";
@@ -125,7 +130,7 @@ if ($transactionSearch !== '') {
     $params[':transaction_search'] = '%' . $transactionSearch . '%';
 }
 if ($orderSearch !== '') {
-    $where[] = 'ps.order_number LIKE :order_search';
+    $where[] = "{$orderSql} LIKE :order_search";
     $params[':order_search'] = '%' . $orderSearch . '%';
 }
 $whereSql = implode(' AND ', $where);
@@ -140,6 +145,7 @@ try {
         LEFT JOIN schedules s ON s.id = r.schedule_id
         LEFT JOIN events e ON e.id = s.event_id
         LEFT JOIN payment_sessions ps ON ps.id = t.payment_session_id
+        LEFT JOIN cash_transactions tx ON tx.id = t.payment_transaction_id
         LEFT JOIN users u ON u.id = r.processed_by
         WHERE {$whereSql}";
 
@@ -160,10 +166,10 @@ try {
             r.approved_at,
             r.ticket_uid,
             t.seat_identifier,
+            {$orderSql} AS order_number,
             COALESCE(c.full_name, '—') AS customer_name,
             COALESCE(e.title, 'Без названия') AS event_title,
             s.start_time AS session_start,
-            ps.order_number,
             COALESCE(NULLIF(u.full_name, ''), u.username, '') AS processed_by_name
         {$baseSql}
         ORDER BY r.created_at DESC, r.id DESC

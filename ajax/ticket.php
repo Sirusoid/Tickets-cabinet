@@ -1148,10 +1148,31 @@ if ($action === 'refund_order') {
             VALUES (:ticket_id, :ticket_uid, :schedule_id, :refund_amount, 'refunded', 'cash',
                 NULL, NULL, NOW(), :reason, NULL, NOW())");
         $cashTransaction = null;
-        if (column_exists($pdo, 'cash_transactions', 'type') && column_exists($pdo, 'cash_transactions', 'ticket_uids')) {
-            $cashTransaction = $pdo->prepare("INSERT INTO cash_transactions
-                (type, session_id, user_id, customer_id, amount_cents, currency, payment_method, payload, ticket_uids, created_at)
-                VALUES ('refund', :session_id, :user_id, :customer_id, :amount_cents, 'KZT', 'cash', :payload, :ticket_uids, NOW())");
+        $cashTransactionHasCustomerId = false;
+        $cashTransactionHasTicketUids = false;
+        if (column_exists($pdo, 'cash_transactions', 'type')) {
+            $cashTransactionColumns = [
+                'type' => "'refund'",
+                'session_id' => ':session_id',
+                'user_id' => ':user_id',
+                'amount_cents' => ':amount_cents',
+                'currency' => "'KZT'",
+                'payment_method' => "'cash'",
+                'payload' => ':payload',
+                'created_at' => 'NOW()',
+            ];
+            $cashTransactionHasCustomerId = column_exists($pdo, 'cash_transactions', 'customer_id');
+            $cashTransactionHasTicketUids = column_exists($pdo, 'cash_transactions', 'ticket_uids');
+            if ($cashTransactionHasCustomerId) {
+                $cashTransactionColumns['customer_id'] = ':customer_id';
+            }
+            if ($cashTransactionHasTicketUids) {
+                $cashTransactionColumns['ticket_uids'] = ':ticket_uids';
+            }
+            $cashTransaction = $pdo->prepare(
+                'INSERT INTO cash_transactions (' . implode(', ', array_keys($cashTransactionColumns)) . ')'
+                . ' VALUES (' . implode(', ', array_values($cashTransactionColumns)) . ')'
+            );
         }
 
         foreach ($tickets as $ticket) {
@@ -1182,14 +1203,19 @@ if ($action === 'refund_order') {
                     'refund_method' => 'cash',
                     'reason' => $reason,
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $cashTransaction->execute([
+                $cashTransactionParams = [
                     ':session_id' => (int)$ticket['schedule_id'],
                     ':user_id' => $_SESSION['user_id'] ?? null,
-                    ':customer_id' => $ticket['customer_id'] ?? null,
                     ':amount_cents' => $refundAmountCents,
                     ':payload' => $payload,
-                    ':ticket_uids' => json_encode([$ticketUid], JSON_UNESCAPED_UNICODE),
-                ]);
+                ];
+                if ($cashTransactionHasCustomerId) {
+                    $cashTransactionParams[':customer_id'] = $ticket['customer_id'] ?? null;
+                }
+                if ($cashTransactionHasTicketUids) {
+                    $cashTransactionParams[':ticket_uids'] = json_encode([$ticketUid], JSON_UNESCAPED_UNICODE);
+                }
+                $cashTransaction->execute($cashTransactionParams);
             }
 
             if (function_exists('audit_log_event')) {
